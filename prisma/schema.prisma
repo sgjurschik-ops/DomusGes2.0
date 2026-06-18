@@ -1,0 +1,133 @@
+// DomusGes — Prisma schema
+// Salud: gestión de visitas domiciliarias para terapia ocupacional y afines.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Professional {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         String   // Fisioterapeuta | Terapeuta Ocupacional | Psicólogo/a Clínico/a | ...
+  numColegiado String?
+  phone        String?
+  passwordHash String
+  isActive     Boolean  @default(true)
+  isAdmin      Boolean  @default(false)
+  color        String   @default("#1a5c58")
+  joinedAt     DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  patients     Patient[]     @relation("PatientTherapists")
+  visits       Visit[]
+  assessments  Assessment[]
+  appointments Appointment[]
+  auditLogs    AuditLog[]
+
+  @@index([isActive])
+}
+
+model Patient {
+  id            String   @id @default(cuid())
+  firstName     String
+  lastName      String
+  birthDate     DateTime
+  specialty     String   // Fisioterapia | Psicología | T. Ocupacional
+  status        String   @default("Activo") // Activo | En seguimiento | Alta | Pausado
+  phone         String?
+  address       String?
+  diagnosis     String?
+  objective     String?
+  startDate     DateTime @default(now())
+  referentName  String?
+  referentPhone String?
+  color         String   @default("#1a5c58")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  therapists    Professional[] @relation("PatientTherapists")
+  visits        Visit[]
+  assessments   Assessment[]
+  appointments  Appointment[]
+
+  @@index([status])
+  @@index([specialty])
+}
+
+model Visit {
+  id            String   @id @default(cuid())
+  patientId     String
+  therapistId   String
+  date          DateTime
+  durationMin   Int      @default(45)
+  notes         String
+  interventions String   @default("[]") // JSON-encoded string[]
+  score         Int?     // 0-10 subjective progress
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  patient       Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist     Professional  @relation(fields: [therapistId], references: [id])
+
+  @@index([patientId, date])
+  @@index([therapistId, date])
+}
+
+model Assessment {
+  id          String   @id @default(cuid())
+  patientId   String
+  therapistId String
+  scale       String   // EVN | Barthel | Lawton-Brody | PHQ-9 | GAD-7
+  score       String   // "5", "5/8", "12/27" — normalized later for charts
+  notes       String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  patient     Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist   Professional @relation(fields: [therapistId], references: [id])
+
+  @@index([patientId, scale, date])
+}
+
+model Appointment {
+  id          String   @id @default(cuid())
+  patientId   String
+  therapistId String
+  start       DateTime
+  durationMin Int      @default(45)
+  type        String   // Sesión | Valoración | Seguimiento | Coordinación
+  status      String   @default("programada") // programada | completada | cancelada | no_show
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  patient     Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist   Professional @relation(fields: [therapistId], references: [id])
+
+  @@index([therapistId, start])
+  @@index([patientId, start])
+  @@index([start])
+}
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  professionalId String?
+  action        String   // patient.create | patient.view | visit.create | professional.update | ...
+  entityType    String   // Patient | Visit | Professional | Assessment | Appointment
+  entityId      String?
+  metadata      String?  // JSON
+  ipAddress     String?
+  createdAt     DateTime @default(now())
+
+  professional  Professional? @relation(fields: [professionalId], references: [id])
+
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+}
