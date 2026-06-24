@@ -1,6 +1,6 @@
 "use client";
 
-import { usePatient, useVisits, useAssessments, useProfessionals, useCreateAssessment } from "@/hooks/api";
+import { usePatient, useVisits, useAssessments, useProfessionals, useCreateAssessment, useDeletePatient, useUpdatePatient } from "@/hooks/api";
 import { useNav } from "@/store/nav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,7 +17,7 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { assessmentCreateSchema, type AssessmentCreateInput, ASSESSMENT_SCALES } from "@/lib/schemas";
-import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil } from "lucide-react";
 import { useMemo } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -30,6 +30,8 @@ export function PatientDetailView() {
   const { data: visits } = useVisits(selectedPatientId ?? undefined);
   const { data: assessments } = useAssessments(selectedPatientId ?? undefined);
   const { data: professionals } = useProfessionals();
+  const deletePatient = useDeletePatient();
+  const updatePatient = useUpdatePatient();
 
   if (!selectedPatientId) {
     return <p className="text-sm text-muted-foreground">Selecciona un paciente.</p>;
@@ -93,17 +95,94 @@ export function PatientDetailView() {
                 )}
               </div>
             </div>
-            <Button
-              onClick={() => {
-                useNav.getState().setNewVisitPatient(patient.id);
-                navigate("new-visit");
-              }}
-              disabled={!professionals?.length}
-            >
-              <Plus className="w-4 h-4 mr-1.5" /> Registrar visita
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+                
+  <Button
+  variant="outline"
+  onClick={async () => {
+    const phone = prompt("Teléfono", patient.phone ?? "");
+    if (phone === null) return;
+
+    const address = prompt("Dirección", patient.address ?? "");
+    if (address === null) return;
+
+    const diagnosis = prompt("Diagnóstico", patient.diagnosis ?? "");
+    if (diagnosis === null) return;
+
+    const objective = prompt("Objetivo terapéutico", patient.objective ?? "");
+    if (objective === null) return;
+
+    try {
+      await updatePatient.mutateAsync({
+        id: patient.id,
+        data: {
+          phone,
+          address,
+          diagnosis,
+          objective,
+        },
+      });
+
+      toast({
+        title: "Paciente actualizado",
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "No se ha podido actualizar el paciente.",
+        variant: "destructive",
+      });
+    }
+  }}
+>
+  <Pencil className="w-4 h-4 mr-1.5" />
+
+  Editar
+</Button>              
+  <Button
+    variant="destructive"
+    onClick={async () => {
+      const ok = confirm(
+        `¿Seguro que quieres eliminar a ${patient.fullName}? Esta acción no se puede deshacer.`,
+      );
+
+      if (!ok) return;
+
+      try {
+        await deletePatient.mutateAsync(patient.id);
+        toast({
+          title: "Paciente eliminado",
+          description: `${patient.fullName} ha sido eliminado.`,
+        });
+        navigate("patients");
+      } catch {
+        toast({
+          title: "Error",
+          description: "No se ha podido eliminar el paciente.",
+          variant: "destructive",
+        });
+      }
+    }}
+  >
+    <Trash2 className="w-4 h-4 mr-1.5" />
+
+    Eliminar
+  </Button>
+
+  <Button
+    onClick={() => {
+      useNav.getState().setNewVisitPatient(patient.id);
+      navigate("new-visit");
+    }}
+    disabled={!professionals?.length}
+  >
+    <Plus className="w-4 h-4 mr-1.5" />
+
+    Registrar visita
+  </Button>
+</div>
           </div>
-        </CardContent>
+       </CardContent>
       </Card>
 
       <Tabs defaultValue="overview" className="w-full">

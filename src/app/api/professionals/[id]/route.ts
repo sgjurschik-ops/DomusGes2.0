@@ -53,14 +53,34 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   await audit(admin.id, "professional.update", "Professional", id, { name: row.name });
   return NextResponse.json(row);
 }
-
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
   const admin = await requireAdmin();
   const { id } = await params;
+
   if (id === admin.id) {
-    return NextResponse.json({ error: "CANNOT_DELETE_SELF" }, { status: 400 });
+    return NextResponse.json(
+      { error: "CANNOT_DELETE_SELF", message: "No puedes eliminar tu propia cuenta." },
+      { status: 400 },
+    );
   }
-  await db.professional.delete({ where: { id } });
+
+  await db.$transaction(async (tx) => {
+    await tx.auditLog.deleteMany({ where: { professionalId: id } });
+    await tx.appointment.deleteMany({ where: { therapistId: id } });
+    await tx.assessment.deleteMany({ where: { therapistId: id } });
+    await tx.visit.deleteMany({ where: { therapistId: id } });
+
+    await tx.professional.update({
+      where: { id },
+      data: {
+        patients: { set: [] },
+      },
+    });
+
+    await tx.professional.delete({ where: { id } });
+  });
+
   await audit(admin.id, "professional.delete", "Professional", id);
+
   return NextResponse.json({ ok: true });
 }

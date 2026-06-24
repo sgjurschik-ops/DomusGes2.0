@@ -87,6 +87,21 @@ export function useCreatePatient() {
   });
 }
 
+export function useUpdatePatient() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<PatientCreateInput> }) =>
+      fetcher<PatientDTO>(`/api/patients/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: patientKeys.all });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
 // ─── Visits ──────────────────────────────────────────────────────────────────
 
 export function useVisits(patientId?: string) {
@@ -222,7 +237,16 @@ export function useDeleteProfessional() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["professionals"] }),
   });
 }
-
+export function useDeletePatient() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => fetcher(`/api/patients/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["patients"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
 // ─── Audit log (admin) ───────────────────────────────────────────────────────
 
 export function useAuditLog(limit = 100) {
