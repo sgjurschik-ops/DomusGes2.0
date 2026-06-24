@@ -1,7 +1,7 @@
 // Seed script — fake but realistic Spanish occupational-therapy demo data.
 // NO REAL PATIENT DATA. Run with `bun run db:seed`.
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type Patient, type Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const db = new PrismaClient();
@@ -67,7 +67,7 @@ async function main() {
   console.log("✓ Profesionales creados (admin@domusges.es / admin2026, ana/carlos/laura@domusges.es / demo2026)");
 
   // ─── Pacientes (datos claramente ficticios) ────────────────────────────────
-  const patients = [
+  const patients: Prisma.PatientCreateInput[] = [
     {
       firstName: "Marta", lastName: "Ejemplo Uno", birthDate: new Date("1958-03-12"),
       specialty: "Fisioterapia", status: "Activo",
@@ -129,9 +129,9 @@ async function main() {
       color: PALETTE[5],
     },
   ];
-  const patientRows = [];
+  const patientRows: Patient[] = [];
   for (const p of patients) {
-    patientRows.push(await db.patient.create({ data: p as any }));
+    patientRows.push(await db.patient.create({ data: p }));
   }
   console.log(`✓ ${patientRows.length} pacientes ficticios creados`);
 
