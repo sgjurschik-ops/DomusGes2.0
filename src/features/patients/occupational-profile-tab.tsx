@@ -130,13 +130,13 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         fields={["documentsAttached", "referralResource", "interventionReason"]}
       >
         <Field label="Documentos que adjunta">
-          <Textarea value={profile.documentsAttached ?? ""} onChange={(e) => update("documentsAttached", e.target.value)} />
+          <Textarea value={profile.documentsAttached ?? ""} onChange={(e) => update("documentsAttached", e.target.value)} className={!profile.documentsAttached ? "bg-muted/60" : ""} />
         </Field>
         <Field label="Recurso que deriva">
-          <Input value={profile.referralResource ?? ""} onChange={(e) => update("referralResource", e.target.value)} />
+          <Input value={profile.referralResource ?? ""} onChange={(e) => update("referralResource", e.target.value)} className={!profile.referralResource ? "bg-muted/60" : ""} />
         </Field>
         <Field label="Motivo de intervención">
-          <Textarea value={profile.interventionReason ?? ""} onChange={(e) => update("interventionReason", e.target.value)} />
+          <Textarea value={profile.interventionReason ?? ""} onChange={(e) => update("interventionReason", e.target.value)} className={!profile.interventionReason ? "bg-muted/60" : ""} />
         </Field>
       </Section>
 
@@ -160,7 +160,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Carné de conducir">
             <Select value={profile.drivingLicense ?? ""} onValueChange={(v) => update("drivingLicense", v)}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectTrigger className={!profile.drivingLicense ? "bg-muted/60" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Sí">Sí</SelectItem>
                 <SelectItem value="No">No</SelectItem>
@@ -173,7 +173,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
               value={profile.currentlyDrives === true ? "Sí" : profile.currentlyDrives === false ? "No" : ""}
               onValueChange={(v) => update("currentlyDrives", v === "Sí")}
             >
-              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectTrigger className={profile.currentlyDrives === undefined ? "bg-muted/60" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Sí">Sí</SelectItem>
                 <SelectItem value="No">No</SelectItem>
@@ -183,21 +183,21 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         </div>
 
         <Field label="Motivo si no conduce o información relevante">
-          <Input value={profile.drivingReason ?? ""} onChange={(e) => update("drivingReason", e.target.value)} />
+          <Input value={profile.drivingReason ?? ""} onChange={(e) => update("drivingReason", e.target.value)} className={!profile.drivingReason ? "bg-muted/60" : ""} />
         </Field>
 
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Estado civil">
-            <Input value={profile.maritalStatus ?? ""} onChange={(e) => update("maritalStatus", e.target.value)} />
+            <Input value={profile.maritalStatus ?? ""} onChange={(e) => update("maritalStatus", e.target.value)} className={!profile.maritalStatus ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Nombre y edad / información pareja">
-            <Input value={profile.partnerInfo ?? ""} onChange={(e) => update("partnerInfo", e.target.value)} />
+            <Input value={profile.partnerInfo ?? ""} onChange={(e) => update("partnerInfo", e.target.value)} className={!profile.partnerInfo ? "bg-muted/60" : ""} />
           </Field>
         </div>
 
         <Field label="Convivencia actual">
           <Select value={profile.livingSituation ?? ""} onValueChange={(v) => update("livingSituation", v)}>
-            <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+            <SelectTrigger className={!profile.livingSituation ? "bg-muted/60" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="Casa propia">Casa propia</SelectItem>
               <SelectItem value="Casa familiar">Casa familiar</SelectItem>
@@ -214,6 +214,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
             placeholder="Ejemplo: Madre — convive — apoyo alto / Hermana — contacto semanal..."
             value={profile.familyComposition ?? ""}
             onChange={(e) => update("familyComposition", e.target.value)}
+            className={!profile.familyComposition ? "bg-muted/60" : ""}
           />
         </Field>
 
@@ -223,15 +224,16 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
             placeholder="Nombre, relación, frecuencia de contacto, vía de contacto..."
             value={profile.supportNetwork ?? ""}
             onChange={(e) => update("supportNetwork", e.target.value)}
+            className={!profile.supportNetwork ? "bg-muted/60" : ""}
           />
         </Field>
 
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Con quién tiene mejor relación">
-            <Input value={profile.bestRelationship ?? ""} onChange={(e) => update("bestRelationship", e.target.value)} />
+            <Input value={profile.bestRelationship ?? ""} onChange={(e) => update("bestRelationship", e.target.value)} className={!profile.bestRelationship ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Con quién tiene peor relación">
-            <Input value={profile.worstRelationship ?? ""} onChange={(e) => update("worstRelationship", e.target.value)} />
+            <Input value={profile.worstRelationship ?? ""} onChange={(e) => update("worstRelationship", e.target.value)} className={!profile.worstRelationship ? "bg-muted/60" : ""} />
           </Field>
         </div>
       </Section>
@@ -253,7 +255,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       >
         <Field label="Estudios realizados">
           <Select value={profile.educationLevel ?? ""} onValueChange={(v) => update("educationLevel", v)}>
-            <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+            <SelectTrigger className={!profile.educationLevel ? "bg-muted/60" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="Sin escolarizar">Sin escolarizar</SelectItem>
               <SelectItem value="ESO">ESO</SelectItem>
@@ -267,7 +269,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         </Field>
 
         <Field label="Otros estudios, cursos o talleres">
-          <Textarea value={profile.otherEducation ?? ""} onChange={(e) => update("otherEducation", e.target.value)} />
+          <Textarea value={profile.otherEducation ?? ""} onChange={(e) => update("otherEducation", e.target.value)} className={!profile.otherEducation ? "bg-muted/60" : ""} />
         </Field>
 
         <Field label="Trabajos realizados">
@@ -276,28 +278,29 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
             placeholder="Trabajo — año — duración..."
             value={profile.workHistory ?? ""}
             onChange={(e) => update("workHistory", e.target.value)}
+            className={!profile.workHistory ? "bg-muted/60" : ""}
           />
         </Field>
 
         <Field label="Situación laboral actual">
-          <Input value={profile.currentWorkSituation ?? ""} onChange={(e) => update("currentWorkSituation", e.target.value)} />
+          <Input value={profile.currentWorkSituation ?? ""} onChange={(e) => update("currentWorkSituation", e.target.value)} className={!profile.currentWorkSituation ? "bg-muted/60" : ""} />
         </Field>
 
         <Field label="Trabajo u ocupación actual">
-          <Textarea value={profile.currentOccupation ?? ""} onChange={(e) => update("currentOccupation", e.target.value)} />
+          <Textarea value={profile.currentOccupation ?? ""} onChange={(e) => update("currentOccupation", e.target.value)} className={!profile.currentOccupation ? "bg-muted/60" : ""} />
         </Field>
 
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Ingresos aproximados">
-            <Input value={profile.approximateIncome ?? ""} onChange={(e) => update("approximateIncome", e.target.value)} />
+            <Input value={profile.approximateIncome ?? ""} onChange={(e) => update("approximateIncome", e.target.value)} className={!profile.approximateIncome ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Quién gestiona el dinero">
-            <Input value={profile.moneyManager ?? ""} onChange={(e) => update("moneyManager", e.target.value)} />
+            <Input value={profile.moneyManager ?? ""} onChange={(e) => update("moneyManager", e.target.value)} className={!profile.moneyManager ? "bg-muted/60" : ""} />
           </Field>
         </div>
 
         <Field label="Organización de ingresos / autonomía económica">
-          <Textarea value={profile.incomeOrganization ?? ""} onChange={(e) => update("incomeOrganization", e.target.value)} />
+          <Textarea value={profile.incomeOrganization ?? ""} onChange={(e) => update("incomeOrganization", e.target.value)} className={!profile.incomeOrganization ? "bg-muted/60" : ""} />
         </Field>
       </Section>
 
@@ -316,27 +319,27 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         ]}
       >
         <Field label="Día normal con horarios aproximados">
-          <Textarea rows={5} value={profile.dailyRoutine ?? ""} onChange={(e) => update("dailyRoutine", e.target.value)} />
+          <Textarea rows={5} value={profile.dailyRoutine ?? ""} onChange={(e) => update("dailyRoutine", e.target.value)} className={!profile.dailyRoutine ? "bg-muted/60" : ""} />
         </Field>
 
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Autocuidado">
-            <Textarea value={profile.selfCare ?? ""} onChange={(e) => update("selfCare", e.target.value)} />
+            <Textarea value={profile.selfCare ?? ""} onChange={(e) => update("selfCare", e.target.value)} className={!profile.selfCare ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Ocio">
-            <Textarea value={profile.leisure ?? ""} onChange={(e) => update("leisure", e.target.value)} />
+            <Textarea value={profile.leisure ?? ""} onChange={(e) => update("leisure", e.target.value)} className={!profile.leisure ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Tareas domésticas">
-            <Textarea value={profile.domesticTasks ?? ""} onChange={(e) => update("domesticTasks", e.target.value)} />
+            <Textarea value={profile.domesticTasks ?? ""} onChange={(e) => update("domesticTasks", e.target.value)} className={!profile.domesticTasks ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Actividad física">
-            <Textarea value={profile.physicalActivity ?? ""} onChange={(e) => update("physicalActivity", e.target.value)} />
+            <Textarea value={profile.physicalActivity ?? ""} onChange={(e) => update("physicalActivity", e.target.value)} className={!profile.physicalActivity ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Responsabilidades">
-            <Textarea value={profile.responsibilities ?? ""} onChange={(e) => update("responsibilities", e.target.value)} />
+            <Textarea value={profile.responsibilities ?? ""} onChange={(e) => update("responsibilities", e.target.value)} className={!profile.responsibilities ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Participación social">
-            <Textarea value={profile.socialParticipation ?? ""} onChange={(e) => update("socialParticipation", e.target.value)} />
+            <Textarea value={profile.socialParticipation ?? ""} onChange={(e) => update("socialParticipation", e.target.value)} className={!profile.socialParticipation ? "bg-muted/60" : ""} />
           </Field>
         </div>
       </Section>
@@ -356,22 +359,22 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       >
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Actividades de ocio que realiza actualmente">
-            <Textarea value={profile.leisureActivitiesCurrent ?? ""} onChange={(e) => update("leisureActivitiesCurrent", e.target.value)} />
+            <Textarea value={profile.leisureActivitiesCurrent ?? ""} onChange={(e) => update("leisureActivitiesCurrent", e.target.value)} className={!profile.leisureActivitiesCurrent ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Actividades de ocio que ya no realiza">
-            <Textarea value={profile.leisureActivitiesPast ?? ""} onChange={(e) => update("leisureActivitiesPast", e.target.value)} />
+            <Textarea value={profile.leisureActivitiesPast ?? ""} onChange={(e) => update("leisureActivitiesPast", e.target.value)} className={!profile.leisureActivitiesPast ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Deportes actuales">
-            <Textarea value={profile.sportsCurrent ?? ""} onChange={(e) => update("sportsCurrent", e.target.value)} />
+            <Textarea value={profile.sportsCurrent ?? ""} onChange={(e) => update("sportsCurrent", e.target.value)} className={!profile.sportsCurrent ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Deportes que ya no realiza">
-            <Textarea value={profile.sportsPast ?? ""} onChange={(e) => update("sportsPast", e.target.value)} />
+            <Textarea value={profile.sportsPast ?? ""} onChange={(e) => update("sportsPast", e.target.value)} className={!profile.sportsPast ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Cursos o formación actual">
-            <Textarea value={profile.trainingCurrent ?? ""} onChange={(e) => update("trainingCurrent", e.target.value)} />
+            <Textarea value={profile.trainingCurrent ?? ""} onChange={(e) => update("trainingCurrent", e.target.value)} className={!profile.trainingCurrent ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Cursos o formación que ya no realiza">
-            <Textarea value={profile.trainingPast ?? ""} onChange={(e) => update("trainingPast", e.target.value)} />
+            <Textarea value={profile.trainingPast ?? ""} onChange={(e) => update("trainingPast", e.target.value)} className={!profile.trainingPast ? "bg-muted/60" : ""} />
           </Field>
         </div>
       </Section>
@@ -383,18 +386,18 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         fields={["desiredImprovements", "shortTermGoal1", "shortTermGoal2", "shortTermGoal3"]}
       >
         <Field label="Qué le gustaría conseguir o mejorar">
-          <Textarea rows={3} value={profile.desiredImprovements ?? ""} onChange={(e) => update("desiredImprovements", e.target.value)} />
+          <Textarea rows={3} value={profile.desiredImprovements ?? ""} onChange={(e) => update("desiredImprovements", e.target.value)} className={!profile.desiredImprovements ? "bg-muted/60" : ""} />
         </Field>
 
         <div className="grid sm:grid-cols-3 gap-3">
           <Field label="Objetivo 1">
-            <Textarea value={profile.shortTermGoal1 ?? ""} onChange={(e) => update("shortTermGoal1", e.target.value)} />
+            <Textarea value={profile.shortTermGoal1 ?? ""} onChange={(e) => update("shortTermGoal1", e.target.value)} className={!profile.shortTermGoal1 ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Objetivo 2">
-            <Textarea value={profile.shortTermGoal2 ?? ""} onChange={(e) => update("shortTermGoal2", e.target.value)} />
+            <Textarea value={profile.shortTermGoal2 ?? ""} onChange={(e) => update("shortTermGoal2", e.target.value)} className={!profile.shortTermGoal2 ? "bg-muted/60" : ""} />
           </Field>
           <Field label="Objetivo 3">
-            <Textarea value={profile.shortTermGoal3 ?? ""} onChange={(e) => update("shortTermGoal3", e.target.value)} />
+            <Textarea value={profile.shortTermGoal3 ?? ""} onChange={(e) => update("shortTermGoal3", e.target.value)} className={!profile.shortTermGoal3 ? "bg-muted/60" : ""} />
           </Field>
         </div>
       </Section>
@@ -429,8 +432,8 @@ function Section({
   const isEmpty = filled === 0;
 
   return (
-    <details open={defaultOpen} className="group rounded-lg border bg-card">
-      <summary className="cursor-pointer list-none px-4 py-3 border-b flex items-center justify-between gap-3">
+    <details open={defaultOpen} className="group rounded-lg border bg-card shadow-sm overflow-hidden">
+      <summary className="cursor-pointer list-none px-4 py-3 border-b bg-accent/60 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">{title}</h3>
           {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
@@ -438,12 +441,12 @@ function Section({
         <div className="flex items-center gap-2 shrink-0">
           <span
             className={
-              "text-xs rounded-full px-2 py-0.5 font-medium " +
+              "text-xs rounded-full px-2 py-0.5 font-medium border " +
               (isComplete
-                ? "bg-emerald-100 text-emerald-700"
+                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
                 : isEmpty
-                ? "bg-muted text-muted-foreground"
-                : "bg-amber-100 text-amber-700")
+                ? "bg-background text-muted-foreground border-border"
+                : "bg-amber-100 text-amber-700 border-amber-200")
             }
             title={`${filled} de ${total} campos rellenados`}
           >
@@ -452,7 +455,7 @@ function Section({
           <span className="text-muted-foreground text-xs transition-transform group-open:rotate-90">▶</span>
         </div>
       </summary>
-      <div className="p-4 space-y-4">{children}</div>
+      <div className="p-4 space-y-4 bg-card">{children}</div>
     </details>
   );
 }
