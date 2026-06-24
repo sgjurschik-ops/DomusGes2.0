@@ -12,6 +12,18 @@ import { Save } from "lucide-react";
 
 type Profile = Record<string, any>;
 
+// Each section declares which profile fields belong to it, so we can show a
+// "filled / total" indicator on the collapsed header without guessing.
+function countFilled(profile: Profile, fields: string[]) {
+  const filled = fields.filter((f) => {
+    const v = profile[f];
+    if (v === undefined || v === null) return false;
+    if (typeof v === "string") return v.trim() !== "";
+    return true; // booleans (e.g. currentlyDrives) count as filled once set
+  }).length;
+  return { filled, total: fields.length };
+}
+
 const emptyProfile: Profile = {
   documentsAttached: "",
   interventionReason: "",
@@ -110,7 +122,13 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
 
   return (
     <div className="space-y-4">
-      <Section title="Datos generales" description="Información inicial de la valoración.">
+      <Section
+        title="Datos generales"
+        description="Información inicial de la valoración."
+        defaultOpen
+        profile={profile}
+        fields={["documentsAttached", "referralResource", "interventionReason"]}
+      >
         <Field label="Documentos que adjunta">
           <Textarea value={profile.documentsAttached ?? ""} onChange={(e) => update("documentsAttached", e.target.value)} />
         </Field>
@@ -122,7 +140,23 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         </Field>
       </Section>
 
-      <Section title="Área social-familiar" description="Convivencia, red de apoyo y relaciones significativas.">
+      <Section
+        title="Área social-familiar"
+        description="Convivencia, red de apoyo y relaciones significativas."
+        profile={profile}
+        fields={[
+          "drivingLicense",
+          "currentlyDrives",
+          "drivingReason",
+          "maritalStatus",
+          "partnerInfo",
+          "livingSituation",
+          "familyComposition",
+          "supportNetwork",
+          "bestRelationship",
+          "worstRelationship",
+        ]}
+      >
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Carné de conducir">
             <Select value={profile.drivingLicense ?? ""} onValueChange={(v) => update("drivingLicense", v)}>
@@ -202,7 +236,21 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         </div>
       </Section>
 
-      <Section title="Área laboral y económica" description="Formación, trayectoria laboral y autonomía económica.">
+      <Section
+        title="Área laboral y económica"
+        description="Formación, trayectoria laboral y autonomía económica."
+        profile={profile}
+        fields={[
+          "educationLevel",
+          "otherEducation",
+          "workHistory",
+          "currentWorkSituation",
+          "currentOccupation",
+          "approximateIncome",
+          "moneyManager",
+          "incomeOrganization",
+        ]}
+      >
         <Field label="Estudios realizados">
           <Select value={profile.educationLevel ?? ""} onValueChange={(v) => update("educationLevel", v)}>
             <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
@@ -253,7 +301,20 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         </Field>
       </Section>
 
-      <Section title="Hábitos y rutinas" description="Rutina diaria y participación ocupacional.">
+      <Section
+        title="Hábitos y rutinas"
+        description="Rutina diaria y participación ocupacional."
+        profile={profile}
+        fields={[
+          "dailyRoutine",
+          "selfCare",
+          "leisure",
+          "domesticTasks",
+          "physicalActivity",
+          "responsibilities",
+          "socialParticipation",
+        ]}
+      >
         <Field label="Día normal con horarios aproximados">
           <Textarea rows={5} value={profile.dailyRoutine ?? ""} onChange={(e) => update("dailyRoutine", e.target.value)} />
         </Field>
@@ -280,7 +341,19 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         </div>
       </Section>
 
-      <Section title="Intereses y motivaciones" description="Actividades actuales, abandonadas y posibles intereses a recuperar.">
+      <Section
+        title="Intereses y motivaciones"
+        description="Actividades actuales, abandonadas y posibles intereses a recuperar."
+        profile={profile}
+        fields={[
+          "leisureActivitiesCurrent",
+          "leisureActivitiesPast",
+          "sportsCurrent",
+          "sportsPast",
+          "trainingCurrent",
+          "trainingPast",
+        ]}
+      >
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Actividades de ocio que realiza actualmente">
             <Textarea value={profile.leisureActivitiesCurrent ?? ""} onChange={(e) => update("leisureActivitiesCurrent", e.target.value)} />
@@ -303,7 +376,12 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         </div>
       </Section>
 
-      <Section title="Objetivos y planificación" description="Objetivos ocupacionales y planificación inicial.">
+      <Section
+        title="Objetivos y planificación"
+        description="Objetivos ocupacionales y planificación inicial."
+        profile={profile}
+        fields={["desiredImprovements", "shortTermGoal1", "shortTermGoal2", "shortTermGoal3"]}
+      >
         <Field label="Qué le gustaría conseguir o mejorar">
           <Textarea rows={3} value={profile.desiredImprovements ?? ""} onChange={(e) => update("desiredImprovements", e.target.value)} />
         </Field>
@@ -334,18 +412,44 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
 function Section({
   title,
   description,
+  defaultOpen = false,
+  profile,
+  fields,
   children,
 }: {
   title: string;
   description?: string;
+  defaultOpen?: boolean;
+  profile: Profile;
+  fields: string[];
   children: React.ReactNode;
 }) {
+  const { filled, total } = countFilled(profile, fields);
+  const isComplete = filled === total;
+  const isEmpty = filled === 0;
+
   return (
-    <details open className="rounded-lg border bg-card">
-      <summary className="cursor-pointer list-none px-4 py-3 border-b">
+    <details open={defaultOpen} className="group rounded-lg border bg-card">
+      <summary className="cursor-pointer list-none px-4 py-3 border-b flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">{title}</h3>
           {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className={
+              "text-xs rounded-full px-2 py-0.5 font-medium " +
+              (isComplete
+                ? "bg-emerald-100 text-emerald-700"
+                : isEmpty
+                ? "bg-muted text-muted-foreground"
+                : "bg-amber-100 text-amber-700")
+            }
+            title={`${filled} de ${total} campos rellenados`}
+          >
+            {filled}/{total}
+          </span>
+          <span className="text-muted-foreground text-xs transition-transform group-open:rotate-90">▶</span>
         </div>
       </summary>
       <div className="p-4 space-y-4">{children}</div>
