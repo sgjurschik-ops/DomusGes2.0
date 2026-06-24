@@ -1,21 +1,369 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
+import { Save } from "lucide-react";
+
+type Profile = Record<string, any>;
+
+const emptyProfile: Profile = {
+  documentsAttached: "",
+  interventionReason: "",
+  referralResource: "",
+  drivingLicense: "",
+  currentlyDrives: undefined,
+  drivingReason: "",
+  maritalStatus: "",
+  partnerInfo: "",
+  livingSituation: "",
+  familyComposition: "",
+  supportNetwork: "",
+  bestRelationship: "",
+  worstRelationship: "",
+  educationLevel: "",
+  otherEducation: "",
+  workHistory: "",
+  currentWorkSituation: "",
+  currentOccupation: "",
+  approximateIncome: "",
+  moneyManager: "",
+  incomeOrganization: "",
+  dailyRoutine: "",
+  selfCare: "",
+  domesticTasks: "",
+  responsibilities: "",
+  leisure: "",
+  physicalActivity: "",
+  socialParticipation: "",
+  leisureActivitiesCurrent: "",
+  leisureActivitiesPast: "",
+  sportsCurrent: "",
+  sportsPast: "",
+  trainingCurrent: "",
+  trainingPast: "",
+  desiredImprovements: "",
+  shortTermGoal1: "",
+  shortTermGoal2: "",
+  shortTermGoal3: "",
+};
 
 export function OccupationalProfileTab({ patientId }: { patientId: string }) {
+  const [profile, setProfile] = useState<Profile>(emptyProfile);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    async function loadProfile() {
+      setLoading(true);
+      const res = await fetch(`/api/patients/${patientId}/occupational-profile`);
+      const data = await res.json();
+      setProfile({ ...emptyProfile, ...(data ?? {}) });
+      setLoading(false);
+    }
+
+    loadProfile();
+  }, [patientId]);
+
+  function update(field: string, value: any) {
+    setProfile((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function save() {
+    setSaving(true);
+
+    try {
+      const res = await fetch(`/api/patients/${patientId}/occupational-profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
+      });
+
+      if (!res.ok) throw new Error("SAVE_ERROR");
+
+      const saved = await res.json();
+      setProfile({ ...emptyProfile, ...(saved ?? {}) });
+
+      toast({
+        title: "Perfil ocupacional guardado",
+        description: "La información se ha actualizado correctamente.",
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "No se ha podido guardar el perfil ocupacional.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return <p className="text-sm text-muted-foreground">Cargando perfil ocupacional…</p>;
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Perfil ocupacional</CardTitle>
-        <CardDescription>
-          Registro estructurado del perfil ocupacional del paciente.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
-          Perfil ocupacional del paciente {patientId}. Próximo paso: formulario editable.
-        </p>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <Section title="Datos generales" description="Información inicial de la valoración.">
+        <Field label="Documentos que adjunta">
+          <Textarea value={profile.documentsAttached ?? ""} onChange={(e) => update("documentsAttached", e.target.value)} />
+        </Field>
+        <Field label="Recurso que deriva">
+          <Input value={profile.referralResource ?? ""} onChange={(e) => update("referralResource", e.target.value)} />
+        </Field>
+        <Field label="Motivo de intervención">
+          <Textarea value={profile.interventionReason ?? ""} onChange={(e) => update("interventionReason", e.target.value)} />
+        </Field>
+      </Section>
+
+      <Section title="Área social-familiar" description="Convivencia, red de apoyo y relaciones significativas.">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Carné de conducir">
+            <Select value={profile.drivingLicense ?? ""} onValueChange={(v) => update("drivingLicense", v)}>
+              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Sí">Sí</SelectItem>
+                <SelectItem value="No">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Field label="¿Conduce actualmente?">
+            <Select
+              value={profile.currentlyDrives === true ? "Sí" : profile.currentlyDrives === false ? "No" : ""}
+              onValueChange={(v) => update("currentlyDrives", v === "Sí")}
+            >
+              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Sí">Sí</SelectItem>
+                <SelectItem value="No">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+
+        <Field label="Motivo si no conduce o información relevante">
+          <Input value={profile.drivingReason ?? ""} onChange={(e) => update("drivingReason", e.target.value)} />
+        </Field>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Estado civil">
+            <Input value={profile.maritalStatus ?? ""} onChange={(e) => update("maritalStatus", e.target.value)} />
+          </Field>
+          <Field label="Nombre y edad / información pareja">
+            <Input value={profile.partnerInfo ?? ""} onChange={(e) => update("partnerInfo", e.target.value)} />
+          </Field>
+        </div>
+
+        <Field label="Convivencia actual">
+          <Select value={profile.livingSituation ?? ""} onValueChange={(v) => update("livingSituation", v)}>
+            <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Casa propia">Casa propia</SelectItem>
+              <SelectItem value="Casa familiar">Casa familiar</SelectItem>
+              <SelectItem value="Casa de alquiler">Casa de alquiler</SelectItem>
+              <SelectItem value="Residencia o piso tutelado">Residencia o piso tutelado</SelectItem>
+              <SelectItem value="Otro">Otro</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <Field label="Composición familiar">
+          <Textarea
+            rows={4}
+            placeholder="Ejemplo: Madre — convive — apoyo alto / Hermana — contacto semanal..."
+            value={profile.familyComposition ?? ""}
+            onChange={(e) => update("familyComposition", e.target.value)}
+          />
+        </Field>
+
+        <Field label="Red de apoyo / amistades">
+          <Textarea
+            rows={4}
+            placeholder="Nombre, relación, frecuencia de contacto, vía de contacto..."
+            value={profile.supportNetwork ?? ""}
+            onChange={(e) => update("supportNetwork", e.target.value)}
+          />
+        </Field>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Con quién tiene mejor relación">
+            <Input value={profile.bestRelationship ?? ""} onChange={(e) => update("bestRelationship", e.target.value)} />
+          </Field>
+          <Field label="Con quién tiene peor relación">
+            <Input value={profile.worstRelationship ?? ""} onChange={(e) => update("worstRelationship", e.target.value)} />
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Área laboral y económica" description="Formación, trayectoria laboral y autonomía económica.">
+        <Field label="Estudios realizados">
+          <Select value={profile.educationLevel ?? ""} onValueChange={(v) => update("educationLevel", v)}>
+            <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Sin escolarizar">Sin escolarizar</SelectItem>
+              <SelectItem value="ESO">ESO</SelectItem>
+              <SelectItem value="Bachillerato">Bachillerato</SelectItem>
+              <SelectItem value="Formación Profesional">Formación Profesional</SelectItem>
+              <SelectItem value="Carrera Universitaria">Carrera Universitaria</SelectItem>
+              <SelectItem value="Especialización">Especialización</SelectItem>
+              <SelectItem value="Otros">Otros</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <Field label="Otros estudios, cursos o talleres">
+          <Textarea value={profile.otherEducation ?? ""} onChange={(e) => update("otherEducation", e.target.value)} />
+        </Field>
+
+        <Field label="Trabajos realizados">
+          <Textarea
+            rows={4}
+            placeholder="Trabajo — año — duración..."
+            value={profile.workHistory ?? ""}
+            onChange={(e) => update("workHistory", e.target.value)}
+          />
+        </Field>
+
+        <Field label="Situación laboral actual">
+          <Input value={profile.currentWorkSituation ?? ""} onChange={(e) => update("currentWorkSituation", e.target.value)} />
+        </Field>
+
+        <Field label="Trabajo u ocupación actual">
+          <Textarea value={profile.currentOccupation ?? ""} onChange={(e) => update("currentOccupation", e.target.value)} />
+        </Field>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Ingresos aproximados">
+            <Input value={profile.approximateIncome ?? ""} onChange={(e) => update("approximateIncome", e.target.value)} />
+          </Field>
+          <Field label="Quién gestiona el dinero">
+            <Input value={profile.moneyManager ?? ""} onChange={(e) => update("moneyManager", e.target.value)} />
+          </Field>
+        </div>
+
+        <Field label="Organización de ingresos / autonomía económica">
+          <Textarea value={profile.incomeOrganization ?? ""} onChange={(e) => update("incomeOrganization", e.target.value)} />
+        </Field>
+      </Section>
+
+      <Section title="Hábitos y rutinas" description="Rutina diaria y participación ocupacional.">
+        <Field label="Día normal con horarios aproximados">
+          <Textarea rows={5} value={profile.dailyRoutine ?? ""} onChange={(e) => update("dailyRoutine", e.target.value)} />
+        </Field>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Autocuidado">
+            <Textarea value={profile.selfCare ?? ""} onChange={(e) => update("selfCare", e.target.value)} />
+          </Field>
+          <Field label="Ocio">
+            <Textarea value={profile.leisure ?? ""} onChange={(e) => update("leisure", e.target.value)} />
+          </Field>
+          <Field label="Tareas domésticas">
+            <Textarea value={profile.domesticTasks ?? ""} onChange={(e) => update("domesticTasks", e.target.value)} />
+          </Field>
+          <Field label="Actividad física">
+            <Textarea value={profile.physicalActivity ?? ""} onChange={(e) => update("physicalActivity", e.target.value)} />
+          </Field>
+          <Field label="Responsabilidades">
+            <Textarea value={profile.responsibilities ?? ""} onChange={(e) => update("responsibilities", e.target.value)} />
+          </Field>
+          <Field label="Participación social">
+            <Textarea value={profile.socialParticipation ?? ""} onChange={(e) => update("socialParticipation", e.target.value)} />
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Intereses y motivaciones" description="Actividades actuales, abandonadas y posibles intereses a recuperar.">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Actividades de ocio que realiza actualmente">
+            <Textarea value={profile.leisureActivitiesCurrent ?? ""} onChange={(e) => update("leisureActivitiesCurrent", e.target.value)} />
+          </Field>
+          <Field label="Actividades de ocio que ya no realiza">
+            <Textarea value={profile.leisureActivitiesPast ?? ""} onChange={(e) => update("leisureActivitiesPast", e.target.value)} />
+          </Field>
+          <Field label="Deportes actuales">
+            <Textarea value={profile.sportsCurrent ?? ""} onChange={(e) => update("sportsCurrent", e.target.value)} />
+          </Field>
+          <Field label="Deportes que ya no realiza">
+            <Textarea value={profile.sportsPast ?? ""} onChange={(e) => update("sportsPast", e.target.value)} />
+          </Field>
+          <Field label="Cursos o formación actual">
+            <Textarea value={profile.trainingCurrent ?? ""} onChange={(e) => update("trainingCurrent", e.target.value)} />
+          </Field>
+          <Field label="Cursos o formación que ya no realiza">
+            <Textarea value={profile.trainingPast ?? ""} onChange={(e) => update("trainingPast", e.target.value)} />
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Objetivos y planificación" description="Objetivos ocupacionales y planificación inicial.">
+        <Field label="Qué le gustaría conseguir o mejorar">
+          <Textarea rows={3} value={profile.desiredImprovements ?? ""} onChange={(e) => update("desiredImprovements", e.target.value)} />
+        </Field>
+
+        <div className="grid sm:grid-cols-3 gap-3">
+          <Field label="Objetivo 1">
+            <Textarea value={profile.shortTermGoal1 ?? ""} onChange={(e) => update("shortTermGoal1", e.target.value)} />
+          </Field>
+          <Field label="Objetivo 2">
+            <Textarea value={profile.shortTermGoal2 ?? ""} onChange={(e) => update("shortTermGoal2", e.target.value)} />
+          </Field>
+          <Field label="Objetivo 3">
+            <Textarea value={profile.shortTermGoal3 ?? ""} onChange={(e) => update("shortTermGoal3", e.target.value)} />
+          </Field>
+        </div>
+      </Section>
+
+      <div className="flex justify-end">
+        <Button onClick={save} disabled={saving}>
+          <Save className="w-4 h-4 mr-1.5" />
+          {saving ? "Guardando…" : "Guardar perfil ocupacional"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details open className="rounded-lg border bg-card">
+      <summary className="cursor-pointer list-none px-4 py-3 border-b">
+        <div>
+          <h3 className="text-sm font-semibold">{title}</h3>
+          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+        </div>
+      </summary>
+      <div className="p-4 space-y-4">{children}</div>
+    </details>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">{label}</Label>
+      {children}
+    </div>
   );
 }

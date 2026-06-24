@@ -23,6 +23,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { toast } from "@/hooks/use-toast";
+import { OccupationalProfileTab } from "./occupational-profile-tab";
 
 export function PatientDetailView() {
   const { selectedPatientId, navigate, back } = useNav();
@@ -154,9 +155,10 @@ export function PatientDetailView() {
       </Card>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 max-w-md">
+        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
           <TabsTrigger value="overview">Resumen</TabsTrigger>
           <TabsTrigger value="visits">Visitas ({visits?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="occupational-profile">Perfil ocupacional</TabsTrigger>
           <TabsTrigger value="assessments">Escalas</TabsTrigger>
           <TabsTrigger value="progress">Evolución</TabsTrigger>
         </TabsList>
@@ -247,6 +249,11 @@ export function PatientDetailView() {
             ))
           )}
         </TabsContent>
+
+{/* Occupational profile */}
+<TabsContent value="occupational-profile" className="mt-4">
+  <OccupationalProfileTab patientId={patient.id} />
+</TabsContent>
 
         {/* Assessments */}
         <TabsContent value="assessments" className="mt-4 space-y-4">

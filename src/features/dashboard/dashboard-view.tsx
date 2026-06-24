@@ -48,26 +48,26 @@ export function DashboardView() {
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="Pacientes activos"
-          value={isLoading ? null : data?.totals.activePatients}
-          total={isLoading ? null : data?.totals.patients}
+          value={isLoading ? null : data?.totals.activePatients ?? null}
+          total={isLoading ? null : data?.totals.patients ?? null}
           icon={Users}
           onClick={() => navigate("patients")}
         />
         <KpiCard
           label="Citas hoy"
-          value={isLoading ? null : data?.totals.todayAppointments}
+          value={isLoading ? null : data?.totals.todayAppointments ?? null}
           icon={MapPin}
           onClick={() => navigate("today")}
         />
         <KpiCard
           label="Citas esta semana"
-          value={isLoading ? null : data?.totals.weekAppointments}
+          value={isLoading ? null : data?.totals.weekAppointments ?? null}
           icon={CalendarDays}
           onClick={() => navigate("calendar")}
         />
         <KpiCard
           label="Visitas últimos 30 días"
-          value={isLoading ? null : data?.totals.recentVisits}
+          value={isLoading ? null : data?.totals.recentVisits ?? null}
           icon={Activity}
           onClick={() => navigate("reports")}
         />

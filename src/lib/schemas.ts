@@ -62,7 +62,7 @@ export const professionalCreateSchema = z
   .object({
     name: z.string().min(2, "El nombre es obligatorio"),
     email: z.string().email("Email no válido"),
-    role: z.enum(PROFESSIONAL_ROLES, { errorMap: () => ({ message: "Rol no válido" }) }),
+    role: z.enum(PROFESSIONAL_ROLES, { error: "Rol no válido" }),
     numColegiado: z.string().optional().default(""),
     phone: z.string().optional().default(""),
     color: z.string().default("#1a5c58"),

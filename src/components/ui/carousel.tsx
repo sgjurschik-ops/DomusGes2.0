@@ -95,7 +95,10 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return
-    onSelect(api)
+    // Run the initial sync outside the effect's synchronous body to avoid
+    // cascading renders (react-hooks/set-state-in-effect). This still runs
+    // before the next paint, so there is no visible delay.
+    queueMicrotask(() => onSelect(api))
     api.on("reInit", onSelect)
     api.on("select", onSelect)
 

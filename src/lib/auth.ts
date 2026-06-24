@@ -47,7 +47,12 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = (user as { role: string }).role;
+        // `user` here is always the object returned by `authorize()` above,
+        // which always includes `role` — but NextAuth types it as
+        // `User | AdapterUser` (a union where AdapterUser lacks `role`),
+        // so a direct cast is rejected. Going through `unknown` is correct
+        // here because we know the real shape from our own authorize().
+        token.role = (user as unknown as { role: string }).role;
       }
       // Always refresh isActive/isAdmin from DB so disabled admins are kicked
       const prof = await db.professional.findUnique({

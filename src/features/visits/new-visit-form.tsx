@@ -18,6 +18,8 @@ import { visitCreateSchema, type VisitCreateInput } from "@/lib/schemas";
 import { toast } from "@/hooks/use-toast";
 import { useState } from "react";
 
+import { z } from "zod";
+
 export function NewVisitForm() {
   const create = useCreateVisit();
   const { data: patients } = usePatients();
@@ -32,7 +34,7 @@ export function NewVisitForm() {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<VisitCreateInput>({
+  } = useForm<z.input<typeof visitCreateSchema>, any, z.output<typeof visitCreateSchema>>({
     resolver: zodResolver(visitCreateSchema),
     defaultValues: {
       patientId: newVisitPatientId ?? "",

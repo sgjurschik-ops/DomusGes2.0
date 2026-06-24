@@ -32,7 +32,18 @@ export async function GET(req: NextRequest) {
     orderBy: { start: "asc" },
   });
 
-  const lines = appointments.map((a) => ({
+  interface BillingLine {
+    id: string;
+    date: string;
+    patientName: string;
+    specialty: string;
+    therapistName: string;
+    type: string;
+    amount: number;
+    durationMin: number;
+  }
+
+  const lines: BillingLine[] = appointments.map((a) => ({
     id: a.id,
     date: a.start.toISOString(),
     patientName: `${a.patient.firstName} ${a.patient.lastName}`,
@@ -44,12 +55,12 @@ export async function GET(req: NextRequest) {
   }));
 
   const total = lines.reduce((s, l) => s + l.amount, 0);
-  const byTherapist = lines.reduce<Record<string, { count: number; amount: number }>>((acc, l) => {
-    acc[l.therapistName] ??= { count: 0, amount: 0 };
-    acc[l.therapistName].count += 1;
-    acc[l.therapistName].amount += l.amount;
-    return acc;
-  }, {});
+  const byTherapist: Record<string, { count: number; amount: number }> = {};
+  for (const l of lines) {
+    byTherapist[l.therapistName] ??= { count: 0, amount: 0 };
+    byTherapist[l.therapistName].count += 1;
+    byTherapist[l.therapistName].amount += l.amount;
+  }
 
   return NextResponse.json({
     period: { year, month: month + 1 },

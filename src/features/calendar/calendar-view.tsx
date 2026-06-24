@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   format,
   startOfMonth,
@@ -676,7 +677,7 @@ function CreateAppointmentDialog({
     control,
     reset,
     formState: { errors },
-  } = useForm<AppointmentCreateInput>({
+  } = useForm<z.input<typeof appointmentCreateSchema>, any, z.output<typeof appointmentCreateSchema>>({
     resolver: zodResolver(appointmentCreateSchema),
     defaultValues: {
       patientId: "",
