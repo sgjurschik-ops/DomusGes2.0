@@ -50,6 +50,7 @@ export default function Home() {
       {view === "patients" && <PatientsListView />}
       {view === "patient-detail" && <PatientDetailView />}
       {view === "new-patient" && <NewPatientForm />}
+      {view === "edit-patient" && <NewPatientForm mode="edit" />}
       {view === "new-visit" && <NewVisitForm />}
       {view === "calendar" && <CalendarView />}
       {view === "equipo" && <TeamView />}

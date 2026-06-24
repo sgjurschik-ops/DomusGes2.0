@@ -1,8 +1,14 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCreatePatient, useProfessionals } from "@/hooks/api";
+import {
+  useCreatePatient,
+  useProfessionals,
+  usePatient,
+  useUpdatePatient,
+} from "@/hooks/api";
 import { useNav } from "@/store/nav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,45 +21,98 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, Save } from "lucide-react";
 import {
-  patientCreateSchema, type PatientCreateInput,
-  SPECIALTIES, PATIENT_STATUSES,
+  patientCreateSchema,
+  type PatientCreateInput,
+  SPECIALTIES,
+  PATIENT_STATUSES,
 } from "@/lib/schemas";
 import { toast } from "@/hooks/use-toast";
 import { Avatar } from "@/components/domain";
-import { useRouter } from "next/navigation";
 
-export function NewPatientForm() {
+type Props = {
+  mode?: "create" | "edit";
+};
+
+export function NewPatientForm({ mode = "create" }: Props) {
+  const isEdit = mode === "edit";
+
   const create = useCreatePatient();
+  const update = useUpdatePatient();
   const { data: professionals } = useProfessionals();
-  const { back, selectPatient, navigate } = useNav();
+  const { back, selectPatient, navigate, selectedPatientId } = useNav();
+  const { data: patient, isLoading: isLoadingPatient } = usePatient(
+    isEdit ? selectedPatientId : null,
+  );
 
   const {
     register,
     handleSubmit,
     control,
     watch,
+    reset,
     formState: { errors },
   } = useForm<PatientCreateInput>({
     resolver: zodResolver(patientCreateSchema),
     defaultValues: {
-      firstName: "", lastName: "", birthDate: "",
-      specialty: "T. Ocupacional", status: "Activo",
-      phone: "", address: "", diagnosis: "", objective: "",
+      firstName: "",
+      lastName: "",
+      birthDate: "",
+      specialty: "T. Ocupacional",
+      status: "Activo",
+      phone: "",
+      address: "",
+      diagnosis: "",
+      objective: "",
       startDate: new Date().toISOString().slice(0, 10),
-      referentName: "", referentPhone: "",
+      referentName: "",
+      referentPhone: "",
       therapistIds: [],
     },
   });
 
+  useEffect(() => {
+    if (!isEdit || !patient) return;
+
+    reset({
+      firstName: patient.firstName ?? "",
+      lastName: patient.lastName ?? "",
+      birthDate: patient.birthDate?.slice(0, 10) ?? "",
+      specialty: patient.specialty,
+      status: patient.status,
+      phone: patient.phone ?? "",
+      address: patient.address ?? "",
+      diagnosis: patient.diagnosis ?? "",
+      objective: patient.objective ?? "",
+      startDate: patient.startDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+      referentName: patient.referentName ?? "",
+      referentPhone: patient.referentPhone ?? "",
+      therapistIds: patient.therapistIds ?? [],
+    });
+  }, [isEdit, patient, reset]);
+
   async function onSubmit(values: PatientCreateInput) {
     try {
+      if (isEdit) {
+        if (!selectedPatientId) return;
+
+        const updated = await update.mutateAsync({
+          id: selectedPatientId,
+          data: values,
+        });
+
+        toast({ title: "Paciente actualizado", description: updated.fullName });
+        selectPatient(updated.id);
+        navigate("patient-detail");
+        return;
+      }
+
       const created = await create.mutateAsync(values);
       toast({ title: "Paciente creado", description: created.fullName });
       selectPatient(created.id);
       navigate("patient-detail");
     } catch (e: any) {
       toast({
-        title: "Error al crear paciente",
+        title: isEdit ? "Error al actualizar paciente" : "Error al crear paciente",
         description: e?.body?.error === "VALIDATION" ? "Revisa los campos." : "Inténtalo de nuevo.",
         variant: "destructive",
       });
@@ -62,6 +121,11 @@ export function NewPatientForm() {
 
   const firstName = watch("firstName");
   const lastName = watch("lastName");
+  const isPending = create.isPending || update.isPending;
+
+  if (isEdit && isLoadingPatient) {
+    return <p className="text-sm text-muted-foreground">Cargando datos del paciente…</p>;
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -73,14 +137,15 @@ export function NewPatientForm() {
       </button>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Datos personales */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-3">
               <Avatar name={`${firstName} ${lastName}`} size={32} />
-              Datos personales
+              {isEdit ? "Editar paciente" : "Datos personales"}
             </CardTitle>
-            <CardDescription>Información básica del paciente.</CardDescription>
+            <CardDescription>
+              {isEdit ? "Modifica los datos registrados del paciente." : "Información básica del paciente."}
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid sm:grid-cols-2 gap-4">
             <Field label="Nombre" error={errors.firstName?.message} required>
@@ -101,7 +166,6 @@ export function NewPatientForm() {
           </CardContent>
         </Card>
 
-        {/* Información clínica */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Información clínica</CardTitle>
@@ -151,7 +215,6 @@ export function NewPatientForm() {
           </CardContent>
         </Card>
 
-        {/* Referente y terapeutas */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Referente y terapeutas asignados</CardTitle>
@@ -203,9 +266,9 @@ export function NewPatientForm() {
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={back}>Cancelar</Button>
-          <Button type="submit" disabled={create.isPending}>
+          <Button type="submit" disabled={isPending}>
             <Save className="w-4 h-4 mr-1.5" />
-            {create.isPending ? "Guardando…" : "Crear paciente"}
+            {isPending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear paciente"}
           </Button>
         </div>
       </form>

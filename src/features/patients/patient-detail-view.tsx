@@ -97,48 +97,16 @@ export function PatientDetailView() {
             </div>
             <div className="flex gap-2 flex-wrap">
                 
-  <Button
+   <Button
   variant="outline"
-  onClick={async () => {
-    const phone = prompt("Teléfono", patient.phone ?? "");
-    if (phone === null) return;
-
-    const address = prompt("Dirección", patient.address ?? "");
-    if (address === null) return;
-
-    const diagnosis = prompt("Diagnóstico", patient.diagnosis ?? "");
-    if (diagnosis === null) return;
-
-    const objective = prompt("Objetivo terapéutico", patient.objective ?? "");
-    if (objective === null) return;
-
-    try {
-      await updatePatient.mutateAsync({
-        id: patient.id,
-        data: {
-          phone,
-          address,
-          diagnosis,
-          objective,
-        },
-      });
-
-      toast({
-        title: "Paciente actualizado",
-      });
-    } catch {
-      toast({
-        title: "Error",
-        description: "No se ha podido actualizar el paciente.",
-        variant: "destructive",
-      });
-    }
+  onClick={() => {
+    navigate("edit-patient");
   }}
 >
   <Pencil className="w-4 h-4 mr-1.5" />
-
+  
   Editar
-</Button>              
+</Button>          
   <Button
     variant="destructive"
     onClick={async () => {

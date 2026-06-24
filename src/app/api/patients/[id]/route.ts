@@ -57,6 +57,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       startDate: body.startDate ? new Date(body.startDate) : undefined,
       referentName: body.referentName || null,
       referentPhone: body.referentPhone || null,
+      therapists: Array.isArray(body.therapistIds)
+  ? { set: body.therapistIds.map((id: string) => ({ id })) }
+  : undefined,
     },
     include: {
       therapists: { select: { id: true, name: true } },

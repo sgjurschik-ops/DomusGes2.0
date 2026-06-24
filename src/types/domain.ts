@@ -38,6 +38,7 @@ export type View =
   | "patient-detail"
   | "new-visit"
   | "new-patient"
+  | "edit-patient"
   | "equipo"
   | "calendar"
   | "reports"

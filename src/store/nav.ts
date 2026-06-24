@@ -24,7 +24,7 @@ interface NavState {
 }
 
 const VALID_VIEWS: View[] = [
-  "dashboard", "patients", "patient-detail", "new-visit", "new-patient",
+  "dashboard", "patients", "patient-detail", "new-visit", "new-patient", "edit-patient",
   "equipo", "calendar", "reports", "settings", "today", "admin-users", "facturacion",
 ];
 
@@ -67,7 +67,7 @@ export const useNav = create<NavState>((set, get) => ({
   back: () => {
     const v = get().view;
     if (v === "new-visit" && get().selectedPatientId) set({ view: "patient-detail" });
-    else if (v === "new-patient" || v === "patient-detail" || v === "new-visit") {
+    else if (v === "new-patient" || v === "edit-patient" || v === "patient-detail" || v === "new-visit") {
       set({ view: "patients" });
       writeHashState("patients", null);
     } else {
