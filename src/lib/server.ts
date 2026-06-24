@@ -67,6 +67,46 @@ export async function audit(
   }
 }
 
+// ─── Patient timeline (last visit / next appointment) ──────────────────────
+// Computes, for a set of patient IDs, the most recent visit date and the
+// next scheduled appointment date — in exactly 2 queries total, regardless
+// of how many patient IDs are passed in. This replaces the old approach of
+// nesting `visits`/`appointments` with `orderBy` + `take: 1` inside a
+// `findMany`/`findUnique` include, which Prisma cannot turn into a single
+// query and instead resolves with one extra query per patient (see notes
+// above `PatientWithRels`).
+export async function getPatientTimelineMap(patientIds: string[]) {
+  const lastVisitMap = new Map<string, Date>();
+  const nextApptMap = new Map<string, Date>();
+  if (patientIds.length === 0) return { lastVisitMap, nextApptMap };
+
+  const [lastVisits, nextAppts] = await Promise.all([
+    db.visit.groupBy({
+      by: ["patientId"],
+      where: { patientId: { in: patientIds } },
+      _max: { date: true },
+    }),
+    db.appointment.groupBy({
+      by: ["patientId"],
+      where: {
+        patientId: { in: patientIds },
+        start: { gt: new Date() },
+        status: "programada",
+      },
+      _min: { start: true },
+    }),
+  ]);
+
+  for (const v of lastVisits) {
+    if (v._max.date) lastVisitMap.set(v.patientId, v._max.date);
+  }
+  for (const a of nextAppts) {
+    if (a._min.start) nextApptMap.set(a.patientId, a._min.start);
+  }
+
+  return { lastVisitMap, nextApptMap };
+}
+
 // ─── Mappers (Prisma row → DTO) ─────────────────────────────────────────────
 
 export function calcAge(birthDate: Date, now: Date = new Date()): number {
@@ -76,21 +116,25 @@ export function calcAge(birthDate: Date, now: Date = new Date()): number {
   return age;
 }
 
+// NOTE on performance: this type intentionally does NOT include `visits` or
+// `appointments` as nested relations. Prisma cannot resolve a nested relation
+// that combines `orderBy` + `take` into a single SQL query — it falls back to
+// issuing one extra query PER PARENT ROW (confirmed Prisma behaviour, not a
+// bug in our code). For a list of N patients that meant 1 + 2N queries.
+// Instead, the caller fetches `lastVisitDate`/`nextAppointmentDate` separately
+// with two aggregate queries (one for the whole list, regardless of N) and
+// passes the result in here.
 type PatientWithRels = Prisma.PatientGetPayload<{
   include: {
     therapists: { select: { id: true; name: true } };
-    visits: { select: { date: true }; orderBy: { date: "desc" }; take: 1 };
-    appointments: {
-      where: { start: { gt: Date } };
-      select: { start: true };
-      orderBy: { start: "asc" };
-      take: 1;
-    };
     _count: { select: { visits: true } };
   };
 }>;
 
-export function mapPatient(p: PatientWithRels) {
+export function mapPatient(
+  p: PatientWithRels,
+  extra: { lastVisitDate: Date | null; nextAppointmentDate: Date | null },
+) {
   const now = new Date();
   return {
     id: p.id,
@@ -112,8 +156,8 @@ export function mapPatient(p: PatientWithRels) {
     therapistIds: p.therapists.map((t) => t.id),
     therapistNames: p.therapists.map((t) => t.name),
     totalVisits: p._count.visits,
-    lastVisitDate: p.visits[0]?.date.toISOString() ?? null,
-    nextAppointmentDate: p.appointments[0]?.start.toISOString() ?? null,
+    lastVisitDate: extra.lastVisitDate?.toISOString() ?? null,
+    nextAppointmentDate: extra.nextAppointmentDate?.toISOString() ?? null,
   };
 }
 

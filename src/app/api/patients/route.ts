@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapPatient } from "@/lib/server";
+import { requireProfessional, audit, mapPatient, getPatientTimelineMap } from "@/lib/server";
 import { patientCreateSchema } from "@/lib/schemas";
 
 export async function GET() {
@@ -10,23 +10,20 @@ export async function GET() {
   const rows = await db.patient.findMany({
     include: {
       therapists: { select: { id: true, name: true } },
-      visits: {
-        select: { date: true },
-        orderBy: { date: "desc" },
-        take: 1,
-      },
-      appointments: {
-        where: { start: { gt: new Date() }, status: "programada" },
-        select: { start: true },
-        orderBy: { start: "asc" },
-        take: 1,
-      },
       _count: { select: { visits: true } },
     },
     orderBy: { lastName: "asc" },
   });
+  const { lastVisitMap, nextApptMap } = await getPatientTimelineMap(rows.map((r) => r.id));
   await audit(prof.id, "patient.list", "Patient", null);
-  return NextResponse.json(rows.map(mapPatient));
+  return NextResponse.json(
+    rows.map((r) =>
+      mapPatient(r, {
+        lastVisitDate: lastVisitMap.get(r.id) ?? null,
+        nextAppointmentDate: nextApptMap.get(r.id) ?? null,
+      }),
+    ),
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -66,16 +63,14 @@ export async function POST(req: NextRequest) {
     },
     include: {
       therapists: { select: { id: true, name: true } },
-      visits: { select: { date: true }, orderBy: { date: "desc" }, take: 1 },
-      appointments: {
-        where: { start: { gt: new Date() } },
-        select: { start: true },
-        orderBy: { start: "asc" },
-        take: 1,
-      },
       _count: { select: { visits: true } },
     },
   });
   await audit(prof.id, "patient.create", "Patient", row.id, { name: `${row.firstName} ${row.lastName}` });
-  return NextResponse.json(mapPatient(row), { status: 201 });
+  // A brand-new patient has no visits or appointments yet, so both are null —
+  // no extra query needed here.
+  return NextResponse.json(
+    mapPatient(row, { lastVisitDate: null, nextAppointmentDate: null }),
+    { status: 201 },
+  );
 }

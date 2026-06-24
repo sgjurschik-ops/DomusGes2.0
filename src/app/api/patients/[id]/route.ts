@@ -1,7 +1,7 @@
 // /api/patients/[id] — detail, update, delete
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, requireAdmin, audit, mapPatient } from "@/lib/server";
+import { requireProfessional, requireAdmin, audit, mapPatient, getPatientTimelineMap } from "@/lib/server";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -12,23 +12,18 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     where: { id },
     include: {
       therapists: { select: { id: true, name: true, color: true, role: true } },
-      visits: {
-        select: { date: true },
-        orderBy: { date: "desc" },
-        take: 1,
-      },
-      appointments: {
-        where: { start: { gt: new Date() } },
-        select: { start: true },
-        orderBy: { start: "asc" },
-        take: 1,
-      },
       _count: { select: { visits: true } },
     },
   });
   if (!row) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  const { lastVisitMap, nextApptMap } = await getPatientTimelineMap([row.id]);
   await audit(prof.id, "patient.view", "Patient", row.id);
-  return NextResponse.json(mapPatient(row));
+  return NextResponse.json(
+    mapPatient(row, {
+      lastVisitDate: lastVisitMap.get(row.id) ?? null,
+      nextAppointmentDate: nextApptMap.get(row.id) ?? null,
+    }),
+  );
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
@@ -63,20 +58,19 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     },
     include: {
       therapists: { select: { id: true, name: true } },
-      visits: { select: { date: true }, orderBy: { date: "desc" }, take: 1 },
-      appointments: {
-        where: { start: { gt: new Date() } },
-        select: { start: true },
-        orderBy: { start: "asc" },
-        take: 1,
-      },
       _count: { select: { visits: true } },
     },
   });
 
+  const { lastVisitMap, nextApptMap } = await getPatientTimelineMap([row.id]);
   await audit(prof.id, "patient.update", "Patient", row.id);
 
-  return NextResponse.json(mapPatient(row));
+  return NextResponse.json(
+    mapPatient(row, {
+      lastVisitDate: lastVisitMap.get(row.id) ?? null,
+      nextAppointmentDate: nextApptMap.get(row.id) ?? null,
+    }),
+  );
 }
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
