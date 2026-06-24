@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { assessmentCreateSchema, type AssessmentCreateInput, ASSESSMENT_SCALES } from "@/lib/schemas";
 import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil } from "lucide-react";
@@ -322,7 +322,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
     watch,
     formState: { errors },
   } = useForm<AssessmentCreateInput>({
-    resolver: zodResolver(assessmentCreateSchema),
+    resolver: zodResolver(assessmentCreateSchema) as Resolver<AssessmentCreateInput>,
     defaultValues: {
       patientId,
       therapistId,

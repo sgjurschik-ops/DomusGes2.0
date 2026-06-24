@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   useCreatePatient,
@@ -52,7 +52,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
     reset,
     formState: { errors },
   } = useForm<PatientCreateInput>({
-    resolver: zodResolver(patientCreateSchema),
+    resolver: zodResolver(patientCreateSchema) as Resolver<PatientCreateInput>,
     defaultValues: {
       firstName: "",
       lastName: "",

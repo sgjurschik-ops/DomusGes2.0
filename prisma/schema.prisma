@@ -57,6 +57,7 @@ model Patient {
   visits        Visit[]
   assessments   Assessment[]
   appointments  Appointment[]
+  occupationalProfile OccupationalProfile?
 
   @@index([status])
   @@index([specialty])
@@ -131,4 +132,59 @@ model AuditLog {
 
   @@index([action, createdAt])
   @@index([entityType, entityId])
+}
+model OccupationalProfile {
+  id        String   @id @default(cuid())
+  patientId String  @unique
+
+  documentsAttached String?
+  interventionReason String?
+  referralResource String?
+
+  drivingLicense String?
+  currentlyDrives Boolean?
+  drivingReason String?
+  maritalStatus String?
+  partnerInfo String?
+  otherSocialInfo String?
+  livingSituation String?
+
+  familyComposition String? // JSON
+  supportNetwork String? // JSON
+  bestRelationship String?
+  worstRelationship String?
+
+  educationLevel String?
+  otherEducation String?
+  workHistory String? // JSON
+  currentWorkSituation String?
+  currentOccupation String?
+  approximateIncome String?
+  moneyManager String?
+  incomeOrganization String?
+
+  dailyRoutine String?
+  selfCare String?
+  domesticTasks String?
+  responsibilities String?
+  leisure String?
+  physicalActivity String?
+  socialParticipation String?
+
+  leisureActivitiesCurrent String?
+  leisureActivitiesPast String?
+  sportsCurrent String?
+  sportsPast String?
+  trainingCurrent String?
+  trainingPast String?
+
+  desiredImprovements String?
+  shortTermGoal1 String?
+  shortTermGoal2 String?
+  shortTermGoal3 String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
