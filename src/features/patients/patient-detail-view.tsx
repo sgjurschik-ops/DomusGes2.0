@@ -75,11 +75,17 @@ export function PatientDetailView() {
               <p className="text-sm text-muted-foreground mt-1">
                 {patient.age} años · {patient.totalVisits} visitas · Inicio {formatDate(patient.startDate)}
               </p>
+
+              {/* Clinical info first — what matters most before a session */}
+              <div className="mt-3 rounded-md bg-accent/40 px-3 py-2.5 space-y-2">
+                <InfoRow icon={Stethoscope} label="Diagnóstico / motivo de derivación" value={patient.diagnosis ?? "—"} />
+                <InfoRow icon={Target} label="Objetivo terapéutico" value={patient.objective ?? "—"} />
+              </div>
+
+              {/* Administrative info — contact, scheduling, referral */}
               <div className="grid sm:grid-cols-2 gap-2 mt-3 text-sm">
                 <InfoRow icon={Phone} label="Teléfono" value={patient.phone ?? "—"} />
                 <InfoRow icon={MapPin} label="Dirección" value={patient.address ?? "—"} />
-                <InfoRow icon={Stethoscope} label="Diagnóstico" value={patient.diagnosis ?? "—"} />
-                <InfoRow icon={Target} label="Objetivo" value={patient.objective ?? "—"} />
                 <InfoRow icon={User2} label="Referente" value={
                   patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"
                 } />

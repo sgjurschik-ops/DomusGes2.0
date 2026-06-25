@@ -203,7 +203,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
                 )}
               />
             </Field>
-            <Field label="Diagnóstico" error={errors.diagnosis?.message} className="sm:col-span-2">
+            <Field label="Diagnóstico / motivo de derivación" error={errors.diagnosis?.message} className="sm:col-span-2">
               <Input id="diagnosis" placeholder="p. ej. Fractura de cadera derecha" {...register("diagnosis")} />
             </Field>
             <Field label="Objetivo terapéutico" error={errors.objective?.message} className="sm:col-span-2">
