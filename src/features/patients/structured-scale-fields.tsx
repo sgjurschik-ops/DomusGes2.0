@@ -99,7 +99,7 @@ function ScaleItemRow({
     <div className="space-y-1.5">
       <Label className="text-xs">{item.label}</Label>
       <Select value={value !== undefined ? String(value) : ""} onValueChange={(v) => onChange(Number(v))}>
-        <SelectTrigger className={value === undefined ? "bg-muted/60" : ""}>
+        <SelectTrigger className={"w-full " + (value === undefined ? "bg-muted/60" : "")}>
           <SelectValue placeholder="Seleccionar" />
         </SelectTrigger>
         <SelectContent>
