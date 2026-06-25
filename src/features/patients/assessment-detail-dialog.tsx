@@ -142,8 +142,14 @@ function AssessmentSummary({
               return (
                 <li key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                   <span className="text-muted-foreground truncate">{item.label}</span>
-                  <span className="font-medium shrink-0">
-                    {opt ? `${opt.value}/${itemMax}` : "—"}
+                  <span className="font-medium shrink-0 text-right">
+                    {opt ? (
+                      <>
+                        {opt.value}/{itemMax} <span className="text-muted-foreground">— {opt.shortLabel}</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
                   </span>
                 </li>
               );

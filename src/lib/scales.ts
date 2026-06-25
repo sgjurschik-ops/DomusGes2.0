@@ -6,7 +6,10 @@
 // by the assessment form (per-item inputs + live total) and can later be
 // reused by any report/printout without duplicating the clinical content.
 
-export type ScaleOption = { value: number; label: string };
+// `shortLabel` is the compact clinical word used in the read-only summary
+// (e.g. "Independiente", "Dependencia parcial") — `label` stays the full
+// descriptive sentence shown in the dropdown while answering.
+export type ScaleOption = { value: number; label: string; shortLabel: string };
 export type ScaleItem = { id: string; label: string; options: ScaleOption[] };
 
 export type ScaleDefinition = {
@@ -27,90 +30,90 @@ const BARTHEL_ITEMS: ScaleItem[] = [
     id: "feeding",
     label: "Alimentación",
     options: [
-      { value: 10, label: "Independiente. Come solo y utiliza correctamente los cubiertos" },
-      { value: 5, label: "Necesita ayuda para cortar, untar o parte de la tarea" },
-      { value: 0, label: "Dependiente" },
+      { value: 10, label: "Independiente. Come solo y utiliza correctamente los cubiertos", shortLabel: "Independiente" },
+      { value: 5, label: "Necesita ayuda para cortar, untar o parte de la tarea", shortLabel: "Ayuda parcial" },
+      { value: 0, label: "Dependiente", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "bathing",
     label: "Baño",
     options: [
-      { value: 5, label: "Independiente para bañarse o ducharse" },
-      { value: 0, label: "Dependiente" },
+      { value: 5, label: "Independiente para bañarse o ducharse", shortLabel: "Independiente" },
+      { value: 0, label: "Dependiente", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "grooming",
     label: "Aseo personal",
     options: [
-      { value: 5, label: "Independiente (lavarse la cara, peinarse, afeitarse, dientes...)" },
-      { value: 0, label: "Dependiente" },
+      { value: 5, label: "Independiente (lavarse la cara, peinarse, afeitarse, dientes...)", shortLabel: "Independiente" },
+      { value: 0, label: "Dependiente", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "dressing",
     label: "Vestido",
     options: [
-      { value: 10, label: "Independiente, incluyendo abrocharse y ayudas técnicas" },
-      { value: 5, label: "Necesita ayuda parcial" },
-      { value: 0, label: "Dependiente" },
+      { value: 10, label: "Independiente, incluyendo abrocharse y ayudas técnicas", shortLabel: "Independiente" },
+      { value: 5, label: "Necesita ayuda parcial", shortLabel: "Ayuda parcial" },
+      { value: 0, label: "Dependiente", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "bowels",
     label: "Control de deposiciones",
     options: [
-      { value: 10, label: "Continente" },
-      { value: 5, label: "Episodios ocasionales o ayuda para enemas/supositorios" },
-      { value: 0, label: "Incontinente" },
+      { value: 10, label: "Continente", shortLabel: "Continente" },
+      { value: 5, label: "Episodios ocasionales o ayuda para enemas/supositorios", shortLabel: "Incontinencia ocasional" },
+      { value: 0, label: "Incontinente", shortLabel: "Incontinente" },
     ],
   },
   {
     id: "bladder",
     label: "Control de micción",
     options: [
-      { value: 10, label: "Continente" },
-      { value: 5, label: "Episodios ocasionales o ayuda con la sonda" },
-      { value: 0, label: "Incontinente" },
+      { value: 10, label: "Continente", shortLabel: "Continente" },
+      { value: 5, label: "Episodios ocasionales o ayuda con la sonda", shortLabel: "Incontinencia ocasional" },
+      { value: 0, label: "Incontinente", shortLabel: "Incontinente" },
     ],
   },
   {
     id: "toilet",
     label: "Uso del retrete",
     options: [
-      { value: 10, label: "Independiente para entrar, salir, limpiarse y vestirse" },
-      { value: 5, label: "Necesita alguna ayuda" },
-      { value: 0, label: "Dependiente" },
+      { value: 10, label: "Independiente para entrar, salir, limpiarse y vestirse", shortLabel: "Independiente" },
+      { value: 5, label: "Necesita alguna ayuda", shortLabel: "Ayuda parcial" },
+      { value: 0, label: "Dependiente", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "transfer",
     label: "Traslado silla-cama",
     options: [
-      { value: 15, label: "Independiente" },
-      { value: 10, label: "Mínima ayuda o supervisión" },
-      { value: 5, label: "Ayuda importante de una o dos personas" },
-      { value: 0, label: "Dependiente; no colabora" },
+      { value: 15, label: "Independiente", shortLabel: "Independiente" },
+      { value: 10, label: "Mínima ayuda o supervisión", shortLabel: "Supervisión mínima" },
+      { value: 5, label: "Ayuda importante de una o dos personas", shortLabel: "Ayuda importante" },
+      { value: 0, label: "Dependiente; no colabora", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "ambulation",
     label: "Deambulación",
     options: [
-      { value: 15, label: "Independiente (puede usar bastón, muletas o andador)" },
-      { value: 10, label: "Ayuda o supervisión para caminar ~50 metros" },
-      { value: 5, label: "Independiente en silla de ruedas al menos 50 metros" },
-      { value: 0, label: "Dependiente" },
+      { value: 15, label: "Independiente (puede usar bastón, muletas o andador)", shortLabel: "Independiente" },
+      { value: 10, label: "Ayuda o supervisión para caminar ~50 metros", shortLabel: "Ayuda o supervisión" },
+      { value: 5, label: "Independiente en silla de ruedas al menos 50 metros", shortLabel: "Independiente en silla de ruedas" },
+      { value: 0, label: "Dependiente", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "stairs",
     label: "Subir y bajar escaleras",
     options: [
-      { value: 10, label: "Independiente" },
-      { value: 5, label: "Ayuda o supervisión" },
-      { value: 0, label: "Dependiente" },
+      { value: 10, label: "Independiente", shortLabel: "Independiente" },
+      { value: 5, label: "Ayuda o supervisión", shortLabel: "Ayuda o supervisión" },
+      { value: 0, label: "Dependiente", shortLabel: "Dependiente" },
     ],
   },
 ];
@@ -140,64 +143,64 @@ const LAWTON_BRODY_ITEMS: ScaleItem[] = [
     id: "phone",
     label: "Uso del teléfono",
     options: [
-      { value: 1, label: "Utiliza el teléfono por iniciativa propia, busca números y llama" },
-      { value: 0, label: "No lo utiliza de forma independiente o necesita ayuda" },
+      { value: 1, label: "Utiliza el teléfono por iniciativa propia, busca números y llama", shortLabel: "Independiente" },
+      { value: 0, label: "No lo utiliza de forma independiente o necesita ayuda", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "shopping",
     label: "Compras",
     options: [
-      { value: 1, label: "Realiza todas las compras de forma independiente" },
-      { value: 0, label: "Necesita ayuda o no puede realizar las compras" },
+      { value: 1, label: "Realiza todas las compras de forma independiente", shortLabel: "Independiente" },
+      { value: 0, label: "Necesita ayuda o no puede realizar las compras", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "food_prep",
     label: "Preparación de comidas",
     options: [
-      { value: 1, label: "Planifica, prepara y sirve comidas adecuadas de forma independiente" },
-      { value: 0, label: "Necesita ayuda o no prepara las comidas" },
+      { value: 1, label: "Planifica, prepara y sirve comidas adecuadas de forma independiente", shortLabel: "Independiente" },
+      { value: 0, label: "Necesita ayuda o no prepara las comidas", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "housekeeping",
     label: "Cuidado de la casa",
     options: [
-      { value: 1, label: "Mantiene la casa con autonomía (puede requerir ayuda en tareas pesadas)" },
-      { value: 0, label: "Necesita ayuda para el mantenimiento del hogar" },
+      { value: 1, label: "Mantiene la casa con autonomía (puede requerir ayuda en tareas pesadas)", shortLabel: "Independiente" },
+      { value: 0, label: "Necesita ayuda para el mantenimiento del hogar", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "laundry",
     label: "Lavado de la ropa",
     options: [
-      { value: 1, label: "Lava toda su ropa de forma independiente" },
-      { value: 0, label: "Necesita ayuda o no realiza esta actividad" },
+      { value: 1, label: "Lava toda su ropa de forma independiente", shortLabel: "Independiente" },
+      { value: 0, label: "Necesita ayuda o no realiza esta actividad", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "transport",
     label: "Uso de medios de transporte",
     options: [
-      { value: 1, label: "Se desplaza solo (transporte público, vehículo propio, taxi o a pie)" },
-      { value: 0, label: "Necesita ayuda para desplazarse" },
+      { value: 1, label: "Se desplaza solo (transporte público, vehículo propio, taxi o a pie)", shortLabel: "Independiente" },
+      { value: 0, label: "Necesita ayuda para desplazarse", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "medication",
     label: "Responsabilidad sobre la medicación",
     options: [
-      { value: 1, label: "Se responsabiliza de tomarla en dosis y horarios adecuados" },
-      { value: 0, label: "Necesita supervisión o que otra persona la administre" },
+      { value: 1, label: "Se responsabiliza de tomarla en dosis y horarios adecuados", shortLabel: "Independiente" },
+      { value: 0, label: "Necesita supervisión o que otra persona la administre", shortLabel: "Dependiente" },
     ],
   },
   {
     id: "finances",
     label: "Manejo de asuntos económicos",
     options: [
-      { value: 1, label: "Administra su dinero, paga facturas y hace gestiones de forma independiente" },
-      { value: 0, label: "Necesita ayuda o no puede gestionar sus finanzas" },
+      { value: 1, label: "Administra su dinero, paga facturas y hace gestiones de forma independiente", shortLabel: "Independiente" },
+      { value: 0, label: "Necesita ayuda o no puede gestionar sus finanzas", shortLabel: "Dependiente" },
     ],
   },
 ];
@@ -223,11 +226,11 @@ export const LAWTON_BRODY: ScaleDefinition = {
 // ─── VAVDI (AVD básicas + instrumentales, nivel de apoyo) ───────────────────
 
 const VAVDI_SUPPORT_OPTIONS: ScaleOption[] = [
-  { value: 1, label: "Autónomo. Lo realiza de forma independiente, segura y sin ayuda" },
-  { value: 2, label: "Requiere supervisión o apoyo mínimo" },
-  { value: 3, label: "Requiere ayuda moderada o guía frecuente (verbal, gestual o física parcial)" },
-  { value: 4, label: "Requiere ayuda importante. Solo realiza parte de la actividad" },
-  { value: 5, label: "Dependiente. La actividad debe ser realizada por otra persona" },
+  { value: 1, label: "Autónomo. Lo realiza de forma independiente, segura y sin ayuda", shortLabel: "Autónomo" },
+  { value: 2, label: "Requiere supervisión o apoyo mínimo", shortLabel: "Supervisión mínima" },
+  { value: 3, label: "Requiere ayuda moderada o guía frecuente (verbal, gestual o física parcial)", shortLabel: "Ayuda moderada" },
+  { value: 4, label: "Requiere ayuda importante. Solo realiza parte de la actividad", shortLabel: "Ayuda importante" },
+  { value: 5, label: "Dependiente. La actividad debe ser realizada por otra persona", shortLabel: "Dependiente" },
 ];
 
 const VAVDI_BASIC_ITEMS: ScaleItem[] = [
