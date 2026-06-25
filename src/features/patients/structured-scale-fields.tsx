@@ -40,7 +40,7 @@ export function StructuredScaleFields({ scale, itemScores, onChange }: Props) {
         VAVDI_BLOCKS.map((block) => (
           <div key={block.title} className="space-y-3">
             <p className="text-xs font-semibold text-foreground">{block.title}</p>
-            <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-3">
               {block.items.map((item) => (
                 <ScaleItemRow
                   key={item.id}
@@ -53,7 +53,7 @@ export function StructuredScaleFields({ scale, itemScores, onChange }: Props) {
           </div>
         ))
       ) : (
-        <div className="grid sm:grid-cols-2 gap-3">
+        <div className="space-y-3">
           {def.items.map((item) => (
             <ScaleItemRow
               key={item.id}

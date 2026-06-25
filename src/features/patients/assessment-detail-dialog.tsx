@@ -140,17 +140,18 @@ function AssessmentSummary({
               // own options, not a shared constant.
               const itemMax = Math.max(...item.options.map((o) => o.value));
               return (
-                <li key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                  <span className="text-muted-foreground truncate">{item.label}</span>
-                  <span className="font-medium shrink-0 text-right">
+                <li key={item.id} className="px-3 py-2 text-sm">
+                  <p className="text-muted-foreground">{item.label}</p>
+                  <p className="font-medium mt-0.5">
                     {opt ? (
                       <>
-                        {opt.value}/{itemMax} <span className="text-muted-foreground">— {opt.shortLabel}</span>
+                        {opt.value}/{itemMax}{" "}
+                        <span className="text-muted-foreground font-normal">— {opt.shortLabel}</span>
                       </>
                     ) : (
                       "—"
                     )}
-                  </span>
+                  </p>
                 </li>
               );
             })}

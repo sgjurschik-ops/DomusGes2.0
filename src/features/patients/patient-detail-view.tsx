@@ -385,10 +385,18 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
 
   async function onSubmit(values: AssessmentCreateInput) {
     const payload = isStructured ? { ...values, itemScores } : values;
-    await create.mutateAsync(payload);
-    toast({ title: "Evaluación registrada" });
-    setItemScores({});
-    reset({ ...values, score: "", notes: "" });
+    try {
+      await create.mutateAsync(payload);
+      toast({ title: "Evaluación registrada" });
+      setItemScores({});
+      reset({ ...values, score: "", notes: "" });
+    } catch {
+      toast({
+        title: "Error al guardar",
+        description: "No se ha podido registrar la evaluación. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    }
   }
 
   function handleScaleChange(value: AssessmentCreateInput["scale"]) {
