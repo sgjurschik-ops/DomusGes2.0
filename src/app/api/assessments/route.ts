@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireProfessional, audit, mapAssessment } from "@/lib/server";
 import { assessmentCreateSchema } from "@/lib/schemas";
+import { generateAreaSummaryData } from "@/lib/scales";
 
 export async function GET(req: NextRequest) {
   const prof = await requireProfessional();
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
     );
   }
   const d = parsed.data;
+  const areaSummaryData = d.itemScores ? generateAreaSummaryData(d.scale, d.itemScores) : null;
   const row = await db.assessment.create({
     data: {
       patientId: d.patientId,
@@ -40,6 +42,7 @@ export async function POST(req: NextRequest) {
       scale: d.scale,
       score: d.score,
       itemScores: d.itemScores ? JSON.stringify(d.itemScores) : null,
+      areaSummary: areaSummaryData ? JSON.stringify(areaSummaryData) : null,
       notes: d.notes || null,
       date: new Date(d.date),
     },

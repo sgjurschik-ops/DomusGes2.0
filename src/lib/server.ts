@@ -4,7 +4,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import type { ProfessionalDTO } from "@/types/domain";
+import type { ProfessionalDTO, AreaSummaryData } from "@/types/domain";
 import type { Prisma } from "@prisma/client";
 
 export async function getCurrentProfessional(): Promise<ProfessionalDTO | null> {
@@ -201,6 +201,7 @@ export function mapAssessment(a: AssessmentWithRels) {
     scale: a.scale,
     score: a.score,
     itemScores: a.itemScores ? (JSON.parse(a.itemScores) as Record<string, number>) : null,
+    areaSummary: a.areaSummary ? (JSON.parse(a.areaSummary) as AreaSummaryData) : null,
     notes: a.notes,
     date: a.date.toISOString(),
   };

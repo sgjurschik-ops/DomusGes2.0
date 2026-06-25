@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireProfessional, audit, mapAssessment } from "@/lib/server";
 import { assessmentUpdateSchema } from "@/lib/schemas";
+import { generateAreaSummaryData } from "@/lib/scales";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -40,6 +41,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     );
   }
   const d = parsed.data;
+  const areaSummaryData = d.itemScores ? generateAreaSummaryData(d.scale, d.itemScores) : null;
 
   const row = await db.assessment.update({
     where: { id },
@@ -47,6 +49,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       scale: d.scale,
       score: d.score,
       itemScores: d.itemScores ? JSON.stringify(d.itemScores) : null,
+      areaSummary: areaSummaryData ? JSON.stringify(areaSummaryData) : null,
       notes: d.notes || null,
       date: new Date(d.date),
     },

@@ -86,8 +86,18 @@ model Assessment {
   id          String   @id @default(cuid())
   patientId   String
   therapistId String
-  scale       String   // EVN | Barthel | Lawton-Brody | PHQ-9 | GAD-7
+  scale       String   // EVN | Barthel | Lawton-Brody | VAVDI | PHQ-9 | GAD-7
   score       String   // "5", "5/8", "12/27" — normalized later for charts
+  itemScores  String?  // JSON-encoded Record<string, number> — only set for
+                        // structured scales (Barthel, Lawton-Brody, VAVDI),
+                        // where each key is an item id and value its score.
+                        // Free-text scales (EVN, PHQ-9, GAD-7) leave this null.
+  areaSummary String?  // JSON-encoded AreaSummaryData (see src/lib/scales.ts):
+                        // strengths/areas-to-work-on grouped by clinical
+                        // block, computed and stored at save time (Barthel/
+                        // VAVDI only) — stored rather than recomputed on
+                        // read, so a past assessment's conclusion doesn't
+                        // silently change if the scoring rules evolve.
   notes       String?
   date        DateTime @default(now())
   createdAt   DateTime @default(now())

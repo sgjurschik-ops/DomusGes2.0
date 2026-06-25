@@ -136,6 +136,20 @@ export const BARTHEL: ScaleDefinition = {
   interpret: interpretBarthel,
 };
 
+// Barthel has no official sub-block grouping (unlike VAVDI), but for the
+// "strengths vs. areas to work on" summary it helps to cluster items into
+// recognizable clinical categories rather than listing 10 items flat.
+export const BARTHEL_BLOCKS = [
+  {
+    title: "Autocuidado",
+    itemIds: ["feeding", "bathing", "grooming", "dressing", "bowels", "bladder", "toilet"],
+  },
+  {
+    title: "Movilidad",
+    itemIds: ["transfer", "ambulation", "stairs"],
+  },
+];
+
 // ─── Lawton-Brody (AVD instrumentales) ──────────────────────────────────────
 
 const LAWTON_BRODY_ITEMS: ScaleItem[] = [
@@ -299,4 +313,97 @@ export function formatScaleScore(scaleId: string, itemScores: Record<string, num
   if (!def) return "";
   const total = computeScaleTotal(scaleId, itemScores);
   return `${total}/${def.maxScore} — ${def.interpret(total)}`;
+}
+
+// ─── Area summary (strengths vs. areas to work on) ──────────────────────────
+//
+// Rule-based (not AI-generated): for a given scale, groups items into their
+// clinical blocks (Barthel: Autocuidado/Movilidad; VAVDI: AVD básicas/AVDI)
+// and, within each block, separates items the person handles well from
+// those that need support — using each item's own best possible score as
+// the bar, since Barthel items have different max values per item.
+//
+// Deterministic by design: the same scores always produce the same result,
+// which matters for clinical use — no variability between runs, no cost
+// per generation, no network dependency.
+
+type AreaBlock = { title: string; items: ScaleItem[] };
+
+function blocksFor(scaleId: string): AreaBlock[] | null {
+  if (scaleId === "VAVDI") return VAVDI_BLOCKS;
+  if (scaleId === "Barthel") {
+    return BARTHEL_BLOCKS.map((b) => ({
+      title: b.title,
+      items: BARTHEL_ITEMS.filter((i) => b.itemIds.includes(i.id)),
+    }));
+  }
+  return null; // Lawton-Brody has no sub-blocks; not covered by this summary.
+}
+
+// An item counts as a strength if its score is at (or above) this fraction
+// of its own maximum. VAVDI's scale is inverted (1 = best), so it's handled
+// separately below rather than through a single shared threshold.
+const BARTHEL_STRENGTH_RATIO = 1; // Barthel: only the item's own max counts as a strength — partial credit still signals a support need.
+const VAVDI_STRENGTH_MAX_SCORE = 2; // VAVDI: 1 (autónomo) or 2 (supervisión mínima) count as a strength.
+
+export type AreaSummaryBlock = { title: string; strengths: string[]; toWork: string[] };
+export type AreaSummaryData = { blocks: AreaSummaryBlock[] };
+
+// Structured version — used by the UI to render strengths/areas-to-work-on
+// as two clearly separated, colored columns instead of a single paragraph.
+export function generateAreaSummaryData(
+  scaleId: string,
+  itemScores: Record<string, number>,
+): AreaSummaryData | null {
+  const blocks = blocksFor(scaleId);
+  if (!blocks) return null;
+
+  const result: AreaSummaryBlock[] = [];
+
+  for (const block of blocks) {
+    const strengths: string[] = [];
+    const toWork: string[] = [];
+
+    for (const item of block.items) {
+      const score = itemScores[item.id];
+      if (score === undefined) continue;
+
+      const isStrength =
+        scaleId === "VAVDI"
+          ? score <= VAVDI_STRENGTH_MAX_SCORE
+          : score >= Math.max(...item.options.map((o) => o.value)) * BARTHEL_STRENGTH_RATIO;
+
+      (isStrength ? strengths : toWork).push(item.label);
+    }
+
+    if (strengths.length === 0 && toWork.length === 0) continue;
+    result.push({ title: block.title, strengths, toWork });
+  }
+
+  return result.length > 0 ? { blocks: result } : null;
+}
+
+// Plain-text version, kept for storage/back-compat (e.g. exporting into a
+// report) — derived from the same structured data so the two never drift.
+export function generateAreaSummary(
+  scaleId: string,
+  itemScores: Record<string, number>,
+): string | null {
+  const data = generateAreaSummaryData(scaleId, itemScores);
+  if (!data) return null;
+
+  const lines = data.blocks.map((block) => {
+    if (block.toWork.length === 0) {
+      return `${block.title}: buen desempeño en todas las áreas evaluadas (${block.strengths.join(", ")}).`;
+    }
+    if (block.strengths.length === 0) {
+      return `${block.title}: requiere apoyo en todas las áreas evaluadas (${block.toWork.join(", ")}).`;
+    }
+    return (
+      `${block.title}: buen desempeño en ${block.strengths.join(", ")}. ` +
+      `Áreas a trabajar: ${block.toWork.join(", ")}.`
+    );
+  });
+
+  return lines.join("\n");
 }

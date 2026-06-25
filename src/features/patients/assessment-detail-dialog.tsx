@@ -16,6 +16,7 @@ import {
 } from "@/lib/schemas";
 import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
+import { AreaSummaryView } from "./area-summary-view";
 import {
   Dialog,
   DialogContent,
@@ -163,6 +164,8 @@ function AssessmentSummary({
         </div>
       )}
 
+      {assessment.areaSummary && <AreaSummaryView data={assessment.areaSummary} />}
+
       {assessment.notes && (
         <div>
           <p className="text-xs text-muted-foreground mb-1">Notas</p>
@@ -303,4 +306,3 @@ function AssessmentEditForm({
     </form>
   );
 }
-

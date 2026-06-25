@@ -4,12 +4,14 @@ import {
   STRUCTURED_SCALE_DEFINITIONS,
   VAVDI_BLOCKS,
   computeScaleTotal,
+  generateAreaSummaryData,
   type ScaleItem,
 } from "@/lib/scales";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { AreaSummaryView } from "./area-summary-view";
 
 type Props = {
   scale: string;
@@ -31,6 +33,7 @@ export function StructuredScaleFields({ scale, itemScores, onChange }: Props) {
   const total = computeScaleTotal(scale, itemScores);
   const answeredCount = def.items.filter((i) => itemScores[i.id] !== undefined).length;
   const isComplete = answeredCount === def.items.length;
+  const areaSummaryData = isComplete ? generateAreaSummaryData(scale, itemScores) : null;
 
   return (
     <div className="sm:col-span-2 space-y-4">
@@ -82,6 +85,8 @@ export function StructuredScaleFields({ scale, itemScores, onChange }: Props) {
           {isComplete ? def.interpret(total) : "Responde todos los ítems para ver la interpretación"}
         </p>
       </div>
+
+      {areaSummaryData && <AreaSummaryView data={areaSummaryData} />}
     </div>
   );
 }

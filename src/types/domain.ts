@@ -101,6 +101,15 @@ export interface VisitDTO {
   createdAt: string;
 }
 
+export interface AreaSummaryBlock {
+  title: string;
+  strengths: string[];
+  toWork: string[];
+}
+export interface AreaSummaryData {
+  blocks: AreaSummaryBlock[];
+}
+
 export interface AssessmentDTO {
   id: string;
   patientId: string;
@@ -110,6 +119,7 @@ export interface AssessmentDTO {
   scale: AssessmentScale;
   score: string;
   itemScores: Record<string, number> | null;
+  areaSummary: AreaSummaryData | null;
   notes: string | null;
   date: string;
 }
