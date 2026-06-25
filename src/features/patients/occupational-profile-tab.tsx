@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Save } from "lucide-react";
+import { Save, FileDown } from "lucide-react";
 
 type Profile = Record<string, any>;
 
@@ -69,6 +69,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
 
   useEffect(() => {
     async function loadProfile() {
@@ -113,6 +114,52 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function generateReport() {
+    setGeneratingReport(true);
+    try {
+      // Save first so the report always reflects what's currently on
+      // screen, even if the person hasn't clicked "Guardar" yet.
+      const saveRes = await fetch(`/api/patients/${patientId}/occupational-profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
+      });
+      if (!saveRes.ok) throw new Error("SAVE_ERROR");
+      const saved = await saveRes.json();
+      setProfile({ ...emptyProfile, ...(saved ?? {}) });
+
+      const res = await fetch(`/api/patients/${patientId}/occupational-profile/report`);
+      if (!res.ok) throw new Error("REPORT_ERROR");
+
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      const fileName = match?.[1] ?? "Perfil_ocupacional.docx";
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Informe generado",
+        description: "El documento Word se ha descargado correctamente.",
+      });
+    } catch {
+      toast({
+        title: "Error",
+        description: "No se ha podido generar el informe Word.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingReport(false);
     }
   }
 
@@ -402,8 +449,12 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         </div>
       </Section>
 
-      <div className="flex justify-end">
-        <Button onClick={save} disabled={saving}>
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={generateReport} disabled={generatingReport || saving}>
+          <FileDown className="w-4 h-4 mr-1.5" />
+          {generatingReport ? "Generando…" : "Generar informe Word"}
+        </Button>
+        <Button onClick={save} disabled={saving || generatingReport}>
           <Save className="w-4 h-4 mr-1.5" />
           {saving ? "Guardando…" : "Guardar perfil ocupacional"}
         </Button>
