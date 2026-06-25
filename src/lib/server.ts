@@ -200,6 +200,7 @@ export function mapAssessment(a: AssessmentWithRels) {
     therapistName: a.therapist.name,
     scale: a.scale,
     score: a.score,
+    itemScores: a.itemScores ? (JSON.parse(a.itemScores) as Record<string, number>) : null,
     notes: a.notes,
     date: a.date.toISOString(),
   };

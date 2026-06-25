@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
       therapistId: d.therapistId,
       scale: d.scale,
       score: d.score,
+      itemScores: d.itemScores ? JSON.stringify(d.itemScores) : null,
       notes: d.notes || null,
       date: new Date(d.date),
     },

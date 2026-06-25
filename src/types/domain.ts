@@ -25,6 +25,7 @@ export type AssessmentScale =
   | "EVN" // Escala Visual Numérica (dolor)
   | "Barthel" // AVD básicas
   | "Lawton-Brody" // AVD instrumentales
+  | "VAVDI" // AVD básicas + instrumentales, nivel de apoyo
   | "PHQ-9" // Depresión
   | "GAD-7" // Ansiedad
   | "Mini-Mental" // Estado cognitivo
@@ -108,6 +109,7 @@ export interface AssessmentDTO {
   therapistName: string;
   scale: AssessmentScale;
   score: string;
+  itemScores: Record<string, number> | null;
   notes: string | null;
   date: string;
 }

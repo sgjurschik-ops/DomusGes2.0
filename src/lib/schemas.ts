@@ -31,11 +31,18 @@ export const ASSESSMENT_SCALES = [
   "EVN",
   "Barthel",
   "Lawton-Brody",
+  "VAVDI",
   "PHQ-9",
   "GAD-7",
   "Mini-Mental",
   "FIM",
 ] as const;
+
+// Scales with a structured, item-by-item form (score is computed, not
+// typed in by hand). Any scale not in this list keeps the free-text score
+// field as before.
+export const STRUCTURED_SCALES = ["Barthel", "Lawton-Brody", "VAVDI"] as const;
+export type StructuredScale = (typeof STRUCTURED_SCALES)[number];
 
 export const PROFESSIONAL_COLORS = [
   "#1a5c58", // brand teal
@@ -128,6 +135,10 @@ export const assessmentCreateSchema = z.object({
   therapistId: z.string().min(1, "Terapeuta obligatorio"),
   scale: z.enum(ASSESSMENT_SCALES),
   score: z.string().min(1, "La puntuación es obligatoria"),
+  // Only present for structured scales (Barthel, Lawton-Brody, VAVDI): a
+  // map of item id -> score for that item, used to recompute the total
+  // and let the report show the per-item breakdown later if needed.
+  itemScores: z.record(z.string(), z.number()).optional(),
   notes: z.string().optional().default(""),
   date: z.string().min(1, "La fecha es obligatoria"),
 });

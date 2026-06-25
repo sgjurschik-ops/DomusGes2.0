@@ -16,9 +16,11 @@ import {
 } from "@/components/ui/select";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { assessmentCreateSchema, type AssessmentCreateInput, ASSESSMENT_SCALES } from "@/lib/schemas";
+import { assessmentCreateSchema, type AssessmentCreateInput, ASSESSMENT_SCALES, STRUCTURED_SCALES } from "@/lib/schemas";
+import { formatScaleScore } from "@/lib/scales";
+import { StructuredScaleFields } from "./structured-scale-fields";
 import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -321,6 +323,7 @@ function InfoRow({
 
 function AssessmentForm({ patientId, therapistId }: { patientId: string; therapistId: string }) {
   const create = useCreateAssessment();
+  const [itemScores, setItemScores] = useState<Record<string, number>>({});
   const {
     register,
     handleSubmit,
@@ -340,10 +343,35 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
     },
   });
 
+  const scale = watch("scale");
+  const isStructured = (STRUCTURED_SCALES as readonly string[]).includes(scale);
+  const structuredItemCount = isStructured
+    ? Object.keys(itemScores).length
+    : 0;
+
+  // Keep the (hidden, but still registered) `score` field in sync with the
+  // computed total as items are answered. This matters because
+  // react-hook-form/Zod validate `score` on submit regardless of whether
+  // the input is visually shown — hiding the field without updating its
+  // value left `score` empty, so validation silently failed and the
+  // submit handler never ran (no value -> no API call -> nothing visible).
+  useEffect(() => {
+    if (isStructured) {
+      setValue("score", formatScaleScore(scale, itemScores), { shouldValidate: false });
+    }
+  }, [isStructured, scale, itemScores, setValue]);
+
   async function onSubmit(values: AssessmentCreateInput) {
-    await create.mutateAsync(values);
+    const payload = isStructured ? { ...values, itemScores } : values;
+    await create.mutateAsync(payload);
     toast({ title: "Evaluación registrada" });
+    setItemScores({});
     reset({ ...values, score: "", notes: "" });
+  }
+
+  function handleScaleChange(value: AssessmentCreateInput["scale"]) {
+    setValue("scale", value);
+    setItemScores({});
   }
 
   return (
@@ -360,10 +388,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
           <input type="hidden" {...register("therapistId")} />
           <div className="space-y-1.5">
             <Label htmlFor="scale" className="text-xs">Escala</Label>
-            <Select
-              value={watch("scale")}
-              onValueChange={(v) => setValue("scale", v as AssessmentCreateInput["scale"])}
-            >
+            <Select value={scale} onValueChange={handleScaleChange}>
               <SelectTrigger id="scale"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {ASSESSMENT_SCALES.map((s) => (
@@ -372,22 +397,38 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="score" className="text-xs">Puntuación</Label>
-            <Input id="score" placeholder="p. ej. 5/10, 18/27" {...register("score")} />
-            {errors.score && <p className="text-xs text-destructive">{errors.score.message}</p>}
-          </div>
+          {isStructured ? (
+            <input type="hidden" {...register("score")} />
+          ) : (
+            <div className="space-y-1.5">
+              <Label htmlFor="score" className="text-xs">Puntuación</Label>
+              <Input id="score" placeholder="p. ej. 5/10, 18/27" {...register("score")} />
+              {errors.score && <p className="text-xs text-destructive">{errors.score.message}</p>}
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="date" className="text-xs">Fecha</Label>
             <Input id="date" type="date" {...register("date")} />
             {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
           </div>
+
+          {isStructured && (
+            <StructuredScaleFields scale={scale} itemScores={itemScores} onChange={setItemScores} />
+          )}
+
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="notes" className="text-xs">Notas (opcional)</Label>
             <Textarea id="notes" rows={2} {...register("notes")} />
           </div>
           <div className="sm:col-span-2 flex justify-end">
-            <Button type="submit" size="sm" disabled={create.isPending}>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={
+                create.isPending ||
+                (isStructured && structuredItemCount < (STRUCTURED_SCALES as readonly string[]).length)
+              }
+            >
               {create.isPending ? "Guardando…" : "Añadir evaluación"}
             </Button>
           </div>
