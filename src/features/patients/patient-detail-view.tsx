@@ -19,6 +19,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { assessmentCreateSchema, type AssessmentCreateInput, ASSESSMENT_SCALES, STRUCTURED_SCALES } from "@/lib/schemas";
 import { formatScaleScore } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
+import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -35,6 +36,7 @@ export function PatientDetailView() {
   const { data: professionals } = useProfessionals();
   const deletePatient = useDeletePatient();
   const updatePatient = useUpdatePatient();
+  const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
 
   if (!selectedPatientId) {
     return <p className="text-sm text-muted-foreground">Selecciona un paciente.</p>;
@@ -275,15 +277,21 @@ export function PatientDetailView() {
               <CardContent className="p-0">
                 <ul className="divide-y divide-border">
                   {assessments.map((a) => (
-                    <li key={a.id} className="px-4 py-3 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium">{a.scale}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(a.date)} · {a.therapistName}
-                        </p>
-                        {a.notes && <p className="text-xs text-muted-foreground mt-1 italic">{a.notes}</p>}
-                      </div>
-                      <span className="font-mono text-sm font-semibold">{a.score}</span>
+                    <li key={a.id}>
+                      <button
+                        type="button"
+                        onClick={() => setOpenAssessmentId(a.id)}
+                        className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left hover:bg-muted/50 transition-colors"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{a.scale}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(a.date)} · {a.therapistName}
+                          </p>
+                          {a.notes && <p className="text-xs text-muted-foreground mt-1 italic">{a.notes}</p>}
+                        </div>
+                        <span className="font-mono text-sm font-semibold shrink-0">{a.score}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -297,6 +305,14 @@ export function PatientDetailView() {
           <ProgressChart assessments={assessments ?? []} />
         </TabsContent>
       </Tabs>
+
+      {openAssessmentId && (
+        <AssessmentDetailDialog
+          assessmentId={openAssessmentId}
+          patientId={patient.id}
+          onClose={() => setOpenAssessmentId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -336,7 +352,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
     defaultValues: {
       patientId,
       therapistId,
-      scale: "EVN",
+      scale: "VAVDI",
       score: "",
       notes: "",
       date: new Date().toISOString().slice(0, 10),

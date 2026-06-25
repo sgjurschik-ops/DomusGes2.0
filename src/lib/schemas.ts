@@ -28,10 +28,10 @@ export const APPOINTMENT_STATUSES = [
   "no_show",
 ] as const;
 export const ASSESSMENT_SCALES = [
-  "EVN",
+  "VAVDI",
   "Barthel",
   "Lawton-Brody",
-  "VAVDI",
+  "EVN",
   "PHQ-9",
   "GAD-7",
   "Mini-Mental",
@@ -143,6 +143,17 @@ export const assessmentCreateSchema = z.object({
   date: z.string().min(1, "La fecha es obligatoria"),
 });
 export type AssessmentCreateInput = z.infer<typeof assessmentCreateSchema>;
+
+// Editing an existing assessment never changes which patient/therapist it
+// belongs to — only the scale's answers, date or notes.
+export const assessmentUpdateSchema = z.object({
+  scale: z.enum(ASSESSMENT_SCALES),
+  score: z.string().min(1, "La puntuación es obligatoria"),
+  itemScores: z.record(z.string(), z.number()).optional(),
+  notes: z.string().optional().default(""),
+  date: z.string().min(1, "La fecha es obligatoria"),
+});
+export type AssessmentUpdateInput = z.infer<typeof assessmentUpdateSchema>;
 
 // ─── Appointment ─────────────────────────────────────────────────────────────
 
