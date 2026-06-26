@@ -143,6 +143,56 @@ function computeDurationLabel(start?: string, end?: string): string | null {
 
 // Minutes elapsed since midnight, refreshed every minute, so the "current
 // time" line in week/day view stays accurate if the page is left open.
+
+// Generates "HH:mm" options every 30 minutes across the day, used by
+// TimeSelect so people pick a start/end time from a dropdown instead of
+// typing it in by hand. Starts at 00:00 and covers the full 24h so an
+// existing appointment/reservation outside the usual 7–20h agenda window
+// (e.g. one entered before this feature existed) still has its exact time
+// available as an option.
+function generateTimeOptions(): string[] {
+  const options: string[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (const m of [0, 30]) {
+      options.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    }
+  }
+  return options;
+}
+const TIME_OPTIONS = generateTimeOptions();
+
+// Dropdown for picking a time in 30-minute steps. If the current value
+// doesn't fall on a 30-minute mark (e.g. an older record saved at :15),
+// it's still included as an extra option so the field never silently
+// shows something different from what's actually saved.
+function TimeSelect({
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  ariaLabel: string;
+}) {
+  const options = TIME_OPTIONS.includes(value) || !value
+    ? TIME_OPTIONS
+    : [...TIME_OPTIONS, value].sort();
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger aria-label={ariaLabel}>
+        <SelectValue placeholder="Hora" />
+      </SelectTrigger>
+      <SelectContent className="max-h-72">
+        {options.map((t) => (
+          <SelectItem key={t} value={t}>
+            {t}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function useNowMinutes(): number {
   const [minutes, setMinutes] = useState(() => {
     const n = new Date();
@@ -319,10 +369,16 @@ export function CalendarView() {
             </Button>
           </div>
 
-          <Button size="sm" onClick={() => openCreateAppt()}>
-            <Plus className="w-4 h-4 mr-1" />
-            Nueva cita
-          </Button>
+          <div className="flex flex-col gap-1.5">
+            <Button size="sm" onClick={() => openCreateAppt()}>
+              <Plus className="w-4 h-4 mr-1" />
+              Nueva cita
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => openCreateReservation()}>
+              <Lock className="w-4 h-4 mr-1" />
+              Reserva de espacio
+            </Button>
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-2 flex-wrap pb-3 border-b">
@@ -1552,10 +1608,22 @@ function AppointmentFormDialog({
 
           <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
             <Field label="Hora inicio" error={errors.time?.message} required>
-              <Input type="time" {...register("time")} />
+              <Controller
+                control={control}
+                name="time"
+                render={({ field }) => (
+                  <TimeSelect value={field.value} onChange={field.onChange} ariaLabel="Hora inicio" />
+                )}
+              />
             </Field>
             <Field label="Hora fin" error={errors.endTime?.message} required>
-              <Input type="time" {...register("endTime")} />
+              <Controller
+                control={control}
+                name="endTime"
+                render={({ field }) => (
+                  <TimeSelect value={field.value} onChange={field.onChange} ariaLabel="Hora fin" />
+                )}
+              />
             </Field>
             <div className="space-y-1.5 pb-2">
               <span className="inline-flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm text-muted-foreground whitespace-nowrap">
@@ -1768,10 +1836,22 @@ function ReservationFormDialog({
 
           <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
             <Field label="Hora inicio" error={errors.time?.message} required>
-              <Input type="time" {...register("time")} />
+              <Controller
+                control={control}
+                name="time"
+                render={({ field }) => (
+                  <TimeSelect value={field.value} onChange={field.onChange} ariaLabel="Hora inicio" />
+                )}
+              />
             </Field>
             <Field label="Hora fin" error={errors.endTime?.message} required>
-              <Input type="time" {...register("endTime")} />
+              <Controller
+                control={control}
+                name="endTime"
+                render={({ field }) => (
+                  <TimeSelect value={field.value} onChange={field.onChange} ariaLabel="Hora fin" />
+                )}
+              />
             </Field>
             <div className="space-y-1.5 pb-2">
               <span className="inline-flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm text-muted-foreground whitespace-nowrap">
