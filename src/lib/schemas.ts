@@ -221,6 +221,7 @@ export type AppointmentUpdateInput = z.infer<typeof appointmentUpdateSchema>;
 export const slotReservationCreateSchema = z
   .object({
     therapistId: z.string().min(1, "Terapeuta obligatorio"),
+    categoryId: z.string().optional(),
     title: z.string().min(1, "El título es obligatorio"),
     date: z.string().min(1, "La fecha es obligatoria"),
     time: z.string().min(1, "La hora de inicio es obligatoria"),
@@ -236,6 +237,7 @@ export type SlotReservationCreateInput = z.infer<typeof slotReservationCreateSch
 export const slotReservationUpdateSchema = z
   .object({
     therapistId: z.string().min(1, "Terapeuta obligatorio"),
+    categoryId: z.string().optional(),
     title: z.string().min(1, "El título es obligatorio"),
     date: z.string().min(1, "La fecha es obligatoria"),
     time: z.string().min(1, "La hora de inicio es obligatoria"),
@@ -254,3 +256,18 @@ export const slotReservationMoveSchema = z.object({
   durationMin: z.coerce.number().int().min(15).max(480).optional(),
 });
 export type SlotReservationMoveInput = z.infer<typeof slotReservationMoveSchema>;
+
+// ─── Reservation categories (per-professional labels with a color, used to
+// tag slot reservations as e.g. "Trabajo", "Personal", "Vacaciones") ────────
+
+export const reservationCategoryCreateSchema = z.object({
+  name: z.string().min(1, "El nombre es obligatorio").max(40, "Máximo 40 caracteres"),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Color inválido"),
+});
+export type ReservationCategoryCreateInput = z.infer<typeof reservationCategoryCreateSchema>;
+
+export const reservationCategoryUpdateSchema = z.object({
+  name: z.string().min(1, "El nombre es obligatorio").max(40, "Máximo 40 caracteres"),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Color inválido"),
+});
+export type ReservationCategoryUpdateInput = z.infer<typeof reservationCategoryUpdateSchema>;

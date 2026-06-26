@@ -31,6 +31,7 @@ model Professional {
   assessments  Assessment[]
   appointments Appointment[]
   slotReservations SlotReservation[]
+  reservationCategories ReservationCategory[]
   auditLogs    AuditLog[]
 
   @@index([isActive])
@@ -130,16 +131,31 @@ model Appointment {
   @@index([start])
 }
 
+model ReservationCategory {
+  id             String   @id @default(cuid())
+  professionalId String
+  name           String
+  color          String
+  createdAt      DateTime @default(now())
+
+  professional   Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  reservations   SlotReservation[]
+
+  @@index([professionalId])
+}
+
 model SlotReservation {
   id          String   @id @default(cuid())
   therapistId String
+  categoryId  String?
   title       String
   start       DateTime
   durationMin Int      @default(45)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  therapist   Professional @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  therapist   Professional         @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  category    ReservationCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@index([therapistId, start])
   @@index([start])

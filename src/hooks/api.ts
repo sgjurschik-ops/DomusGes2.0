@@ -52,10 +52,11 @@ export function useCurrentSession() {
 
 // ─── Patients ────────────────────────────────────────────────────────────────
 
-import type { PatientDTO, VisitDTO, AssessmentDTO, AppointmentDTO, SlotReservationDTO, ProfessionalDTO, AuditLogDTO } from "@/types/domain";
+import type { PatientDTO, VisitDTO, AssessmentDTO, AppointmentDTO, SlotReservationDTO, ReservationCategoryDTO, ProfessionalDTO, AuditLogDTO } from "@/types/domain";
 import type {
   PatientCreateInput, VisitCreateInput, VisitUpdateInput, AssessmentCreateInput, AssessmentUpdateInput,
   AppointmentCreateInput, SlotReservationCreateInput, SlotReservationUpdateInput, AppointmentUpdateInput, ProfessionalCreateInput, ProfessionalUpdateInput,
+  ReservationCategoryCreateInput, ReservationCategoryUpdateInput,
 } from "@/lib/schemas";
 
 export const patientKeys = {
@@ -322,6 +323,53 @@ export function useDeleteReservation() {
   return useMutation({
     mutationFn: (id: string) => fetcher(`/api/reservations/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["reservations"] }),
+  });
+}
+
+// ─── Reservation categories (personal, per-professional) ──────────────────────
+
+export function useReservationCategories() {
+  return useQuery<ReservationCategoryDTO[]>({
+    queryKey: ["reservation-categories"],
+    queryFn: () => fetcher("/api/reservation-categories"),
+  });
+}
+
+export function useCreateReservationCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ReservationCategoryCreateInput) =>
+      fetcher<ReservationCategoryDTO>("/api/reservation-categories", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["reservation-categories"] }),
+  });
+}
+
+export function useUpdateReservationCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: ReservationCategoryUpdateInput }) =>
+      fetcher<ReservationCategoryDTO>(`/api/reservation-categories/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reservation-categories"] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
+    },
+  });
+}
+
+export function useDeleteReservationCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => fetcher(`/api/reservation-categories/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reservation-categories"] });
+      qc.invalidateQueries({ queryKey: ["reservations"] });
+    },
   });
 }
 

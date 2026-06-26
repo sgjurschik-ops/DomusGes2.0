@@ -19,7 +19,7 @@ import {
   addMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Lock, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Lock, AlertTriangle, Trash2 } from "lucide-react";
 
 import {
   useAppointments,
@@ -30,6 +30,10 @@ import {
   useReservations,
   useCreateReservation,
   useUpdateReservation,
+  useReservationCategories,
+  useCreateReservationCategory,
+  useUpdateReservationCategory,
+  useDeleteReservationCategory,
   useMoveReservation,
   useDeleteReservation,
   usePatients,
@@ -77,7 +81,7 @@ import {
   type SlotReservationUpdateInput,
   APPOINTMENT_TYPES,
 } from "@/lib/schemas";
-import type { AppointmentDTO, SlotReservationDTO } from "@/types/domain";
+import type { AppointmentDTO, SlotReservationDTO, ReservationCategoryDTO } from "@/types/domain";
 
 type ViewMode = "month" | "week" | "day";
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -589,10 +593,19 @@ function MonthView({
                         );
                       }}
                       onClick={() => onSelectReservation(r)}
-                      className={`flex items-center gap-1.5 text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate transition-colors hover:bg-muted ${
-                        overlapsAppt ? "bg-amber-50 border-amber-300" : "bg-muted/60 border-border"
+                      className={`flex items-center gap-1.5 text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate transition-colors hover:opacity-80 ${
+                        overlapsAppt
+                          ? "bg-amber-50 border-amber-300"
+                          : r.categoryColor
+                            ? "border-transparent"
+                            : "bg-muted/60 border-border"
                       }`}
-                      title={`${r.title} · ${format(new Date(r.start), "HH:mm")}${overlapsAppt ? " · Se solapa con una cita" : ""}`}
+                      style={
+                        !overlapsAppt && r.categoryColor
+                          ? { backgroundColor: `${r.categoryColor}33`, borderColor: `${r.categoryColor}80` }
+                          : undefined
+                      }
+                      title={`${r.title} · ${format(new Date(r.start), "HH:mm")}${r.categoryName ? ` · ${r.categoryName}` : ""}${overlapsAppt ? " · Se solapa con una cita" : ""}`}
                     >
                       <Lock className="w-3 h-3 shrink-0 text-muted-foreground" />
                       <span className="font-semibold shrink-0">{format(new Date(r.start), "HH:mm")}</span>
@@ -1049,10 +1062,20 @@ function DayColumn({
             role="button"
             tabIndex={0}
             className={`group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible border z-[5] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-ring ${
-              overlapsAppt ? "bg-amber-50 border-amber-300" : "bg-muted/70 border-border"
+              overlapsAppt
+                ? "bg-amber-50 border-amber-300"
+                : r.categoryColor
+                  ? "border-transparent"
+                  : "bg-muted/70 border-border"
             }`}
-            style={{ top, height: Math.max(18, height) }}
-            aria-label={`Reserva de espacio "${r.title}" ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}${overlapsAppt ? ", se solapa con una cita" : ""}`}
+            style={{
+              top,
+              height: Math.max(18, height),
+              ...(!overlapsAppt && r.categoryColor
+                ? { backgroundColor: `${r.categoryColor}33`, borderColor: `${r.categoryColor}80` }
+                : {}),
+            }}
+            aria-label={`Reserva de espacio "${r.title}" ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}${r.categoryName ? `, ${r.categoryName}` : ""}${overlapsAppt ? ", se solapa con una cita" : ""}`}
           >
             <ResizeHandle
               position="top"
@@ -1604,6 +1627,7 @@ function ReservationFormDialog({
   const create = useCreateReservation();
   const update = useUpdateReservation();
   const { data: professionals } = useProfessionals();
+  const { data: categories } = useReservationCategories();
 
   const schema = mode === "edit" ? slotReservationUpdateSchema : slotReservationCreateSchema;
 
@@ -1613,6 +1637,7 @@ function ReservationFormDialog({
     control,
     reset,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<
     z.input<typeof slotReservationCreateSchema> | z.input<typeof slotReservationUpdateSchema>,
@@ -1624,6 +1649,7 @@ function ReservationFormDialog({
       mode === "edit" && reservation
         ? {
             therapistId: reservation.therapistId,
+            categoryId: reservation.categoryId ?? undefined,
             title: reservation.title,
             date: reservation.start.slice(0, 10),
             time: reservation.start.slice(11, 16),
@@ -1631,6 +1657,7 @@ function ReservationFormDialog({
           }
         : {
             therapistId: "",
+            categoryId: undefined,
             title: "",
             date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
             time: preset?.time ?? "10:00",
@@ -1643,6 +1670,7 @@ function ReservationFormDialog({
     if (mode === "edit" && reservation) {
       reset({
         therapistId: reservation.therapistId,
+        categoryId: reservation.categoryId ?? undefined,
         title: reservation.title,
         date: reservation.start.slice(0, 10),
         time: reservation.start.slice(11, 16),
@@ -1651,6 +1679,7 @@ function ReservationFormDialog({
     } else if (mode === "create") {
       reset({
         therapistId: "",
+        categoryId: undefined,
         title: "",
         date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
         time: preset?.time ?? "10:00",
@@ -1662,6 +1691,7 @@ function ReservationFormDialog({
   const watchedStartTime = watch("time");
   const watchedEndTime = watch("endTime");
   const computedDuration = computeDurationLabel(watchedStartTime, watchedEndTime);
+  const watchedCategoryId = watch("categoryId");
 
   async function onSubmit(values: SlotReservationCreateInput | SlotReservationUpdateInput) {
     try {
@@ -1701,6 +1731,14 @@ function ReservationFormDialog({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <Field label="Título" error={errors.title?.message} required>
             <Input placeholder="p. ej. Roco, Formación, Reunión de equipo…" {...register("title")} />
+          </Field>
+
+          <Field label="Categoría" error={(errors as any).categoryId?.message}>
+            <CategoryPicker
+              categories={categories ?? []}
+              value={watchedCategoryId}
+              onChange={(id) => setValue("categoryId", id, { shouldDirty: true })}
+            />
           </Field>
 
           <Field label="Terapeuta" error={errors.therapistId?.message} required>
@@ -1757,6 +1795,192 @@ function ReservationFormDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── Category picker: pick an existing personal category, or create/edit/
+// delete one inline without leaving the reservation form ───────────────────
+
+const CATEGORY_COLOR_PALETTE = [
+  "#a8c5b3", // sage
+  "#b8a9d9", // lavender
+  "#e8b896", // peach
+  "#9fc5d9", // sky
+  "#d9a9b8", // rose
+  "#c9c08f", // sand
+  "#a9c9c0", // mint
+  "#d9c2a9", // tan
+];
+
+function CategoryPicker({
+  categories,
+  value,
+  onChange,
+}: {
+  categories: ReservationCategoryDTO[];
+  value: string | undefined;
+  onChange: (id: string | undefined) => void;
+}) {
+  const createCategory = useCreateReservationCategory();
+  const updateCategory = useUpdateReservationCategory();
+  const deleteCategory = useDeleteReservationCategory();
+  const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const [draftColor, setDraftColor] = useState(CATEGORY_COLOR_PALETTE[0]);
+
+  function startCreate() {
+    setCreating(true);
+    setEditingId(null);
+    setDraftName("");
+    setDraftColor(CATEGORY_COLOR_PALETTE[0]);
+  }
+
+  function startEdit(cat: ReservationCategoryDTO) {
+    setEditingId(cat.id);
+    setCreating(false);
+    setDraftName(cat.name);
+    setDraftColor(cat.color);
+  }
+
+  async function saveDraft() {
+    const name = draftName.trim();
+    if (!name) return;
+    try {
+      if (editingId) {
+        await updateCategory.mutateAsync({ id: editingId, data: { name, color: draftColor } });
+      } else {
+        const created = await createCategory.mutateAsync({ name, color: draftColor });
+        onChange(created.id);
+      }
+      setCreating(false);
+      setEditingId(null);
+    } catch {
+      toast({ title: "Error al guardar la categoría", variant: "destructive" });
+    }
+  }
+
+  async function removeCategory(id: string) {
+    const ok = confirm("¿Eliminar esta categoría? Las reservas que la usan se quedarán sin categoría.");
+    if (!ok) return;
+    try {
+      await deleteCategory.mutateAsync(id);
+      if (value === id) onChange(undefined);
+    } catch {
+      toast({ title: "Error al eliminar la categoría", variant: "destructive" });
+    }
+  }
+
+  const isEditorOpen = creating || editingId !== null;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          onClick={() => onChange(undefined)}
+          className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+            !value ? "border-foreground/40 bg-muted" : "border-border text-muted-foreground hover:bg-muted/50"
+          }`}
+        >
+          Sin categoría
+        </button>
+        {categories.map((cat) => (
+          <div key={cat.id} className="group relative">
+            <button
+              type="button"
+              onClick={() => onChange(cat.id)}
+              className={`flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-full text-xs border transition-colors ${
+                value === cat.id ? "border-foreground/40" : "border-border hover:bg-muted/50"
+              }`}
+              style={{ backgroundColor: value === cat.id ? `${cat.color}33` : undefined }}
+            >
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+              {cat.name}
+            </button>
+            <button
+              type="button"
+              onClick={() => startEdit(cat)}
+              className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-card border border-border opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+              aria-label={`Editar categoría ${cat.name}`}
+            >
+              <Pencil className="w-2.5 h-2.5" />
+            </button>
+          </div>
+        ))}
+        {!isEditorOpen && (
+          <button
+            type="button"
+            onClick={startCreate}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border border-dashed border-border text-muted-foreground hover:bg-muted/50 transition-colors"
+          >
+            <Plus className="w-3 h-3" /> Nueva
+          </button>
+        )}
+      </div>
+
+      {isEditorOpen && (
+        <div className="rounded-md border bg-muted/30 p-3 space-y-2.5">
+          <Input
+            placeholder="Nombre (p. ej. Trabajo, Personal, Vacaciones…)"
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            className="h-8 text-sm"
+            autoFocus
+          />
+          <div className="flex items-center gap-1.5">
+            {CATEGORY_COLOR_PALETTE.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setDraftColor(c)}
+                className={`w-6 h-6 rounded-full transition-transform ${
+                  draftColor === c ? "ring-2 ring-offset-1 ring-foreground/50 scale-110" : ""
+                }`}
+                style={{ backgroundColor: c }}
+                aria-label={`Color ${c}`}
+              />
+            ))}
+          </div>
+          <div className="flex items-center justify-between gap-2 pt-1">
+            {editingId && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive h-7 px-2"
+                onClick={() => removeCategory(editingId)}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" /> Eliminar
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7"
+                onClick={() => {
+                  setCreating(false);
+                  setEditingId(null);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="h-7"
+                onClick={saveDraft}
+                disabled={!draftName.trim() || createCategory.isPending || updateCategory.isPending}
+              >
+                Guardar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
