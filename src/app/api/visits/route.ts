@@ -42,7 +42,6 @@ export async function POST(req: NextRequest) {
       durationMin: d.durationMin,
       notes: d.notes,
       interventions: JSON.stringify(d.interventions),
-      score: d.score ?? null,
     },
     include: {
       patient: { select: { firstName: true, lastName: true } },

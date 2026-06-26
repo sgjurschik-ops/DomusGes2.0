@@ -111,13 +111,13 @@ export function ReportsView() {
           hint="Total en seguimiento activo"
         />
         <KpiCard
-          label="Visitas (90 días)"
+          label="Seguimientos (90 días)"
           icon={Activity}
           value={isLoading ? null : derived.visits90}
           hint="Sesiones registradas"
         />
         <KpiCard
-          label="Media visitas / paciente"
+          label="Media seguimientos / paciente"
           icon={TrendingUp}
           value={isLoading ? null : derived.avgVisits.toFixed(1)}
           hint="Sobre pacientes con actividad"
@@ -130,7 +130,7 @@ export function ReportsView() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-primary" />
-              Visitas por especialidad
+              Seguimientos por especialidad
             </CardTitle>
             <CardDescription className="text-xs">Últimos 90 días</CardDescription>
           </CardHeader>
@@ -138,7 +138,7 @@ export function ReportsView() {
             {isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : derived.bySpecialty.every((s) => s.value === 0) ? (
-              <EmptyChart label="No hay visitas en los últimos 90 días" />
+              <EmptyChart label="No hay seguimientos en los últimos 90 días" />
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart
@@ -160,7 +160,7 @@ export function ReportsView() {
                   />
                   <Tooltip
                     cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-                    formatter={(v: number | string) => [`${v} visitas`, "Visitas"]}
+                    formatter={(v: number | string) => [`${v} seguimientos`, "Seguimientos"]}
                   />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                     {derived.bySpecialty.map((s) => (
@@ -217,7 +217,7 @@ export function ReportsView() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Trophy className="w-4 h-4 text-primary" />
-            Top 10 pacientes por número de visitas
+            Top 10 pacientes por número de seguimientos
           </CardTitle>
           <CardDescription className="text-xs">
             Histórico acumulado por paciente
@@ -245,8 +245,8 @@ export function ReportsView() {
                   <TableHead className="w-10 text-right">#</TableHead>
                   <TableHead>Paciente</TableHead>
                   <TableHead>Especialidad</TableHead>
-                  <TableHead className="text-right">Visitas</TableHead>
-                  <TableHead>Última visita</TableHead>
+                  <TableHead className="text-right">Seguimientos</TableHead>
+                  <TableHead>Último seguimiento</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

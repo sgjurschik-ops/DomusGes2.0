@@ -124,9 +124,18 @@ export const visitCreateSchema = z.object({
   durationMin: z.coerce.number().int().min(15).max(240).default(45),
   notes: z.string().min(1, "Las notas clínicas son obligatorias"),
   interventions: z.array(z.string()).default([]),
-  score: z.coerce.number().int().min(0).max(10).optional(),
 });
 export type VisitCreateInput = z.infer<typeof visitCreateSchema>;
+
+export const visitUpdateSchema = z.object({
+  therapistId: z.string().min(1, "Terapeuta obligatorio"),
+  date: z.string().min(1, "La fecha es obligatoria"),
+  time: z.string().min(1, "La hora es obligatoria"),
+  durationMin: z.coerce.number().int().min(15).max(240).default(45),
+  notes: z.string().min(1, "Las notas clínicas son obligatorias"),
+  interventions: z.array(z.string()).default([]),
+});
+export type VisitUpdateInput = z.infer<typeof visitUpdateSchema>;
 
 // ─── Assessment ──────────────────────────────────────────────────────────────
 

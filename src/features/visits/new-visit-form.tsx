@@ -50,11 +50,11 @@ export function NewVisitForm() {
   async function onSubmit(values: VisitCreateInput) {
     try {
       const v = await create.mutateAsync(values);
-      toast({ title: "Visita registrada", description: v.patientName });
+      toast({ title: "Seguimiento registrado", description: v.patientName });
       selectPatient(values.patientId);
       navigate("patient-detail");
     } catch (e: any) {
-      toast({ title: "Error al registrar visita", variant: "destructive" });
+      toast({ title: "Error al registrar seguimiento", variant: "destructive" });
     }
   }
 
@@ -81,76 +81,76 @@ export function NewVisitForm() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Datos de la visita</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Datos del seguimiento</CardTitle>
             <CardDescription>Registra la sesión realizada.</CardDescription>
           </CardHeader>
-          <CardContent className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-xs">Paciente <span className="text-destructive">*</span></Label>
-              <Controller
-                control={control}
-                name="patientId"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger><SelectValue placeholder="Selecciona un paciente" /></SelectTrigger>
-                    <SelectContent>
-                      {(patients ?? []).map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.fullName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.patientId && <p className="text-xs text-destructive">{errors.patientId.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Terapeuta <span className="text-destructive">*</span></Label>
-              <Controller
-                control={control}
-                name="therapistId"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger><SelectValue placeholder="Selecciona un terapeuta" /></SelectTrigger>
-                    <SelectContent>
-                      {(professionals ?? []).filter((p) => p.isActive).map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name} · {p.role}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.therapistId && <p className="text-xs text-destructive">{errors.therapistId.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Duración (min)</Label>
-              <Input type="number" min={15} max={240} step={15} {...register("durationMin")} />
-              {errors.durationMin && <p className="text-xs text-destructive">{errors.durationMin.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Fecha <span className="text-destructive">*</span></Label>
-              <Input type="date" {...register("date")} />
-              {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Hora <span className="text-destructive">*</span></Label>
-              <Input type="time" {...register("time")} />
-              {errors.time && <p className="text-xs text-destructive">{errors.time.message}</p>}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Notas clínicas</CardTitle>
-            <CardDescription>Observaciones, evolución y plan.</CardDescription>
-          </CardHeader>
           <CardContent className="space-y-4">
+            {/* Compact data row: 2 cols on mobile, 3 on tablet, all 5 in one row from lg up */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-[2fr_2fr_0.8fr_1fr_0.8fr] gap-3">
+              <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                <Label className="text-xs">Paciente <span className="text-destructive">*</span></Label>
+                <Controller
+                  control={control}
+                  name="patientId"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger><SelectValue placeholder="Selecciona un paciente" /></SelectTrigger>
+                      <SelectContent>
+                        {(patients ?? []).map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.fullName}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.patientId && <p className="text-xs text-destructive">{errors.patientId.message}</p>}
+              </div>
+              <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                <Label className="text-xs">Terapeuta <span className="text-destructive">*</span></Label>
+                <Controller
+                  control={control}
+                  name="therapistId"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger><SelectValue placeholder="Selecciona un terapeuta" /></SelectTrigger>
+                      <SelectContent>
+                        {(professionals ?? []).filter((p) => p.isActive).map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.name} · {p.role}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.therapistId && <p className="text-xs text-destructive">{errors.therapistId.message}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Duración</Label>
+                <Input type="number" min={15} max={240} step={15} {...register("durationMin")} />
+                {errors.durationMin && <p className="text-xs text-destructive">{errors.durationMin.message}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Fecha <span className="text-destructive">*</span></Label>
+                <Input type="date" {...register("date")} />
+                {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Hora <span className="text-destructive">*</span></Label>
+                <Input type="time" {...register("time")} />
+                {errors.time && <p className="text-xs text-destructive">{errors.time.message}</p>}
+              </div>
+            </div>
+
+            <div className="h-px bg-border" />
+
+            {/* Notes get the visual weight: bigger label, larger textarea by default */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Notas <span className="text-destructive">*</span></Label>
+              <Label className="text-sm font-semibold">Notas clínicas <span className="text-destructive">*</span></Label>
+              <p className="text-xs text-muted-foreground">Observaciones, evolución y plan.</p>
               <Textarea
-                rows={6}
-                placeholder="Describe la sesión: hallazgos, técnicas aplicadas, respuesta del paciente, plan para la próxima visita…"
+                rows={12}
+                placeholder="Describe la sesión: hallazgos, técnicas aplicadas, respuesta del paciente, plan para el próximo seguimiento…"
+                className="text-sm"
                 {...register("notes")}
               />
               {errors.notes && <p className="text-xs text-destructive">{errors.notes.message}</p>}
@@ -191,12 +191,6 @@ export function NewVisitForm() {
                 </div>
               )}
             </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs">Puntuación de progreso subjetivo (0–10)</Label>
-              <Input type="number" min={0} max={10} placeholder="Opcional" {...register("score")} />
-              {errors.score && <p className="text-xs text-destructive">{errors.score.message}</p>}
-            </div>
           </CardContent>
         </Card>
 
@@ -204,7 +198,7 @@ export function NewVisitForm() {
           <Button type="button" variant="outline" onClick={back}>Cancelar</Button>
           <Button type="submit" disabled={create.isPending}>
             <Save className="w-4 h-4 mr-1.5" />
-            {create.isPending ? "Guardando…" : "Registrar visita"}
+            {create.isPending ? "Guardando…" : "Registrar seguimiento"}
           </Button>
         </div>
       </form>

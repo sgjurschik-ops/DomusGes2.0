@@ -54,7 +54,7 @@ export function useCurrentSession() {
 
 import type { PatientDTO, VisitDTO, AssessmentDTO, AppointmentDTO, ProfessionalDTO, AuditLogDTO } from "@/types/domain";
 import type {
-  PatientCreateInput, VisitCreateInput, AssessmentCreateInput, AssessmentUpdateInput,
+  PatientCreateInput, VisitCreateInput, VisitUpdateInput, AssessmentCreateInput, AssessmentUpdateInput,
   AppointmentCreateInput, ProfessionalCreateInput, ProfessionalUpdateInput,
 } from "@/lib/schemas";
 
@@ -120,6 +120,41 @@ export function useCreateVisit() {
       qc.invalidateQueries({ queryKey: ["visits"] });
       qc.invalidateQueries({ queryKey: ["patients"] });
       if (vars.patientId) qc.invalidateQueries({ queryKey: patientKeys.detail(vars.patientId) });
+    },
+  });
+}
+
+export function useVisit(id: string | null) {
+  return useQuery<VisitDTO>({
+    queryKey: ["visits", "detail", id],
+    queryFn: () => fetcher(`/api/visits/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useUpdateVisit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: VisitUpdateInput }) =>
+      fetcher<VisitDTO>(`/api/visits/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (d) => {
+      qc.invalidateQueries({ queryKey: ["visits"] });
+      qc.invalidateQueries({ queryKey: patientKeys.detail(d.patientId) });
+    },
+  });
+}
+
+export function useDeleteVisit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: string; patientId: string }) =>
+      fetcher(`/api/visits/${id}`, { method: "DELETE" }),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["visits"] });
+      qc.invalidateQueries({ queryKey: patientKeys.detail(vars.patientId) });
     },
   });
 }

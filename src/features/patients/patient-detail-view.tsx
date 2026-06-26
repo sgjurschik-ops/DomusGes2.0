@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, SpecialtyBadge, StatusBadge, ScoreDots, formatDate, formatDateTime } from "@/components/domain";
+import { Avatar, SpecialtyBadge, StatusBadge, formatDate, formatDateTime } from "@/components/domain";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -14,13 +14,20 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { assessmentCreateSchema, type AssessmentCreateInput, ASSESSMENT_SCALES, STRUCTURED_SCALES } from "@/lib/schemas";
 import { formatScaleScore } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
-import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil } from "lucide-react";
+import { VisitDetailDialog } from "./visit-detail-dialog";
+import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Dot,
@@ -37,6 +44,7 @@ export function PatientDetailView() {
   const deletePatient = useDeletePatient();
   const updatePatient = useUpdatePatient();
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
+  const [openVisitId, setOpenVisitId] = useState<string | null>(null);
 
   if (!selectedPatientId) {
     return <p className="text-sm text-muted-foreground">Selecciona un paciente.</p>;
@@ -73,7 +81,7 @@ export function PatientDetailView() {
                 <StatusBadge status={patient.status} />
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                {patient.age} años · {patient.totalVisits} visitas · Inicio {formatDate(patient.startDate)}
+                {patient.age} años · {patient.totalVisits} seguimientos · Inicio {formatDate(patient.startDate)}
               </p>
 
               {/* Clinical info first — what matters most before a session */}
@@ -106,60 +114,59 @@ export function PatientDetailView() {
                 )}
               </div>
             </div>
-            <div className="flex gap-2 flex-wrap">
-                
-   <Button
-  variant="outline"
-  onClick={() => {
-    navigate("edit-patient");
-  }}
->
-  <Pencil className="w-4 h-4 mr-1.5" />
-  
-  Editar
-</Button>          
-  <Button
-    variant="destructive"
-    onClick={async () => {
-      const ok = confirm(
-        `¿Seguro que quieres eliminar a ${patient.fullName}? Esta acción no se puede deshacer.`,
-      );
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                onClick={() => {
+                  useNav.getState().setNewVisitPatient(patient.id);
+                  navigate("new-visit");
+                }}
+                disabled={!professionals?.length}
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                Registrar seguimiento
+              </Button>
 
-      if (!ok) return;
-
-      try {
-        await deletePatient.mutateAsync(patient.id);
-        toast({
-          title: "Paciente eliminado",
-          description: `${patient.fullName} ha sido eliminado.`,
-        });
-        navigate("patients");
-      } catch {
-        toast({
-          title: "Error",
-          description: "No se ha podido eliminar el paciente.",
-          variant: "destructive",
-        });
-      }
-    }}
-  >
-    <Trash2 className="w-4 h-4 mr-1.5" />
-
-    Eliminar
-  </Button>
-
-  <Button
-    onClick={() => {
-      useNav.getState().setNewVisitPatient(patient.id);
-      navigate("new-visit");
-    }}
-    disabled={!professionals?.length}
-  >
-    <Plus className="w-4 h-4 mr-1.5" />
-
-    Registrar visita
-  </Button>
-</div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Más acciones">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigate("edit-patient")}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={async () => {
+                      const ok = confirm(
+                        `¿Seguro que quieres eliminar a ${patient.fullName}? Esta acción no se puede deshacer.`,
+                      );
+                      if (!ok) return;
+                      try {
+                        await deletePatient.mutateAsync(patient.id);
+                        toast({
+                          title: "Paciente eliminado",
+                          description: `${patient.fullName} ha sido eliminado.`,
+                        });
+                        navigate("patients");
+                      } catch {
+                        toast({
+                          title: "Error",
+                          description: "No se ha podido eliminar el paciente.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Eliminar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
        </CardContent>
       </Card>
@@ -167,7 +174,7 @@ export function PatientDetailView() {
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-5 max-w-2xl">
           <TabsTrigger value="overview">Resumen</TabsTrigger>
-          <TabsTrigger value="visits">Visitas ({visits?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="visits">Seguimientos ({visits?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="occupational-profile">Perfil ocupacional</TabsTrigger>
           <TabsTrigger value="assessments">Escalas</TabsTrigger>
           <TabsTrigger value="progress">Evolución</TabsTrigger>
@@ -178,7 +185,7 @@ export function PatientDetailView() {
           <div className="grid lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Última visita</CardTitle>
+                <CardTitle className="text-sm">Último seguimiento</CardTitle>
               </CardHeader>
               <CardContent>
                 {visits && visits.length > 0 ? (
@@ -187,15 +194,9 @@ export function PatientDetailView() {
                       {formatDateTime(visits[0].date)} · {visits[0].durationMin} min · {visits[0].therapistName}
                     </p>
                     <p className="text-sm line-clamp-3">{visits[0].notes}</p>
-                    {visits[0].score !== null && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Progreso:</span>
-                        <ScoreDots score={visits[0].score} />
-                      </div>
-                    )}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Sin visitas registradas.</p>
+                  <p className="text-sm text-muted-foreground">Sin seguimientos registrados.</p>
                 )}
               </CardContent>
             </Card>
@@ -226,25 +227,29 @@ export function PatientDetailView() {
           {!visits || visits.length === 0 ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">
               <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              No hay visitas registradas todavía.
+              No hay seguimientos registrados todavía.
             </Card>
           ) : (
             visits.map((v) => (
-              <Card key={v.id}>
+              <Card
+                key={v.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setOpenVisitId(v.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setOpenVisitId(v.id);
+                  }
+                }}
+                className="cursor-pointer transition-colors hover:bg-muted/50"
+              >
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div>
-                      <p className="text-sm font-medium">{formatDateTime(v.date)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {v.durationMin} min · {v.therapistName}
-                      </p>
-                    </div>
-                    {v.score !== null && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Progreso</span>
-                        <ScoreDots score={v.score} />
-                      </div>
-                    )}
+                  <div className="mb-2">
+                    <p className="text-sm font-medium">{formatDateTime(v.date)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {v.durationMin} min · {v.therapistName}
+                    </p>
                   </div>
                   <p className="text-sm text-foreground whitespace-pre-wrap">{v.notes}</p>
                   {v.interventions.length > 0 && (
@@ -317,6 +322,14 @@ export function PatientDetailView() {
           assessmentId={openAssessmentId}
           patientId={patient.id}
           onClose={() => setOpenAssessmentId(null)}
+        />
+      )}
+
+      {openVisitId && (
+        <VisitDetailDialog
+          visitId={openVisitId}
+          patientId={patient.id}
+          onClose={() => setOpenVisitId(null)}
         />
       )}
     </div>

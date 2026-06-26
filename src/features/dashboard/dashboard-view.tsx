@@ -66,7 +66,7 @@ export function DashboardView() {
           onClick={() => navigate("calendar")}
         />
         <KpiCard
-          label="Visitas últimos 30 días"
+          label="Seguimientos últimos 30 días"
           value={isLoading ? null : data?.totals.recentVisits ?? null}
           icon={Activity}
           onClick={() => navigate("reports")}

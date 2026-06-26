@@ -502,7 +502,7 @@ function Section({
 
   return (
     <details open={defaultOpen} className="group rounded-lg border bg-card shadow-sm overflow-hidden">
-      <summary className="cursor-pointer list-none px-4 py-3 border-b bg-accent/60 flex items-center justify-between gap-3">
+      <summary className="cursor-pointer list-none px-4 py-3 border-b bg-muted flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {Icon && (
             <span className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary shrink-0">

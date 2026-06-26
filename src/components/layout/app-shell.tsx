@@ -12,7 +12,7 @@ const VIEW_TITLES: Record<string, string> = {
   today: "Ruta de hoy",
   patients: "Pacientes",
   "patient-detail": "Paciente",
-  "new-visit": "Nueva visita",
+  "new-visit": "Nuevo seguimiento",
   "new-patient": "Nuevo paciente",
   calendar: "Agenda",
   equipo: "Equipo",
@@ -71,7 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   navigate("new-visit");
                 }}
               >
-                <Plus className="w-4 h-4 mr-1" /> Nueva visita
+                <Plus className="w-4 h-4 mr-1" /> Nuevo seguimiento
               </Button>
             )}
           </div>
