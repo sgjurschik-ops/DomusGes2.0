@@ -19,7 +19,10 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
   const row = await db.appointment.update({
     where: { id },
-    data: { start: new Date(parsed.data.start) },
+    data: {
+      start: new Date(parsed.data.start),
+      ...(parsed.data.durationMin !== undefined ? { durationMin: parsed.data.durationMin } : {}),
+    },
     include: {
       patient: { select: { firstName: true, lastName: true, color: true, address: true } },
       therapist: { select: { name: true } },

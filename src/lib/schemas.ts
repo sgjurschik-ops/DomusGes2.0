@@ -197,6 +197,7 @@ export type AppointmentCreateInput = z.infer<typeof appointmentCreateSchema>;
 export const appointmentMoveSchema = z.object({
   id: z.string(),
   start: z.string(), // ISO datetime
+  durationMin: z.coerce.number().int().min(15).max(480).optional(),
 });
 export type AppointmentMoveInput = z.infer<typeof appointmentMoveSchema>;
 
@@ -232,8 +233,24 @@ export const slotReservationCreateSchema = z
   .transform((d) => ({ ...d, durationMin: diffMinutes(d.time, d.endTime) }));
 export type SlotReservationCreateInput = z.infer<typeof slotReservationCreateSchema>;
 
+export const slotReservationUpdateSchema = z
+  .object({
+    therapistId: z.string().min(1, "Terapeuta obligatorio"),
+    title: z.string().min(1, "El título es obligatorio"),
+    date: z.string().min(1, "La fecha es obligatoria"),
+    time: z.string().min(1, "La hora de inicio es obligatoria"),
+    endTime: z.string().min(1, "La hora de fin es obligatoria"),
+  })
+  .refine((d) => diffMinutes(d.time, d.endTime) >= 15, {
+    message: "La hora de fin debe ser al menos 15 minutos después del inicio",
+    path: ["endTime"],
+  })
+  .transform((d) => ({ ...d, durationMin: diffMinutes(d.time, d.endTime) }));
+export type SlotReservationUpdateInput = z.infer<typeof slotReservationUpdateSchema>;
+
 export const slotReservationMoveSchema = z.object({
   id: z.string(),
   start: z.string(), // ISO datetime
+  durationMin: z.coerce.number().int().min(15).max(480).optional(),
 });
 export type SlotReservationMoveInput = z.infer<typeof slotReservationMoveSchema>;

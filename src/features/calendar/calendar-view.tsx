@@ -29,6 +29,7 @@ import {
   useDeleteAppointment,
   useReservations,
   useCreateReservation,
+  useUpdateReservation,
   useMoveReservation,
   useDeleteReservation,
   usePatients,
@@ -72,6 +73,8 @@ import {
   type AppointmentUpdateInput,
   slotReservationCreateSchema,
   type SlotReservationCreateInput,
+  slotReservationUpdateSchema,
+  type SlotReservationUpdateInput,
   APPOINTMENT_TYPES,
 } from "@/lib/schemas";
 import type { AppointmentDTO, SlotReservationDTO } from "@/types/domain";
@@ -243,6 +246,22 @@ export function CalendarView() {
     }
   }
 
+  async function handleResizeAppt(id: string, newStart: Date, newDurationMin: number) {
+    try {
+      await moveAppt.mutateAsync({ id, start: newStart.toISOString(), durationMin: newDurationMin });
+    } catch {
+      toast({ title: "Error al cambiar la duración", variant: "destructive" });
+    }
+  }
+
+  async function handleResizeReservation(id: string, newStart: Date, newDurationMin: number) {
+    try {
+      await moveReservation.mutateAsync({ id, start: newStart.toISOString(), durationMin: newDurationMin });
+    } catch {
+      toast({ title: "Error al cambiar la duración", variant: "destructive" });
+    }
+  }
+
   const title = useMemo(() => {
     if (view === "month") return format(cursor, "MMMM yyyy", { locale: es });
     if (view === "week") {
@@ -262,6 +281,8 @@ export function CalendarView() {
     onCreateReservation: openCreateReservation,
     onDropAppt: handleDropAppt,
     onDropReservation: handleDropReservation,
+    onResizeAppt: handleResizeAppt,
+    onResizeReservation: handleResizeReservation,
   };
 
   return (
@@ -354,6 +375,7 @@ export function CalendarView() {
         preset={createPreset}
       />
       <ReservationFormDialog
+        mode="create"
         open={reservationOpen}
         onOpenChange={setReservationOpen}
         preset={createPreset}
@@ -373,6 +395,8 @@ type SharedViewProps = {
   onCreateReservation: (date?: Date, time?: string) => void;
   onDropAppt: (id: string, newStart: Date) => void;
   onDropReservation: (id: string, newStart: Date) => void;
+  onResizeAppt: (id: string, newStart: Date, newDurationMin: number) => void;
+  onResizeReservation: (id: string, newStart: Date, newDurationMin: number) => void;
 };
 
 // ─── Empty-slot trigger: hover tooltip with the hour + click menu ───────────
@@ -380,6 +404,37 @@ type SharedViewProps = {
 // Wraps an empty calendar cell/slot. Hovering shows a small "HH:mm" tooltip;
 // clicking opens a tiny menu to choose "Nueva cita" or "Reserva de espacio"
 // instead of jumping straight into a form.
+
+// ─── Resize handle: thin draggable strip at the top/bottom edge of an
+// appointment or reservation block in week/day view ──────────────────────
+//
+// Invisible at rest, shown as a subtle bar on hover of the parent block
+// (via the parent's `group` class), with a row-resize cursor. Dragging it
+// is handled entirely by the parent DayColumn (global mousemove/mouseup),
+// this just reports the mousedown that starts the gesture.
+
+function ResizeHandle({
+  position,
+  onStart,
+}: {
+  position: "top" | "bottom";
+  onStart: () => void;
+}) {
+  return (
+    <div
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onStart();
+      }}
+      className={`absolute left-0 right-0 h-2 cursor-row-resize z-10 flex items-center justify-center ${
+        position === "top" ? "-top-1" : "-bottom-1"
+      }`}
+    >
+      <div className="w-6 h-[3px] rounded-full bg-foreground/0 group-hover:bg-foreground/25 transition-colors" />
+    </div>
+  );
+}
 
 function EmptySlotTrigger({
   label,
@@ -596,6 +651,8 @@ function WeekView({
   onCreateReservation,
   onDropAppt,
   onDropReservation,
+  onResizeAppt,
+  onResizeReservation,
 }: SharedViewProps & { cursor: Date }) {
   const weekStart = startOfWeek(cursor, { weekStartsOn: 1 });
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -666,6 +723,8 @@ function WeekView({
                 onCreateReservation={onCreateReservation}
                 onDropAppt={onDropAppt}
                 onDropReservation={onDropReservation}
+                onResizeAppt={onResizeAppt}
+                onResizeReservation={onResizeReservation}
                 compact
               />
             ))}
@@ -688,6 +747,8 @@ function DayView({
   onCreateReservation,
   onDropAppt,
   onDropReservation,
+  onResizeAppt,
+  onResizeReservation,
 }: SharedViewProps & { cursor: Date }) {
   const today = new Date();
   const dayAppts = apptsForDay(appts, cursor);
@@ -740,6 +801,8 @@ function DayView({
               onCreateReservation={onCreateReservation}
               onDropAppt={onDropAppt}
               onDropReservation={onDropReservation}
+              onResizeAppt={onResizeAppt}
+              onResizeReservation={onResizeReservation}
             />
           </div>
         </div>
@@ -760,6 +823,8 @@ function DayColumn({
   onCreateReservation,
   onDropAppt,
   onDropReservation,
+  onResizeAppt,
+  onResizeReservation,
   compact = false,
 }: {
   day: Date;
@@ -771,6 +836,8 @@ function DayColumn({
   onCreateReservation: (date?: Date, time?: string) => void;
   onDropAppt: (id: string, newStart: Date) => void;
   onDropReservation: (id: string, newStart: Date) => void;
+  onResizeAppt: (id: string, newStart: Date, newDurationMin: number) => void;
+  onResizeReservation: (id: string, newStart: Date, newDurationMin: number) => void;
   compact?: boolean;
 }) {
   const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
@@ -781,6 +848,20 @@ function DayColumn({
   const nowTop = (nowOffsetMin / 60) * HOUR_PX;
   const colRef = useRef<HTMLDivElement>(null);
   const [dragOverMin, setDragOverMin] = useState<number | null>(null);
+
+  // Resize-by-dragging-the-edge state. Tracks which block is being resized,
+  // which edge (top = change start, bottom = change end/duration), and a
+  // live preview of the in-progress start/duration so the block redraws
+  // immediately as the mouse moves, before the request to save it resolves.
+  const [resizing, setResizing] = useState<{
+    kind: "appt" | "reservation";
+    id: string;
+    edge: "top" | "bottom";
+    originalStartMin: number;
+    originalDurationMin: number;
+    previewStartMin: number;
+    previewDurationMin: number;
+  } | null>(null);
 
   function minutesFromPointerY(clientY: number): number {
     const rect = colRef.current?.getBoundingClientRect();
@@ -795,6 +876,60 @@ function DayColumn({
     d.setHours(0, min, 0, 0);
     return d;
   }
+
+  function beginResize(
+    kind: "appt" | "reservation",
+    id: string,
+    edge: "top" | "bottom",
+    startMin: number,
+    durationMin: number,
+  ) {
+    setResizing({
+      kind,
+      id,
+      edge,
+      originalStartMin: startMin,
+      originalDurationMin: durationMin,
+      previewStartMin: startMin,
+      previewDurationMin: durationMin,
+    });
+  }
+
+  useEffect(() => {
+    if (!resizing) return;
+
+    function onMove(e: MouseEvent) {
+      const pointerMin = minutesFromPointerY(e.clientY);
+      setResizing((r) => {
+        if (!r) return r;
+        if (r.edge === "bottom") {
+          const newDuration = Math.max(SNAP_MIN, pointerMin - r.originalStartMin);
+          return { ...r, previewDurationMin: newDuration };
+        }
+        // Top edge: moving the start while keeping the end fixed.
+        const endMin = r.originalStartMin + r.originalDurationMin;
+        const newStart = Math.min(pointerMin, endMin - SNAP_MIN);
+        return { ...r, previewStartMin: newStart, previewDurationMin: endMin - newStart };
+      });
+    }
+
+    function onUp() {
+      setResizing((r) => {
+        if (!r) return null;
+        const newStart = startFromMinutes(r.previewStartMin);
+        if (r.kind === "appt") onResizeAppt(r.id, newStart, r.previewDurationMin);
+        else onResizeReservation(r.id, newStart, r.previewDurationMin);
+        return null;
+      });
+    }
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, [resizing?.id]);
 
   return (
     <div
@@ -873,37 +1008,51 @@ function DayColumn({
       {reservations.map((r) => {
         const start = new Date(r.start);
         const startMins = start.getHours() * 60 + start.getMinutes();
-        const offsetMin = startMins - HOUR_START * 60;
-        if (offsetMin + r.durationMin <= 0) return null;
+        const isResizingThis = resizing?.kind === "reservation" && resizing.id === r.id;
+        const effectiveStartMin = isResizingThis ? resizing.previewStartMin : startMins;
+        const effectiveDuration = isResizingThis ? resizing.previewDurationMin : r.durationMin;
+        const offsetMin = effectiveStartMin - HOUR_START * 60;
+        if (offsetMin + effectiveDuration <= 0) return null;
         const top = Math.max(0, (offsetMin / 60) * HOUR_PX);
-        const height = (r.durationMin / 60) * HOUR_PX - 2;
-        const end = addMinutes(start, r.durationMin);
+        const height = (effectiveDuration / 60) * HOUR_PX - 2;
+        const effectiveStart = startFromMinutes(effectiveStartMin);
+        const end = addMinutes(effectiveStart, effectiveDuration);
         const overlapsAppt = appts.some((a) =>
-          rangesOverlap(start, r.durationMin, new Date(a.start), a.durationMin),
+          rangesOverlap(effectiveStart, effectiveDuration, new Date(a.start), a.durationMin),
         );
         return (
-          <button
+          <div
             key={r.id}
-            draggable
+            draggable={!resizing}
             onDragStart={(e) => {
               e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "reservation", id: r.id, start: r.start }));
             }}
-            onClick={() => onSelectReservation(r)}
-            className={`absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-hidden border z-[5] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-ring ${
-              overlapsAppt
-                ? "bg-amber-50 border-amber-300"
-                : "bg-muted/70 border-border"
+            onClick={() => !resizing && onSelectReservation(r)}
+            role="button"
+            tabIndex={0}
+            className={`group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible border z-[5] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-ring ${
+              overlapsAppt ? "bg-amber-50 border-amber-300" : "bg-muted/70 border-border"
             }`}
             style={{ top, height: Math.max(18, height) }}
-            aria-label={`Reserva de espacio "${r.title}" ${format(start, "HH:mm")}–${format(end, "HH:mm")}${overlapsAppt ? ", se solapa con una cita" : ""}`}
+            aria-label={`Reserva de espacio "${r.title}" ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}${overlapsAppt ? ", se solapa con una cita" : ""}`}
           >
-            <p className="text-[10px] font-semibold leading-tight truncate flex items-center gap-1">
-              <Lock className="w-2.5 h-2.5 shrink-0" />
-              {format(start, "HH:mm")}–{format(end, "HH:mm")}
-              {overlapsAppt && <AlertTriangle className="w-2.5 h-2.5 text-amber-600 ml-auto shrink-0" />}
-            </p>
-            <p className="text-[10px] font-medium leading-tight truncate text-foreground/80">{r.title}</p>
-          </button>
+            <ResizeHandle
+              position="top"
+              onStart={() => beginResize("reservation", r.id, "top", startMins, r.durationMin)}
+            />
+            <div className="overflow-hidden h-full">
+              <p className="text-[10px] font-semibold leading-tight truncate flex items-center gap-1">
+                <Lock className="w-2.5 h-2.5 shrink-0" />
+                {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
+                {overlapsAppt && <AlertTriangle className="w-2.5 h-2.5 text-amber-600 ml-auto shrink-0" />}
+              </p>
+              <p className="text-[10px] font-medium leading-tight truncate text-foreground/80">{r.title}</p>
+            </div>
+            <ResizeHandle
+              position="bottom"
+              onStart={() => beginResize("reservation", r.id, "bottom", startMins, r.durationMin)}
+            />
+          </div>
         );
       })}
 
@@ -911,35 +1060,51 @@ function DayColumn({
       {appts.map((a) => {
         const start = new Date(a.start);
         const startMins = start.getHours() * 60 + start.getMinutes();
-        const offsetMin = startMins - HOUR_START * 60;
-        if (offsetMin + a.durationMin <= 0) return null;
+        const isResizingThis = resizing?.kind === "appt" && resizing.id === a.id;
+        const effectiveStartMin = isResizingThis ? resizing.previewStartMin : startMins;
+        const effectiveDuration = isResizingThis ? resizing.previewDurationMin : a.durationMin;
+        const offsetMin = effectiveStartMin - HOUR_START * 60;
+        if (offsetMin + effectiveDuration <= 0) return null;
         const top = Math.max(0, (offsetMin / 60) * HOUR_PX);
-        const height = (a.durationMin / 60) * HOUR_PX - 2;
-        const end = addMinutes(start, a.durationMin);
+        const height = (effectiveDuration / 60) * HOUR_PX - 2;
+        const effectiveStart = startFromMinutes(effectiveStartMin);
+        const end = addMinutes(effectiveStart, effectiveDuration);
         return (
-          <button
+          <div
             key={a.id}
-            draggable
+            draggable={!resizing}
             onDragStart={(e) => {
               e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "appt", id: a.id, start: a.start }));
             }}
-            onClick={() => onSelectAppt(a)}
-            className="absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-hidden bg-card border border-border z-[6] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring"
+            onClick={() => !resizing && onSelectAppt(a)}
+            role="button"
+            tabIndex={0}
+            className="group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible bg-card border border-border z-[6] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring"
             style={{
               top,
               height: Math.max(18, height),
               borderLeft: `3px solid ${a.patientColor}`,
             }}
-            aria-label={`Cita de ${a.patientName} ${format(start, "HH:mm")}–${format(end, "HH:mm")}`}
+            aria-label={`Cita de ${a.patientName} ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}`}
           >
-            <p className="text-[10px] font-semibold leading-tight truncate">
-              {format(start, "HH:mm")}–{format(end, "HH:mm")}
-            </p>
-            <p className="text-[10px] font-medium leading-tight truncate">
-              {a.patientName}
-            </p>
-            {!compact && <p className="text-[10px] opacity-80 truncate">{a.type}</p>}
-          </button>
+            <ResizeHandle
+              position="top"
+              onStart={() => beginResize("appt", a.id, "top", startMins, a.durationMin)}
+            />
+            <div className="overflow-hidden h-full">
+              <p className="text-[10px] font-semibold leading-tight truncate">
+                {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
+              </p>
+              <p className="text-[10px] font-medium leading-tight truncate">
+                {a.patientName}
+              </p>
+              {!compact && <p className="text-[10px] opacity-80 truncate">{a.type}</p>}
+            </div>
+            <ResizeHandle
+              position="bottom"
+              onStart={() => beginResize("appt", a.id, "bottom", startMins, a.durationMin)}
+            />
+          </div>
         );
       })}
     </div>
@@ -1087,10 +1252,25 @@ function ReservationDetailDialog({
   reservation: SlotReservationDTO | null;
   onClose: () => void;
 }) {
+  if (!reservation) return null;
+  // Keying on reservation.id resets internal state (isEditing) automatically
+  // whenever a different reservation is selected.
+  return (
+    <ReservationDetailDialogInner key={reservation.id} reservation={reservation} onClose={onClose} />
+  );
+}
+
+function ReservationDetailDialogInner({
+  reservation,
+  onClose,
+}: {
+  reservation: SlotReservationDTO;
+  onClose: () => void;
+}) {
   const del = useDeleteReservation();
+  const [isEditing, setIsEditing] = useState(false);
 
   async function handleDelete() {
-    if (!reservation) return;
     try {
       await del.mutateAsync(reservation.id);
       toast({ title: "Reserva eliminada" });
@@ -1100,12 +1280,28 @@ function ReservationDetailDialog({
     }
   }
 
-  if (!reservation) return null;
+  if (isEditing) {
+    return (
+      <ReservationFormDialog
+        mode="edit"
+        reservation={reservation}
+        open
+        onOpenChange={(o) => {
+          if (!o) {
+            setIsEditing(false);
+            onClose();
+          }
+        }}
+        onCancelEdit={() => setIsEditing(false)}
+      />
+    );
+  }
+
   const start = new Date(reservation.start);
   const end = addMinutes(start, reservation.durationMin);
 
   return (
-    <Dialog open={!!reservation} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -1131,7 +1327,10 @@ function ReservationDetailDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+            <Pencil className="w-4 h-4 mr-1" /> Editar
+          </Button>
           <Button variant="outline" size="sm" onClick={onClose}>
             <X className="w-4 h-4 mr-1" /> Cerrar
           </Button>
@@ -1262,66 +1461,65 @@ function AppointmentFormDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-          <Field label="Paciente" error={errors.patientId?.message} required>
-            <Controller
-              control={control}
-              name="patientId"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger aria-label="Paciente">
-                    <SelectValue placeholder="Selecciona paciente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(patients ?? []).map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
-
-          <Field label="Terapeuta" error={errors.therapistId?.message} required>
-            <Controller
-              control={control}
-              name="therapistId"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger aria-label="Terapeuta">
-                    <SelectValue placeholder="Selecciona terapeuta" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(professionals ?? []).filter((p) => p.isActive).map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
-
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Fecha" error={errors.date?.message} required>
-              <Input type="date" {...register("date")} />
+            <Field label="Paciente" error={errors.patientId?.message} required>
+              <Controller
+                control={control}
+                name="patientId"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger aria-label="Paciente">
+                      <SelectValue placeholder="Selecciona paciente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(patients ?? []).map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.fullName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </Field>
-            <Field label="Hora inicio" error={errors.time?.message} required>
-              <Input type="time" {...register("time")} />
+
+            <Field label="Terapeuta" error={errors.therapistId?.message} required>
+              <Controller
+                control={control}
+                name="therapistId"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger aria-label="Terapeuta">
+                      <SelectValue placeholder="Selecciona terapeuta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(professionals ?? []).filter((p) => p.isActive).map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <Field label="Fecha" error={errors.date?.message} required>
+            <Input type="date" {...register("date")} />
+          </Field>
+
+          <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+            <Field label="Hora inicio" error={errors.time?.message} required>
+              <Input type="time" {...register("time")} />
+            </Field>
             <Field label="Hora fin" error={errors.endTime?.message} required>
               <Input type="time" {...register("endTime")} />
             </Field>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Duración</Label>
-              <p className="h-9 flex items-center text-sm text-muted-foreground px-1">
+            <div className="space-y-1.5 pb-2">
+              <span className="inline-flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm text-muted-foreground whitespace-nowrap">
                 {computedDuration ?? "—"}
-              </p>
+              </span>
             </div>
           </div>
 
@@ -1368,19 +1566,28 @@ function AppointmentFormDialog({
   );
 }
 
-// ─── Reservation form dialog (create only — title + time range) ─────────────
+// ─── Reservation form dialog (create & edit — title + time range) ───────────
 
 function ReservationFormDialog({
+  mode,
+  reservation,
   open,
   onOpenChange,
   preset,
+  onCancelEdit,
 }: {
+  mode: "create" | "edit";
+  reservation?: SlotReservationDTO;
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  preset: { date: string; time: string };
+  preset?: { date: string; time: string };
+  onCancelEdit?: () => void;
 }) {
   const create = useCreateReservation();
+  const update = useUpdateReservation();
   const { data: professionals } = useProfessionals();
+
+  const schema = mode === "edit" ? slotReservationUpdateSchema : slotReservationCreateSchema;
 
   const {
     register,
@@ -1389,42 +1596,74 @@ function ReservationFormDialog({
     reset,
     watch,
     formState: { errors },
-  } = useForm<z.input<typeof slotReservationCreateSchema>, any, SlotReservationCreateInput>({
-    resolver: zodResolver(slotReservationCreateSchema),
-    defaultValues: {
-      therapistId: "",
-      title: "",
-      date: preset.date,
-      time: preset.time,
-      endTime: addMinutesToTimeStr(preset.time, 45),
-    },
+  } = useForm<
+    z.input<typeof slotReservationCreateSchema> | z.input<typeof slotReservationUpdateSchema>,
+    any,
+    SlotReservationCreateInput | SlotReservationUpdateInput
+  >({
+    resolver: zodResolver(schema as any),
+    defaultValues:
+      mode === "edit" && reservation
+        ? {
+            therapistId: reservation.therapistId,
+            title: reservation.title,
+            date: reservation.start.slice(0, 10),
+            time: reservation.start.slice(11, 16),
+            endTime: format(addMinutes(new Date(reservation.start), reservation.durationMin), "HH:mm"),
+          }
+        : {
+            therapistId: "",
+            title: "",
+            date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
+            time: preset?.time ?? "10:00",
+            endTime: addMinutesToTimeStr(preset?.time ?? "10:00", 45),
+          },
   });
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (mode === "edit" && reservation) {
+      reset({
+        therapistId: reservation.therapistId,
+        title: reservation.title,
+        date: reservation.start.slice(0, 10),
+        time: reservation.start.slice(11, 16),
+        endTime: format(addMinutes(new Date(reservation.start), reservation.durationMin), "HH:mm"),
+      });
+    } else if (mode === "create") {
       reset({
         therapistId: "",
         title: "",
-        date: preset.date,
-        time: preset.time,
-        endTime: addMinutesToTimeStr(preset.time, 45),
+        date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
+        time: preset?.time ?? "10:00",
+        endTime: addMinutesToTimeStr(preset?.time ?? "10:00", 45),
       });
     }
-  }, [open, preset, reset]);
+  }, [open, mode, reservation?.id, preset?.date, preset?.time]);
 
   const watchedStartTime = watch("time");
   const watchedEndTime = watch("endTime");
   const computedDuration = computeDurationLabel(watchedStartTime, watchedEndTime);
 
-  async function onSubmit(values: SlotReservationCreateInput) {
+  async function onSubmit(values: SlotReservationCreateInput | SlotReservationUpdateInput) {
     try {
-      await create.mutateAsync(values);
-      toast({ title: "Reserva creada" });
+      if (mode === "edit" && reservation) {
+        await update.mutateAsync({ id: reservation.id, data: values as SlotReservationUpdateInput });
+        toast({ title: "Reserva actualizada" });
+      } else {
+        await create.mutateAsync(values as SlotReservationCreateInput);
+        toast({ title: "Reserva creada" });
+      }
       onOpenChange(false);
     } catch {
-      toast({ title: "Error al crear la reserva", variant: "destructive" });
+      toast({
+        title: mode === "edit" ? "Error al actualizar la reserva" : "Error al crear la reserva",
+        variant: "destructive",
+      });
     }
   }
+
+  const isPending = create.isPending || update.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1432,10 +1671,12 @@ function ReservationFormDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Lock className="w-4 h-4 text-muted-foreground" />
-            Reserva de espacio
+            {mode === "edit" ? "Editar reserva de espacio" : "Reserva de espacio"}
           </DialogTitle>
           <DialogDescription>
-            Bloquea un rato para que no se pueda confundir con una cita disponible.
+            {mode === "edit"
+              ? "Corrige los datos de la reserva."
+              : "Bloquea un rato para que no se pueda confundir con una cita disponible."}
           </DialogDescription>
         </DialogHeader>
 
@@ -1465,33 +1706,34 @@ function ReservationFormDialog({
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Fecha" error={errors.date?.message} required>
-              <Input type="date" {...register("date")} />
-            </Field>
+          <Field label="Fecha" error={errors.date?.message} required>
+            <Input type="date" {...register("date")} />
+          </Field>
+
+          <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
             <Field label="Hora inicio" error={errors.time?.message} required>
               <Input type="time" {...register("time")} />
             </Field>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <Field label="Hora fin" error={errors.endTime?.message} required>
               <Input type="time" {...register("endTime")} />
             </Field>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Duración</Label>
-              <p className="h-9 flex items-center text-sm text-muted-foreground px-1">
+            <div className="space-y-1.5 pb-2">
+              <span className="inline-flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm text-muted-foreground whitespace-nowrap">
                 {computedDuration ?? "—"}
-              </p>
+              </span>
             </div>
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => (mode === "edit" ? onCancelEdit?.() : onOpenChange(false))}
+            >
               Cancelar
             </Button>
-            <Button type="submit" disabled={create.isPending}>
-              {create.isPending ? "Guardando…" : "Crear reserva"}
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Guardando…" : mode === "edit" ? "Guardar cambios" : "Crear reserva"}
             </Button>
           </DialogFooter>
         </form>

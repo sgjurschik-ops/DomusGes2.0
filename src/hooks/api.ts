@@ -55,7 +55,7 @@ export function useCurrentSession() {
 import type { PatientDTO, VisitDTO, AssessmentDTO, AppointmentDTO, SlotReservationDTO, ProfessionalDTO, AuditLogDTO } from "@/types/domain";
 import type {
   PatientCreateInput, VisitCreateInput, VisitUpdateInput, AssessmentCreateInput, AssessmentUpdateInput,
-  AppointmentCreateInput, SlotReservationCreateInput, AppointmentUpdateInput, ProfessionalCreateInput, ProfessionalUpdateInput,
+  AppointmentCreateInput, SlotReservationCreateInput, SlotReservationUpdateInput, AppointmentUpdateInput, ProfessionalCreateInput, ProfessionalUpdateInput,
 } from "@/lib/schemas";
 
 export const patientKeys = {
@@ -241,10 +241,10 @@ export function useCreateAppointment() {
 export function useMoveAppointment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, start }: { id: string; start: string }) =>
+    mutationFn: ({ id, start, durationMin }: { id: string; start: string; durationMin?: number }) =>
       fetcher<AppointmentDTO>(`/api/appointments/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ id, start }),
+        body: JSON.stringify({ id, start, durationMin }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["appointments"] }),
   });
@@ -296,10 +296,22 @@ export function useCreateReservation() {
 export function useMoveReservation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, start }: { id: string; start: string }) =>
+    mutationFn: ({ id, start, durationMin }: { id: string; start: string; durationMin?: number }) =>
       fetcher<SlotReservationDTO>(`/api/reservations/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ id, start }),
+        body: JSON.stringify({ id, start, durationMin }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["reservations"] }),
+  });
+}
+
+export function useUpdateReservation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: SlotReservationUpdateInput }) =>
+      fetcher<SlotReservationDTO>(`/api/reservations/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["reservations"] }),
   });
