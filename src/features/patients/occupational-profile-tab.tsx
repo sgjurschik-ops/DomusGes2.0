@@ -8,7 +8,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Save, FileDown } from "lucide-react";
+import {
+  Save,
+  FileDown,
+  ClipboardList,
+  Users,
+  Briefcase,
+  CalendarClock,
+  Heart,
+  Target,
+  type LucideIcon,
+} from "lucide-react";
 
 type Profile = Record<string, any>;
 
@@ -172,6 +182,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       <Section
         title="Datos generales"
         description="Información inicial de la valoración."
+        icon={ClipboardList}
         defaultOpen
         profile={profile}
         fields={["documentsAttached", "referralResource", "interventionReason"]}
@@ -190,6 +201,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       <Section
         title="Área social-familiar"
         description="Convivencia, red de apoyo y relaciones significativas."
+        icon={Users}
         profile={profile}
         fields={[
           "drivingLicense",
@@ -288,6 +300,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       <Section
         title="Área laboral y económica"
         description="Formación, trayectoria laboral y autonomía económica."
+        icon={Briefcase}
         profile={profile}
         fields={[
           "educationLevel",
@@ -354,6 +367,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       <Section
         title="Hábitos y rutinas"
         description="Rutina diaria y participación ocupacional."
+        icon={CalendarClock}
         profile={profile}
         fields={[
           "dailyRoutine",
@@ -394,6 +408,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       <Section
         title="Intereses y motivaciones"
         description="Actividades actuales, abandonadas y posibles intereses a recuperar."
+        icon={Heart}
         profile={profile}
         fields={[
           "leisureActivitiesCurrent",
@@ -429,6 +444,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       <Section
         title="Objetivos y planificación"
         description="Objetivos ocupacionales y planificación inicial."
+        icon={Target}
         profile={profile}
         fields={["desiredImprovements", "shortTermGoal1", "shortTermGoal2", "shortTermGoal3"]}
       >
@@ -466,6 +482,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
 function Section({
   title,
   description,
+  icon: Icon,
   defaultOpen = false,
   profile,
   fields,
@@ -473,6 +490,7 @@ function Section({
 }: {
   title: string;
   description?: string;
+  icon?: LucideIcon;
   defaultOpen?: boolean;
   profile: Profile;
   fields: string[];
@@ -485,9 +503,16 @@ function Section({
   return (
     <details open={defaultOpen} className="group rounded-lg border bg-card shadow-sm overflow-hidden">
       <summary className="cursor-pointer list-none px-4 py-3 border-b bg-accent/60 flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold">{title}</h3>
-          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+        <div className="flex items-center gap-3">
+          {Icon && (
+            <span className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary shrink-0">
+              <Icon className="w-4 h-4" />
+            </span>
+          )}
+          <div>
+            <h3 className="text-sm font-semibold">{title}</h3>
+            {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span
