@@ -109,7 +109,7 @@ function ScaleItemRow({
         </SelectTrigger>
         <SelectContent>
           {item.options.map((opt) => (
-            <SelectItem key={opt.value} value={String(opt.value)}>
+            <SelectItem key={opt.value} value={String(opt.value)} title={opt.description}>
               {opt.value} — {opt.label}
             </SelectItem>
           ))}
