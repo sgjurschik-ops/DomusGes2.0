@@ -145,9 +145,19 @@ export interface SlotReservationDTO {
   therapistId: string;
   therapistName: string;
   therapistColor: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  categoryColor: string | null;
   title: string;
   start: string; // ISO
   durationMin: number;
+}
+
+export interface ReservationCategoryDTO {
+  id: string;
+  professionalId: string;
+  name: string;
+  color: string;
 }
 
 export interface AuditLogDTO {
