@@ -23,7 +23,7 @@ import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Dot,
 } from "recharts";
 import { toast } from "@/hooks/use-toast";
 import { OccupationalProfileTab } from "./occupational-profile-tab";
@@ -271,6 +271,11 @@ export function PatientDetailView() {
             patientId={patient.id}
             therapistId={patient.therapistIds[0] ?? professionals?.[0]?.id ?? ""}
           />
+        </TabsContent>
+
+        {/* Progress */}
+        <TabsContent value="progress" className="mt-4 space-y-4">
+          <ProgressChart assessments={assessments ?? []} onOpenAssessment={setOpenAssessmentId} />
           {!assessments || assessments.length === 0 ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">
               Sin evaluaciones registradas todavía.
@@ -304,11 +309,6 @@ export function PatientDetailView() {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-
-        {/* Progress */}
-        <TabsContent value="progress" className="mt-4">
-          <ProgressChart assessments={assessments ?? []} />
         </TabsContent>
       </Tabs>
 
@@ -468,16 +468,22 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
   );
 }
 
-function ProgressChart({ assessments }: { assessments: { scale: string; score: string; date: string }[] }) {
+function ProgressChart({
+  assessments,
+  onOpenAssessment,
+}: {
+  assessments: { id: string; scale: string; score: string; date: string }[];
+  onOpenAssessment: (id: string) => void;
+}) {
   // Group by scale and parse "x/y" → x/y * 100 for normalization.
   const data = useMemo(() => {
-    const byScale: Record<string, { date: string; value: number }[]> = {};
+    const byScale: Record<string, { id: string; date: string; value: number }[]> = {};
     for (const a of assessments) {
       const m = a.score.match(/^(\d+)\s*\/\s*(\d+)/);
       const v = m ? (parseFloat(m[1]) / parseFloat(m[2])) * 100 : parseFloat(a.score);
       if (isNaN(v)) continue;
       byScale[a.scale] ??= [];
-      byScale[a.scale].push({ date: a.date, value: Math.round(v) });
+      byScale[a.scale].push({ id: a.id, date: a.date, value: Math.round(v) });
     }
     return Object.entries(byScale).map(([scale, points]) => ({
       scale,
@@ -496,25 +502,55 @@ function ProgressChart({ assessments }: { assessments: { scale: string; score: s
     );
   }
 
-  // Build merged dataset: one row per unique date with one column per scale.
+  // Build merged dataset: one row per unique date with one column per scale,
+  // plus a `<scale>__id` column holding that point's assessment id so a
+  // click can open the right one (Recharts only gives us the row's data,
+  // not which series was clicked, so we resolve that from the click event
+  // by checking which scale columns are present on that row).
   const allDates = Array.from(new Set(data.flatMap((d) => d.points.map((p) => p.date)))).sort();
   const merged = allDates.map((date) => {
     const row: Record<string, number | string> = { date: new Date(date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) };
     for (const { scale, points } of data) {
       const p = points.find((p) => p.date === date);
-      if (p) row[scale] = p.value;
+      if (p) {
+        row[scale] = p.value;
+        row[`${scale}__id`] = p.id;
+      }
     }
     return row;
   });
 
   const COLORS = ["#1a5c58", "#5b3fa0", "#c17f3a", "#b03060", "#2a6b3f", "#1a5c80", "#7c3a3a"];
 
+  // A custom dot (using Recharts' own <Dot>, with a click handler attached)
+  // is the only reliable way to know exactly which point — and which
+  // series — was clicked when multiple Areas overlap on the same X
+  // position. The chart-level onClick exposes `activePayload` for ALL
+  // series at that X coordinate, not just the one nearest the cursor, so
+  // picking activePayload[0] would silently open the wrong scale's
+  // assessment whenever two scales share a date (confirmed in Recharts'
+  // own tracker, e.g. recharts/recharts#5402).
+  function renderClickableDot(scale: string) {
+    return function ClickableDot(props: any) {
+      const id = props.payload?.[`${scale}__id`];
+      if (id == null) return <Dot {...props} r={0} />;
+      return (
+        <Dot
+          {...props}
+          r={4}
+          style={{ cursor: "pointer" }}
+          onClick={() => onOpenAssessment(id)}
+        />
+      );
+    };
+  }
+
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">Evolución por escala (normalizada 0–100)</CardTitle>
         <CardDescription className="text-xs">
-          Cada escala se normaliza a 0–100 para comparar tendencias.
+          Cada escala se normaliza a 0–100 para comparar tendencias. Haz clic en un punto para abrir esa evaluación.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -534,6 +570,8 @@ function ProgressChart({ assessments }: { assessments: { scale: string; score: s
                   fill={COLORS[i % COLORS.length]}
                   fillOpacity={0.1}
                   strokeWidth={2}
+                  dot={renderClickableDot(d.scale)}
+                  activeDot={renderClickableDot(d.scale)}
                 />
               ))}
             </AreaChart>
