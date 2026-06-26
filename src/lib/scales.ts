@@ -25,6 +25,13 @@ export type ScaleDefinition = {
   maxScore: number;
   // Returns a human label for a given total score.
   interpret: (total: number) => string;
+  // Whether a higher total score means MORE independence/autonomy.
+  // Barthel and Lawton-Brody: higher = more independent.
+  // VAVDI: higher = MORE support needed (lower = more autonomy), so it's
+  // the opposite direction — this flag lets trend displays (e.g. the
+  // evolution chart) show improvement/decline correctly per scale instead
+  // of assuming "higher is always better".
+  higherIsBetter: boolean;
 };
 
 // ─── Barthel (AVD básicas) ───────────────────────────────────────────────────
@@ -138,6 +145,7 @@ export const BARTHEL: ScaleDefinition = {
   minScore: 0,
   maxScore: 100,
   interpret: interpretBarthel,
+  higherIsBetter: true,
 };
 
 // Barthel has no official sub-block grouping (unlike VAVDI), but for the
@@ -239,6 +247,7 @@ export const LAWTON_BRODY: ScaleDefinition = {
   minScore: 0,
   maxScore: 8,
   interpret: interpretLawtonBrody,
+  higherIsBetter: true,
 };
 
 // ─── VAVDI (AVD básicas + instrumentales, nivel de apoyo) ───────────────────
@@ -452,6 +461,7 @@ export const VAVDI: ScaleDefinition = {
   minScore: 15,
   maxScore: 75,
   interpret: interpretVavdi,
+  higherIsBetter: false,
 };
 
 // VAVDI items split by block, used to render two clearly labeled groups

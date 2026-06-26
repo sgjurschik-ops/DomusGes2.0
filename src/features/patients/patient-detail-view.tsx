@@ -23,14 +23,14 @@ import {
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { assessmentCreateSchema, type AssessmentCreateInput, ASSESSMENT_SCALES, STRUCTURED_SCALES } from "@/lib/schemas";
-import { formatScaleScore } from "@/lib/scales";
+import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { VisitDetailDialog } from "./visit-detail-dialog";
-import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Dot,
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Dot,
 } from "recharts";
 import { toast } from "@/hooks/use-toast";
 import { OccupationalProfileTab } from "./occupational-profile-tab";
@@ -190,6 +190,7 @@ export function PatientDetailView() {
               <CardContent>
                 {visits && visits.length > 0 ? (
                   <div>
+                    <p className="text-sm font-medium mb-0.5">{visits[0].title ?? "Seguimiento"}</p>
                     <p className="text-xs text-muted-foreground mb-1">
                       {formatDateTime(visits[0].date)} · {visits[0].durationMin} min · {visits[0].therapistName}
                     </p>
@@ -246,9 +247,9 @@ export function PatientDetailView() {
               >
                 <CardContent className="p-4">
                   <div className="mb-2">
-                    <p className="text-sm font-medium">{formatDateTime(v.date)}</p>
+                    <p className="text-sm font-semibold">{v.title ?? "Seguimiento"}</p>
                     <p className="text-xs text-muted-foreground">
-                      {v.durationMin} min · {v.therapistName}
+                      {formatDateTime(v.date)} · {v.durationMin} min · {v.therapistName}
                     </p>
                   </div>
                   <p className="text-sm text-foreground whitespace-pre-wrap">{v.notes}</p>
@@ -488,15 +489,17 @@ function ProgressChart({
   assessments: { id: string; scale: string; score: string; date: string }[];
   onOpenAssessment: (id: string) => void;
 }) {
-  // Group by scale and parse "x/y" → x/y * 100 for normalization.
+  // Group by scale, keeping both the normalized value (for the mini chart's
+  // Y position) and the original "x/y — interpretation" string (for the
+  // subtitle), since the backend already computes that text for us.
   const data = useMemo(() => {
-    const byScale: Record<string, { id: string; date: string; value: number }[]> = {};
+    const byScale: Record<string, { id: string; date: string; value: number; label: string }[]> = {};
     for (const a of assessments) {
       const m = a.score.match(/^(\d+)\s*\/\s*(\d+)/);
       const v = m ? (parseFloat(m[1]) / parseFloat(m[2])) * 100 : parseFloat(a.score);
       if (isNaN(v)) continue;
       byScale[a.scale] ??= [];
-      byScale[a.scale].push({ id: a.id, date: a.date, value: Math.round(v) });
+      byScale[a.scale].push({ id: a.id, date: a.date, value: Math.round(v), label: a.score });
     }
     return Object.entries(byScale).map(([scale, points]) => ({
       scale,
@@ -515,88 +518,126 @@ function ProgressChart({
     );
   }
 
-  // Build merged dataset: one row per unique date with one column per scale,
-  // plus a `<scale>__id` column holding that point's assessment id so a
-  // click can open the right one (Recharts only gives us the row's data,
-  // not which series was clicked, so we resolve that from the click event
-  // by checking which scale columns are present on that row).
-  const allDates = Array.from(new Set(data.flatMap((d) => d.points.map((p) => p.date)))).sort();
-  const merged = allDates.map((date) => {
-    const row: Record<string, number | string> = { date: new Date(date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }) };
-    for (const { scale, points } of data) {
-      const p = points.find((p) => p.date === date);
-      if (p) {
-        row[scale] = p.value;
-        row[`${scale}__id`] = p.id;
-      }
-    }
-    return row;
-  });
-
-  const COLORS = ["#1a5c58", "#5b3fa0", "#c17f3a", "#b03060", "#2a6b3f", "#1a5c80", "#7c3a3a"];
-
-  // A custom dot (using Recharts' own <Dot>, with a click handler attached)
-  // is the only reliable way to know exactly which point — and which
-  // series — was clicked when multiple Areas overlap on the same X
-  // position. The chart-level onClick exposes `activePayload` for ALL
-  // series at that X coordinate, not just the one nearest the cursor, so
-  // picking activePayload[0] would silently open the wrong scale's
-  // assessment whenever two scales share a date (confirmed in Recharts'
-  // own tracker, e.g. recharts/recharts#5402).
-  function renderClickableDot(scale: string) {
-    return function ClickableDot(props: any) {
-      // React 19 no longer allows forwarding `key` through a prop spread —
-      // it must be passed directly to JSX. Recharts includes `key` in the
-      // props object it gives each dot, so it has to be pulled out here
-      // before spreading the rest onto <Dot>.
-      const { key, ...rest } = props;
-      const id = rest.payload?.[`${scale}__id`];
-      if (id == null) return <Dot key={key} {...rest} r={0} />;
-      return (
-        <Dot
-          key={key}
-          {...rest}
-          r={4}
-          style={{ cursor: "pointer" }}
-          onClick={() => onOpenAssessment(id)}
-        />
-      );
-    };
-  }
-
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Evolución por escala (normalizada 0–100)</CardTitle>
+        <CardTitle className="text-sm">Evolución por escala</CardTitle>
         <CardDescription className="text-xs">
-          Cada escala se normaliza a 0–100 para comparar tendencias. Haz clic en un punto para abrir esa evaluación.
+          Una franja por escala, con el cambio respecto a la evaluación anterior. Haz clic en un punto para abrir esa evaluación.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="h-72 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={merged}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-              <Tooltip />
-              {data.map((d, i) => (
-                <Area
-                  key={d.scale}
-                  type="monotone"
-                  dataKey={d.scale}
-                  stroke={COLORS[i % COLORS.length]}
-                  fill={COLORS[i % COLORS.length]}
-                  fillOpacity={0.1}
-                  strokeWidth={2}
-                  dot={renderClickableDot(d.scale)}
-                  activeDot={renderClickableDot(d.scale)}
-                />
-              ))}
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+      <CardContent className="space-y-5">
+        {data.map((d, i) => (
+          <ScaleTrendRow
+            key={d.scale}
+            scale={d.scale}
+            points={d.points}
+            color={SCALE_COLORS[i % SCALE_COLORS.length]}
+            onOpenAssessment={onOpenAssessment}
+            isLast={i === data.length - 1}
+          />
+        ))}
       </CardContent>
     </Card>
+  );
+}
+
+const SCALE_COLORS = ["#1a5c58", "#5b3fa0", "#c17f3a", "#b03060", "#2a6b3f", "#1a5c80", "#7c3a3a"];
+
+function ScaleTrendRow({
+  scale,
+  points,
+  color,
+  onOpenAssessment,
+  isLast,
+}: {
+  scale: string;
+  points: { id: string; date: string; value: number; label: string }[];
+  color: string;
+  onOpenAssessment: (id: string) => void;
+  isLast: boolean;
+}) {
+  const last = points[points.length - 1];
+  const prev = points.length > 1 ? points[points.length - 2] : null;
+  const delta = prev ? last.value - prev.value : null;
+
+  // VAVDI is the opposite of Barthel/Lawton-Brody: a LOWER score means MORE
+  // autonomy. Defaults to true (higher = better) for any non-structured
+  // scale not in this map, since that's the more common convention.
+  const higherIsBetter = STRUCTURED_SCALE_DEFINITIONS[scale]?.higherIsBetter ?? true;
+  const isImprovement = delta !== null && (higherIsBetter ? delta > 0 : delta < 0);
+  const isDecline = delta !== null && (higherIsBetter ? delta < 0 : delta > 0);
+
+  // Stretch the Y axis to the actual range of this scale's own points (with
+  // a little padding) instead of a fixed 0–100, so a real but modest change
+  // (e.g. 65 → 55) is visually legible instead of looking almost flat.
+  const values = points.map((p) => p.value);
+  const min = Math.min(...values);
+  const max = Math.min(100, Math.max(...values));
+  const pad = Math.max((max - min) * 0.3, 4);
+  const domain: [number, number] = [Math.max(0, min - pad), Math.min(100, max + pad)];
+
+  const chartData = points.map((p) => ({
+    ...p,
+    dateLabel: new Date(p.date).toLocaleDateString("es-ES", { day: "2-digit", month: "short" }),
+  }));
+
+  function renderClickableDot(props: any) {
+    const { key, ...rest } = props;
+    const isLastPoint = rest.payload?.id === last.id;
+    return (
+      <Dot
+        key={key}
+        {...rest}
+        r={isLastPoint ? 5 : 3}
+        style={{ cursor: "pointer" }}
+        onClick={() => onOpenAssessment(rest.payload.id)}
+      />
+    );
+  }
+
+  return (
+    <div className={isLast ? "" : "pb-5 border-b"}>
+      <div className="flex items-baseline justify-between gap-3 mb-1.5">
+        <span className="text-sm font-medium">{scale}</span>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground text-right">
+          <span>{last.label}</span>
+          {delta !== null && (
+            <span
+              className={
+                "inline-flex items-center gap-0.5 font-medium shrink-0 " +
+                (isImprovement ? "text-emerald-600" : isDecline ? "text-red-600" : "text-muted-foreground")
+              }
+              title={isImprovement ? "Mejora respecto a la evaluación anterior" : isDecline ? "Empeora respecto a la evaluación anterior" : "Sin cambios"}
+            >
+              {delta > 0 ? <ArrowUp className="w-3 h-3" /> : delta < 0 ? <ArrowDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+              {Math.abs(delta)}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="h-20 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={chartData} margin={{ top: 6, right: 16, bottom: 0, left: 0 }}>
+            <YAxis domain={domain} hide />
+            <XAxis dataKey="dateLabel" hide />
+            <Tooltip
+              formatter={(_value: number, _name: string, ctx: any) => [ctx?.payload?.label ?? "", ""]}
+              labelFormatter={(label: string) => label}
+            />
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke={color}
+              fill={color}
+              fillOpacity={0.1}
+              strokeWidth={2}
+              dot={renderClickableDot}
+              activeDot={renderClickableDot}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }

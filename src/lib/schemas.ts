@@ -122,6 +122,7 @@ export const visitCreateSchema = z.object({
   date: z.string().min(1, "La fecha es obligatoria"),
   time: z.string().min(1, "La hora es obligatoria"),
   durationMin: z.coerce.number().int().min(15).max(240).default(45),
+  title: z.string().min(1, "El título es obligatorio"),
   notes: z.string().min(1, "Las notas clínicas son obligatorias"),
   interventions: z.array(z.string()).default([]),
 });
@@ -132,6 +133,7 @@ export const visitUpdateSchema = z.object({
   date: z.string().min(1, "La fecha es obligatoria"),
   time: z.string().min(1, "La hora es obligatoria"),
   durationMin: z.coerce.number().int().min(15).max(240).default(45),
+  title: z.string().min(1, "El título es obligatorio"),
   notes: z.string().min(1, "Las notas clínicas son obligatorias"),
   interventions: z.array(z.string()).default([]),
 });

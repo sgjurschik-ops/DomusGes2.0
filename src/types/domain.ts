@@ -95,6 +95,7 @@ export interface VisitDTO {
   therapistName: string;
   date: string; // ISO
   durationMin: number;
+  title: string | null; // Null for visits created before this field existed
   notes: string;
   interventions: string[];
   score: number | null;

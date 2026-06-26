@@ -48,6 +48,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       therapistId: d.therapistId,
       date,
       durationMin: d.durationMin,
+      title: d.title,
       notes: d.notes,
       interventions: JSON.stringify(d.interventions),
     },

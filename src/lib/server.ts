@@ -177,6 +177,7 @@ export function mapVisit(v: VisitWithRels) {
     therapistName: v.therapist.name,
     date: v.date.toISOString(),
     durationMin: v.durationMin,
+    title: v.title,
     notes: v.notes,
     interventions: JSON.parse(v.interventions || "[]") as string[],
     score: v.score,

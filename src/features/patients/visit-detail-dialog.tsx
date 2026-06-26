@@ -41,7 +41,7 @@ export function VisitDetailDialog({ visitId, patientId, onClose }: Props) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className={isEditing ? "max-w-3xl max-h-[85vh] overflow-y-auto" : "max-w-2xl max-h-[85vh] overflow-y-auto"}>
+      <DialogContent className={isEditing ? "max-w-4xl max-h-[85vh] overflow-y-auto" : "max-w-2xl max-h-[85vh] overflow-y-auto"}>
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar seguimiento" : "Detalle del seguimiento"}</DialogTitle>
           <DialogDescription>
@@ -107,9 +107,12 @@ function VisitSummary({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium">{formatDateTime(visit.date)}</span>
-        <span className="text-muted-foreground">{visit.durationMin} min · {visit.therapistName}</span>
+      <div>
+        <p className="font-semibold text-base">{visit.title ?? "Seguimiento"}</p>
+        <div className="flex items-center justify-between text-sm mt-0.5">
+          <span className="text-muted-foreground">{formatDateTime(visit.date)}</span>
+          <span className="text-muted-foreground">{visit.durationMin} min · {visit.therapistName}</span>
+        </div>
       </div>
 
       <div className="rounded-lg border bg-muted/40 px-4 py-3">
@@ -176,6 +179,7 @@ function VisitEditForm({
       date: visit.date.slice(0, 10),
       time: visit.date.slice(11, 16),
       durationMin: visit.durationMin,
+      title: visit.title ?? "",
       notes: visit.notes,
       interventions: visit.interventions,
     },
@@ -209,7 +213,7 @@ function VisitEditForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-[2fr_1fr_1fr_1fr] gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-[1.8fr_1fr_1.1fr_0.9fr] gap-3">
         <div className="space-y-1.5 col-span-2 sm:col-span-1">
           <Label className="text-xs">Terapeuta <span className="text-destructive">*</span></Label>
           <Controller
@@ -229,26 +233,32 @@ function VisitEditForm({
           {errors.therapistId && <p className="text-xs text-destructive">{errors.therapistId.message}</p>}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 min-w-0">
           <Label className="text-xs">Duración</Label>
-          <Input type="number" min={15} max={240} step={15} {...register("durationMin")} />
+          <Input type="number" min={15} max={240} step={15} className="px-2" {...register("durationMin")} />
           {errors.durationMin && <p className="text-xs text-destructive">{errors.durationMin.message}</p>}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 min-w-0">
           <Label className="text-xs">Fecha <span className="text-destructive">*</span></Label>
-          <Input type="date" {...register("date")} />
+          <Input type="date" className="px-2" {...register("date")} />
           {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 min-w-0">
           <Label className="text-xs">Hora <span className="text-destructive">*</span></Label>
-          <Input type="time" {...register("time")} />
+          <Input type="time" className="px-2" {...register("time")} />
           {errors.time && <p className="text-xs text-destructive">{errors.time.message}</p>}
         </div>
       </div>
 
       <div className="h-px bg-border" />
+
+      <div className="space-y-1.5">
+        <Label className="text-sm font-semibold">Título del seguimiento <span className="text-destructive">*</span></Label>
+        <Input placeholder="p. ej. Primera valoración, Revisión mensual…" {...register("title")} />
+        {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
+      </div>
 
       <div className="space-y-1.5">
         <Label className="text-sm font-semibold">Notas clínicas <span className="text-destructive">*</span></Label>

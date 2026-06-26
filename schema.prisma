@@ -69,6 +69,7 @@ model Visit {
   therapistId   String
   date          DateTime
   durationMin   Int      @default(45)
+  title         String?  // Optional so existing rows created before this field remain valid
   notes         String
   interventions String   @default("[]") // JSON-encoded string[]
   score         Int?     // 0-10 subjective progress
@@ -92,11 +93,12 @@ model Assessment {
                         // structured scales (Barthel, Lawton-Brody, VAVDI),
                         // where each key is an item id and value its score.
                         // Free-text scales (EVN, PHQ-9, GAD-7) leave this null.
-  areaSummary String?  // Rule-based "strengths vs. areas to work on" text,
-                        // computed and stored at save time (Barthel/VAVDI
-                        // only) — stored rather than recomputed on read, so
-                        // a past assessment's conclusion doesn't silently
-                        // change if the scoring rules in scales.ts evolve.
+  areaSummary String?  // JSON-encoded AreaSummaryData (see src/lib/scales.ts):
+                        // strengths/areas-to-work-on grouped by clinical
+                        // block, computed and stored at save time (Barthel/
+                        // VAVDI only) — stored rather than recomputed on
+                        // read, so a past assessment's conclusion doesn't
+                        // silently change if the scoring rules evolve.
   notes       String?
   date        DateTime @default(now())
   createdAt   DateTime @default(now())

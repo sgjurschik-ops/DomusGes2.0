@@ -42,6 +42,7 @@ export function NewVisitForm() {
       date: new Date().toISOString().slice(0, 10),
       time: "10:00",
       durationMin: 45,
+      title: "",
       notes: "",
       interventions: [],
     },
@@ -87,7 +88,7 @@ export function NewVisitForm() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Compact data row: 2 cols on mobile, 3 on tablet, all 5 in one row from lg up */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-[2fr_2fr_0.8fr_1fr_0.8fr] gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-[1.8fr_1.8fr_1fr_1.1fr_0.9fr] gap-3">
               <div className="space-y-1.5 col-span-2 sm:col-span-1">
                 <Label className="text-xs">Paciente <span className="text-destructive">*</span></Label>
                 <Controller
@@ -124,26 +125,35 @@ export function NewVisitForm() {
                 />
                 {errors.therapistId && <p className="text-xs text-destructive">{errors.therapistId.message}</p>}
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label className="text-xs">Duración</Label>
-                <Input type="number" min={15} max={240} step={15} {...register("durationMin")} />
+                <Input type="number" min={15} max={240} step={15} className="px-2" {...register("durationMin")} />
                 {errors.durationMin && <p className="text-xs text-destructive">{errors.durationMin.message}</p>}
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label className="text-xs">Fecha <span className="text-destructive">*</span></Label>
-                <Input type="date" {...register("date")} />
+                <Input type="date" className="px-2" {...register("date")} />
                 {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label className="text-xs">Hora <span className="text-destructive">*</span></Label>
-                <Input type="time" {...register("time")} />
+                <Input type="time" className="px-2" {...register("time")} />
                 {errors.time && <p className="text-xs text-destructive">{errors.time.message}</p>}
               </div>
             </div>
 
             <div className="h-px bg-border" />
 
-            {/* Notes get the visual weight: bigger label, larger textarea by default */}
+            {/* Title + notes get the visual weight */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-semibold">Título del seguimiento <span className="text-destructive">*</span></Label>
+              <Input
+                placeholder="p. ej. Primera valoración, Revisión mensual…"
+                {...register("title")}
+              />
+              {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
+            </div>
+
             <div className="space-y-1.5">
               <Label className="text-sm font-semibold">Notas clínicas <span className="text-destructive">*</span></Label>
               <p className="text-xs text-muted-foreground">Observaciones, evolución y plan.</p>
