@@ -24,7 +24,7 @@ const VIEW_TITLES: Record<string, string> = {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { status, isLoading } = useCurrentSession();
-  const { view, navigate, newVisitPatientId } = useNav();
+  const { view, navigate } = useNav();
 
   // Redirect non-admin users away from admin views client-side as a defense
   // in depth (server enforces it too via requireAdmin()).
@@ -45,7 +45,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const title = VIEW_TITLES[view] ?? "DomusGes";
   const showNewPatient = view === "patients";
-  const showNewVisit = view === "patient-detail" || view === "today";
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -58,20 +57,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {showNewPatient && (
               <Button size="sm" onClick={() => navigate("new-patient")}>
                 <Plus className="w-4 h-4 mr-1" /> Nuevo paciente
-              </Button>
-            )}
-            {showNewVisit && (
-              <Button
-                size="sm"
-                onClick={() => {
-                  if (view === "patient-detail") {
-                    // current selected patient
-                    useNav.getState().setNewVisitPatient(useNav.getState().selectedPatientId);
-                  }
-                  navigate("new-visit");
-                }}
-              >
-                <Plus className="w-4 h-4 mr-1" /> Nuevo seguimiento
               </Button>
             )}
           </div>

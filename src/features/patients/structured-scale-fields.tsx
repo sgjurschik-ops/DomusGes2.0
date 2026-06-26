@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AreaSummaryView } from "./area-summary-view";
 
 type Props = {
@@ -109,8 +110,19 @@ function ScaleItemRow({
         </SelectTrigger>
         <SelectContent>
           {item.options.map((opt) => (
-            <SelectItem key={opt.value} value={String(opt.value)} title={opt.description}>
-              {opt.value} — {opt.label}
+            <SelectItem key={opt.value} value={String(opt.value)}>
+              {opt.description ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block w-full text-left">{opt.value} — {opt.label}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs text-sm leading-relaxed p-3">
+                    {opt.description}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <>{opt.value} — {opt.label}</>
+              )}
             </SelectItem>
           ))}
         </SelectContent>
