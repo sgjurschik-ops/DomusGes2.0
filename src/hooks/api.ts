@@ -52,10 +52,10 @@ export function useCurrentSession() {
 
 // ─── Patients ────────────────────────────────────────────────────────────────
 
-import type { PatientDTO, VisitDTO, AssessmentDTO, AppointmentDTO, ProfessionalDTO, AuditLogDTO } from "@/types/domain";
+import type { PatientDTO, VisitDTO, AssessmentDTO, AppointmentDTO, SlotReservationDTO, ProfessionalDTO, AuditLogDTO } from "@/types/domain";
 import type {
   PatientCreateInput, VisitCreateInput, VisitUpdateInput, AssessmentCreateInput, AssessmentUpdateInput,
-  AppointmentCreateInput, ProfessionalCreateInput, ProfessionalUpdateInput,
+  AppointmentCreateInput, SlotReservationCreateInput, AppointmentUpdateInput, ProfessionalCreateInput, ProfessionalUpdateInput,
 } from "@/lib/schemas";
 
 export const patientKeys = {
@@ -250,11 +250,66 @@ export function useMoveAppointment() {
   });
 }
 
+export function useUpdateAppointment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: AppointmentUpdateInput }) =>
+      fetcher<AppointmentDTO>(`/api/appointments/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["appointments"] }),
+  });
+}
+
 export function useDeleteAppointment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => fetcher(`/api/appointments/${id}`, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["appointments"] }),
+  });
+}
+
+// ─── Slot reservations (blocked time, no patient) ─────────────────────────────
+
+export function useReservations(params?: { from?: string; to?: string; therapistId?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
+  if (params?.therapistId) qs.set("therapistId", params.therapistId);
+  const str = qs.toString();
+  return useQuery<SlotReservationDTO[]>({
+    queryKey: ["reservations", params ?? {}],
+    queryFn: () => fetcher(`/api/reservations${str ? `?${str}` : ""}`),
+  });
+}
+
+export function useCreateReservation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: SlotReservationCreateInput) =>
+      fetcher<SlotReservationDTO>("/api/reservations", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["reservations"] }),
+  });
+}
+
+export function useMoveReservation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, start }: { id: string; start: string }) =>
+      fetcher<SlotReservationDTO>(`/api/reservations/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ id, start }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["reservations"] }),
+  });
+}
+
+export function useDeleteReservation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => fetcher(`/api/reservations/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["reservations"] }),
   });
 }
 

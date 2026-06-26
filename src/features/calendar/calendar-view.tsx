@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -19,12 +19,18 @@ import {
   addMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Lock, AlertTriangle } from "lucide-react";
 
 import {
   useAppointments,
   useCreateAppointment,
+  useUpdateAppointment,
+  useMoveAppointment,
   useDeleteAppointment,
+  useReservations,
+  useCreateReservation,
+  useMoveReservation,
+  useDeleteReservation,
   usePatients,
   useProfessionals,
 } from "@/hooks/api";
@@ -54,31 +60,95 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   appointmentCreateSchema,
   type AppointmentCreateInput,
+  appointmentUpdateSchema,
+  type AppointmentUpdateInput,
+  slotReservationCreateSchema,
+  type SlotReservationCreateInput,
   APPOINTMENT_TYPES,
 } from "@/lib/schemas";
-import type { AppointmentDTO } from "@/types/domain";
+import type { AppointmentDTO, SlotReservationDTO } from "@/types/domain";
 
 type ViewMode = "month" | "week" | "day";
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-const HOUR_START = 8;
+const HOUR_START = 7;
 const HOUR_END = 20;
-const HOUR_PX = 56; // height of one hour row in week/day view
+const HOUR_PX = 40; // height of one hour row in week/day view (compact)
+const SNAP_MIN = 15; // drag-and-drop snaps to 15-minute increments
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-function hexToRgba(hex: string, alpha: number): string {
-  const h = hex.replace("#", "");
-  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
-  const r = parseInt(full.slice(0, 2), 16) || 0;
-  const g = parseInt(full.slice(2, 4), 16) || 0;
-  const b = parseInt(full.slice(4, 6), 16) || 0;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 function apptsForDay(appts: AppointmentDTO[] | undefined, day: Date): AppointmentDTO[] {
   return (appts ?? []).filter((a) => isSameDay(new Date(a.start), day));
+}
+
+function reservationsForDay(rs: SlotReservationDTO[] | undefined, day: Date): SlotReservationDTO[] {
+  return (rs ?? []).filter((r) => isSameDay(new Date(r.start), day));
+}
+
+// Whether two [start, start+duration) ranges overlap, used to flag a
+// reservation that collides with an appointment (visual warning only — we
+// don't block saving, per the agreed behavior).
+function rangesOverlap(
+  aStart: Date,
+  aDurationMin: number,
+  bStart: Date,
+  bDurationMin: number,
+): boolean {
+  const aEnd = addMinutes(aStart, aDurationMin).getTime();
+  const bEnd = addMinutes(bStart, bDurationMin).getTime();
+  return aStart.getTime() < bEnd && bStart.getTime() < aEnd;
+}
+
+// Adds `minutes` to a "HH:mm" string, used only to seed a sensible default
+// end time (start + 45min) when a create dialog first opens.
+function addMinutesToTimeStr(time: string, minutes: number): string {
+  const [h, m] = time.split(":").map(Number);
+  const total = h * 60 + m + minutes;
+  const wrapped = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
+  return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
+}
+
+// Human-readable duration label ("1h 30min") shown next to the end-time
+// field as the start/end times change, so the person sees the derived
+// duration without ever typing it in directly. Returns null while the
+// fields don't form a valid positive range yet (e.g. end before start).
+function computeDurationLabel(start?: string, end?: string): string | null {
+  if (!start || !end) return null;
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return null;
+  const diff = eh * 60 + em - (sh * 60 + sm);
+  if (diff <= 0) return null;
+  const h = Math.floor(diff / 60);
+  const m = diff % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h} h`;
+  return `${h} h ${m} min`;
+}
+
+// Minutes elapsed since midnight, refreshed every minute, so the "current
+// time" line in week/day view stays accurate if the page is left open.
+function useNowMinutes(): number {
+  const [minutes, setMinutes] = useState(() => {
+    const n = new Date();
+    return n.getHours() * 60 + n.getMinutes();
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      const n = new Date();
+      setMinutes(n.getHours() * 60 + n.getMinutes());
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return minutes;
 }
 
 // ─── Main component ──────────────────────────────────────────────────────────
@@ -89,13 +159,17 @@ export function CalendarView() {
   const [cursor, setCursor] = useState<Date>(today);
   const [filterTherapistId, setFilterTherapistId] = useState<string>("all");
   const [selectedAppt, setSelectedAppt] = useState<AppointmentDTO | null>(null);
+  const [selectedReservation, setSelectedReservation] = useState<SlotReservationDTO | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [reservationOpen, setReservationOpen] = useState(false);
   const [createPreset, setCreatePreset] = useState<{ date: string; time: string }>({
     date: format(today, "yyyy-MM-dd"),
     time: "10:00",
   });
 
   const { data: professionals } = useProfessionals();
+  const moveAppt = useMoveAppointment();
+  const moveReservation = useMoveReservation();
 
   // Compute the visible window for fetching appointments.
   const { from, to } = useMemo(() => {
@@ -118,6 +192,12 @@ export function CalendarView() {
     therapistId: filterTherapistId === "all" ? undefined : filterTherapistId,
   });
 
+  const { data: reservations } = useReservations({
+    from: from.toISOString(),
+    to: to.toISOString(),
+    therapistId: filterTherapistId === "all" ? undefined : filterTherapistId,
+  });
+
   const navigate = (dir: "prev" | "next" | "today") => {
     if (dir === "today") {
       setCursor(new Date());
@@ -129,13 +209,39 @@ export function CalendarView() {
     else setCursor(addDays(cursor, step));
   };
 
-  const openCreate = (date?: Date, time?: string) => {
+  const openCreateAppt = (date?: Date, time?: string) => {
     setCreatePreset({
       date: format(date ?? new Date(), "yyyy-MM-dd"),
       time: time ?? "10:00",
     });
     setCreateOpen(true);
   };
+
+  const openCreateReservation = (date?: Date, time?: string) => {
+    setCreatePreset({
+      date: format(date ?? new Date(), "yyyy-MM-dd"),
+      time: time ?? "10:00",
+    });
+    setReservationOpen(true);
+  };
+
+  async function handleDropAppt(id: string, newStart: Date) {
+    try {
+      await moveAppt.mutateAsync({ id, start: newStart.toISOString() });
+      toast({ title: "Cita movida" });
+    } catch {
+      toast({ title: "Error al mover la cita", variant: "destructive" });
+    }
+  }
+
+  async function handleDropReservation(id: string, newStart: Date) {
+    try {
+      await moveReservation.mutateAsync({ id, start: newStart.toISOString() });
+      toast({ title: "Reserva movida" });
+    } catch {
+      toast({ title: "Error al mover la reserva", variant: "destructive" });
+    }
+  }
 
   const title = useMemo(() => {
     if (view === "month") return format(cursor, "MMMM yyyy", { locale: es });
@@ -147,36 +253,64 @@ export function CalendarView() {
     return format(cursor, "EEEE d 'de' MMMM yyyy", { locale: es });
   }, [view, cursor]);
 
+  const sharedViewProps = {
+    appts: appts ?? [],
+    reservations: reservations ?? [],
+    onSelectAppt: setSelectedAppt,
+    onSelectReservation: setSelectedReservation,
+    onCreateAppt: openCreateAppt,
+    onCreateReservation: openCreateReservation,
+    onDropAppt: handleDropAppt,
+    onDropReservation: handleDropReservation,
+  };
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 justify-between">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => navigate("prev")}
-            aria-label="Anterior"
-          >
-            <ChevronLeft className="w-4 h-4" />
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold capitalize">{title}</h2>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => navigate("prev")}
+              aria-label="Anterior"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" className="h-7" onClick={() => navigate("today")}>
+              Hoy
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => navigate("next")}
+              aria-label="Siguiente"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <Button size="sm" onClick={() => openCreateAppt()}>
+            <Plus className="w-4 h-4 mr-1" />
+            Nueva cita
           </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate("today")}>
-            Hoy
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => navigate("next")}
-            aria-label="Siguiente"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-          <h2 className="text-lg font-semibold capitalize ml-2">{title}</h2>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center justify-between gap-2 flex-wrap pb-3 border-b">
+          <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
+            <TabsList>
+              <TabsTrigger value="month">Mes</TabsTrigger>
+              <TabsTrigger value="week">Semana</TabsTrigger>
+              <TabsTrigger value="day">Día</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           <Select value={filterTherapistId} onValueChange={setFilterTherapistId}>
-            <SelectTrigger aria-label="Filtrar por terapeuta" className="w-[200px]">
+            <SelectTrigger aria-label="Filtrar por terapeuta" className="w-[200px] h-8 text-muted-foreground">
               <SelectValue placeholder="Todos los terapeutas" />
             </SelectTrigger>
             <SelectContent>
@@ -188,19 +322,6 @@ export function CalendarView() {
               ))}
             </SelectContent>
           </Select>
-
-          <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
-            <TabsList>
-              <TabsTrigger value="month">Mes</TabsTrigger>
-              <TabsTrigger value="week">Semana</TabsTrigger>
-              <TabsTrigger value="day">Día</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <Button size="sm" onClick={() => openCreate()}>
-            <Plus className="w-4 h-4 mr-1" />
-            Nueva cita
-          </Button>
         </div>
       </div>
 
@@ -208,26 +329,101 @@ export function CalendarView() {
       {isLoading ? (
         <Skeleton className="h-[600px] w-full" />
       ) : view === "month" ? (
-        <MonthView cursor={cursor} appts={appts ?? []} onSelect={setSelectedAppt} onCreate={openCreate} />
+        <MonthView cursor={cursor} {...sharedViewProps} />
       ) : view === "week" ? (
-        <WeekView cursor={cursor} appts={appts ?? []} onSelect={setSelectedAppt} onCreate={openCreate} />
+        <WeekView cursor={cursor} {...sharedViewProps} />
       ) : (
-        <DayView cursor={cursor} appts={appts ?? []} onSelect={setSelectedAppt} onCreate={openCreate} />
+        <DayView cursor={cursor} {...sharedViewProps} />
       )}
 
-      {/* Detail dialog */}
+      {/* Detail dialogs */}
       <AppointmentDetailDialog
         appt={selectedAppt}
         onClose={() => setSelectedAppt(null)}
       />
+      <ReservationDetailDialog
+        reservation={selectedReservation}
+        onClose={() => setSelectedReservation(null)}
+      />
 
-      {/* Create dialog */}
-      <CreateAppointmentDialog
+      {/* Create dialogs */}
+      <AppointmentFormDialog
+        mode="create"
         open={createOpen}
         onOpenChange={setCreateOpen}
         preset={createPreset}
       />
+      <ReservationFormDialog
+        open={reservationOpen}
+        onOpenChange={setReservationOpen}
+        preset={createPreset}
+      />
     </div>
+  );
+}
+
+// ─── Shared view props type ──────────────────────────────────────────────────
+
+type SharedViewProps = {
+  appts: AppointmentDTO[];
+  reservations: SlotReservationDTO[];
+  onSelectAppt: (a: AppointmentDTO) => void;
+  onSelectReservation: (r: SlotReservationDTO) => void;
+  onCreateAppt: (date?: Date, time?: string) => void;
+  onCreateReservation: (date?: Date, time?: string) => void;
+  onDropAppt: (id: string, newStart: Date) => void;
+  onDropReservation: (id: string, newStart: Date) => void;
+};
+
+// ─── Empty-slot trigger: hover tooltip with the hour + click menu ───────────
+//
+// Wraps an empty calendar cell/slot. Hovering shows a small "HH:mm" tooltip;
+// clicking opens a tiny menu to choose "Nueva cita" or "Reserva de espacio"
+// instead of jumping straight into a form.
+
+function EmptySlotTrigger({
+  label,
+  onCreateAppt,
+  onCreateReservation,
+  className,
+  style,
+}: {
+  label: string;
+  onCreateAppt: () => void;
+  onCreateReservation: () => void;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          onMouseEnter={() => setHover(true)}
+          onMouseLeave={() => setHover(false)}
+          className={`relative block w-full text-left ${className ?? ""}`}
+          style={style}
+          aria-label={`Añadir en ${label}`}
+        >
+          {hover && (
+            <span className="pointer-events-none absolute z-20 left-1 top-0 -translate-y-1/2 bg-popover border border-border rounded px-1.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm whitespace-nowrap">
+              {label}
+            </span>
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuItem onClick={onCreateAppt}>
+          <Plus className="w-4 h-4 mr-2" />
+          Nueva cita
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onCreateReservation}>
+          <Lock className="w-4 h-4 mr-2" />
+          Reserva de espacio
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -236,20 +432,21 @@ export function CalendarView() {
 function MonthView({
   cursor,
   appts,
-  onSelect,
-  onCreate,
-}: {
-  cursor: Date;
-  appts: AppointmentDTO[];
-  onSelect: (a: AppointmentDTO) => void;
-  onCreate: (date?: Date) => void;
-}) {
+  reservations,
+  onSelectAppt,
+  onSelectReservation,
+  onCreateAppt,
+  onCreateReservation,
+  onDropAppt,
+  onDropReservation,
+}: SharedViewProps & { cursor: Date }) {
   const monthStart = startOfMonth(cursor);
   const monthEnd = endOfMonth(cursor);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
   const today = new Date();
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null);
 
   return (
     <Card className="p-2 sm:p-4">
@@ -271,51 +468,106 @@ function MonthView({
           const dayAppts = apptsForDay(appts, day).sort(
             (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
           );
+          const dayReservations = reservationsForDay(reservations, day);
           const inMonth = isSameMonth(day, cursor);
           const isToday = isSameDay(day, today);
-          const overflow = Math.max(0, dayAppts.length - 3);
+          const dayKey = day.toISOString();
+          const isDragOver = dragOverDay === dayKey;
+          const totalItems = dayAppts.length + dayReservations.length;
+          const overflow = Math.max(0, totalItems - 3);
+
           return (
             <div
-              key={day.toISOString()}
+              key={dayKey}
               role="gridcell"
               aria-current={isToday ? "date" : undefined}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOverDay(dayKey);
+              }}
+              onDragLeave={() => setDragOverDay((d) => (d === dayKey ? null : d))}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOverDay(null);
+                const raw = e.dataTransfer.getData("text/plain");
+                if (!raw) return;
+                const payload = JSON.parse(raw) as { kind: "appt" | "reservation"; id: string; start: string };
+                const original = new Date(payload.start);
+                const newStart = new Date(day);
+                newStart.setHours(original.getHours(), original.getMinutes(), 0, 0);
+                if (payload.kind === "appt") onDropAppt(payload.id, newStart);
+                else onDropReservation(payload.id, newStart);
+              }}
               className={`min-h-[92px] sm:min-h-[110px] rounded-md border p-1.5 flex flex-col gap-1 group ${
                 inMonth ? "bg-card" : "bg-muted/30"
-              } ${isToday ? "border-primary ring-1 ring-primary" : "border-border"}`}
+              } ${isDragOver ? "ring-2 ring-primary bg-accent/40" : isToday ? "bg-accent/40 border-border" : "border-border"}`}
             >
-              <button
-                onClick={() => onCreate(day)}
-                className="self-start text-xs font-medium rounded-full w-6 h-6 flex items-center justify-center transition-colors hover:bg-muted"
-                aria-label={`Añadir cita el ${format(day, "d 'de' MMMM", { locale: es })}`}
-              >
-                <span
-                  className={
-                    isToday
-                      ? "bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center"
-                      : ""
-                  }
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => onCreateAppt(day)}
+                  className="self-start text-xs font-medium rounded-full w-6 h-6 flex items-center justify-center transition-colors hover:bg-muted"
+                  aria-label={`Añadir cita el ${format(day, "d 'de' MMMM", { locale: es })}`}
                 >
-                  {format(day, "d")}
-                </span>
-              </button>
+                  <span className={isToday ? "font-semibold" : ""}>{format(day, "d")}</span>
+                </button>
+                <EmptySlotTrigger
+                  label={format(day, "d MMM", { locale: es })}
+                  onCreateAppt={() => onCreateAppt(day)}
+                  onCreateReservation={() => onCreateReservation(day)}
+                  className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                />
+              </div>
 
               <div className="flex-1 flex flex-col gap-1 overflow-hidden">
-                {dayAppts.slice(0, 3).map((a) => (
+                {dayReservations.slice(0, 3).map((r) => {
+                  const overlapsAppt = dayAppts.some((a) =>
+                    rangesOverlap(new Date(r.start), r.durationMin, new Date(a.start), a.durationMin),
+                  );
+                  return (
+                    <button
+                      key={r.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData(
+                          "text/plain",
+                          JSON.stringify({ kind: "reservation", id: r.id, start: r.start }),
+                        );
+                      }}
+                      onClick={() => onSelectReservation(r)}
+                      className={`flex items-center gap-1.5 text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate transition-colors hover:bg-muted ${
+                        overlapsAppt ? "bg-amber-50 border-amber-300" : "bg-muted/60 border-border"
+                      }`}
+                      title={`${r.title} · ${format(new Date(r.start), "HH:mm")}${overlapsAppt ? " · Se solapa con una cita" : ""}`}
+                    >
+                      <Lock className="w-3 h-3 shrink-0 text-muted-foreground" />
+                      <span className="font-semibold shrink-0">{format(new Date(r.start), "HH:mm")}</span>
+                      <span className="truncate text-foreground/80">{r.title}</span>
+                      {overlapsAppt && <AlertTriangle className="w-3 h-3 shrink-0 text-amber-600 ml-auto" />}
+                    </button>
+                  );
+                })}
+                {dayAppts.slice(0, Math.max(0, 3 - dayReservations.length)).map((a) => (
                   <button
                     key={a.id}
-                    onClick={() => onSelect(a)}
-                    className="text-left text-[11px] leading-tight px-1.5 py-0.5 rounded truncate font-medium transition-opacity hover:opacity-80"
-                    style={{
-                      backgroundColor: hexToRgba(a.patientColor, 0.2),
-                      border: `2px solid ${a.patientColor}`,
-                      color: a.patientColor,
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(
+                        "text/plain",
+                        JSON.stringify({ kind: "appt", id: a.id, start: a.start }),
+                      );
                     }}
+                    onClick={() => onSelectAppt(a)}
+                    className="flex items-center gap-1.5 text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border bg-card truncate transition-colors hover:bg-muted/60 cursor-grab active:cursor-grabbing"
                     title={`${a.patientName} · ${format(new Date(a.start), "HH:mm")}`}
                   >
-                    <span className="font-semibold">
+                    <span
+                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ backgroundColor: a.patientColor }}
+                    />
+                    <span className="font-semibold shrink-0">
                       {format(new Date(a.start), "HH:mm")}
-                    </span>{" "}
-                    {a.patientName}
+                    </span>
+                    <span className="truncate text-foreground/90">{a.patientName}</span>
                   </button>
                 ))}
                 {overflow > 0 && (
@@ -337,14 +589,14 @@ function MonthView({
 function WeekView({
   cursor,
   appts,
-  onSelect,
-  onCreate,
-}: {
-  cursor: Date;
-  appts: AppointmentDTO[];
-  onSelect: (a: AppointmentDTO) => void;
-  onCreate: (date?: Date, time?: string) => void;
-}) {
+  reservations,
+  onSelectAppt,
+  onSelectReservation,
+  onCreateAppt,
+  onCreateReservation,
+  onDropAppt,
+  onDropReservation,
+}: SharedViewProps & { cursor: Date }) {
   const weekStart = startOfWeek(cursor, { weekStartsOn: 1 });
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const today = new Date();
@@ -354,12 +606,12 @@ function WeekView({
     <Card className="p-2 sm:p-4">
       <div className="overflow-x-auto">
         <div
-          className="min-w-[760px]"
+          className="min-w-[640px]"
           role="grid"
           aria-label="Vista semanal"
         >
           {/* Header row */}
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] sticky top-0 bg-card z-10">
+          <div className="grid grid-cols-[44px_repeat(7,1fr)] sticky top-0 bg-card z-10">
             <div />
             {days.map((d) => {
               const isToday = isSameDay(d, today);
@@ -367,15 +619,15 @@ function WeekView({
                 <div
                   key={d.toISOString()}
                   role="columnheader"
-                  className={`text-center py-2 border-b border-border ${
-                    isToday ? "text-primary" : "text-foreground"
+                  className={`text-center py-1 border-b border-border rounded-t-md ${
+                    isToday ? "text-primary bg-accent/40" : "text-foreground"
                   }`}
                 >
-                  <div className="text-xs font-medium uppercase text-muted-foreground">
+                  <div className="text-[10px] font-medium uppercase text-muted-foreground">
                     {WEEKDAYS[(d.getDay() + 6) % 7]}
                   </div>
                   <div
-                    className={`text-base font-semibold inline-flex items-center justify-center w-7 h-7 rounded-full ${
+                    className={`text-xs font-semibold inline-flex items-center justify-center w-5 h-5 rounded-full ${
                       isToday ? "bg-primary text-primary-foreground" : ""
                     }`}
                   >
@@ -387,13 +639,13 @@ function WeekView({
           </div>
 
           {/* Time grid */}
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] relative">
+          <div className="grid grid-cols-[44px_repeat(7,1fr)] relative">
             {/* Hours column */}
             <div className="relative">
               {hours.map((h) => (
                 <div
                   key={h}
-                  className="text-[11px] text-muted-foreground text-right pr-2 border-t border-border"
+                  className="text-[10px] text-muted-foreground text-right pr-1.5 border-t border-border"
                   style={{ height: HOUR_PX }}
                 >
                   {String(h).padStart(2, "0")}:00
@@ -407,8 +659,14 @@ function WeekView({
                 key={d.toISOString()}
                 day={d}
                 appts={apptsForDay(appts, d)}
-                onSelect={onSelect}
-                onCreate={onCreate}
+                reservations={reservationsForDay(reservations, d)}
+                onSelectAppt={onSelectAppt}
+                onSelectReservation={onSelectReservation}
+                onCreateAppt={onCreateAppt}
+                onCreateReservation={onCreateReservation}
+                onDropAppt={onDropAppt}
+                onDropReservation={onDropReservation}
+                compact
               />
             ))}
           </div>
@@ -423,23 +681,24 @@ function WeekView({
 function DayView({
   cursor,
   appts,
-  onSelect,
-  onCreate,
-}: {
-  cursor: Date;
-  appts: AppointmentDTO[];
-  onSelect: (a: AppointmentDTO) => void;
-  onCreate: (date?: Date, time?: string) => void;
-}) {
+  reservations,
+  onSelectAppt,
+  onSelectReservation,
+  onCreateAppt,
+  onCreateReservation,
+  onDropAppt,
+  onDropReservation,
+}: SharedViewProps & { cursor: Date }) {
   const today = new Date();
   const dayAppts = apptsForDay(appts, cursor);
+  const dayReservations = reservationsForDay(reservations, cursor);
   const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
 
   return (
     <Card className="p-2 sm:p-4">
       <div className="overflow-x-auto">
         <div className="min-w-[360px]" role="grid" aria-label="Vista diaria">
-          <div className="grid grid-cols-[80px_1fr]">
+          <div className="grid grid-cols-[64px_1fr]">
             <div
               className={`text-center py-2 border-b border-border ${
                 isSameDay(cursor, today) ? "text-primary" : ""
@@ -459,7 +718,7 @@ function DayView({
             <div className="border-b border-border" />
           </div>
 
-          <div className="grid grid-cols-[80px_1fr] relative">
+          <div className="grid grid-cols-[64px_1fr] relative">
             <div className="relative">
               {hours.map((h) => (
                 <div
@@ -474,8 +733,13 @@ function DayView({
             <DayColumn
               day={cursor}
               appts={dayAppts}
-              onSelect={onSelect}
-              onCreate={onCreate}
+              reservations={dayReservations}
+              onSelectAppt={onSelectAppt}
+              onSelectReservation={onSelectReservation}
+              onCreateAppt={onCreateAppt}
+              onCreateReservation={onCreateReservation}
+              onDropAppt={onDropAppt}
+              onDropReservation={onDropReservation}
             />
           </div>
         </div>
@@ -489,34 +753,157 @@ function DayView({
 function DayColumn({
   day,
   appts,
-  onSelect,
-  onCreate,
+  reservations,
+  onSelectAppt,
+  onSelectReservation,
+  onCreateAppt,
+  onCreateReservation,
+  onDropAppt,
+  onDropReservation,
+  compact = false,
 }: {
   day: Date;
   appts: AppointmentDTO[];
-  onSelect: (a: AppointmentDTO) => void;
-  onCreate: (date?: Date, time?: string) => void;
+  reservations: SlotReservationDTO[];
+  onSelectAppt: (a: AppointmentDTO) => void;
+  onSelectReservation: (r: SlotReservationDTO) => void;
+  onCreateAppt: (date?: Date, time?: string) => void;
+  onCreateReservation: (date?: Date, time?: string) => void;
+  onDropAppt: (id: string, newStart: Date) => void;
+  onDropReservation: (id: string, newStart: Date) => void;
+  compact?: boolean;
 }) {
   const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
+  const nowMinutes = useNowMinutes();
+  const isToday = isSameDay(day, new Date());
+  const nowOffsetMin = nowMinutes - HOUR_START * 60;
+  const showNowLine = isToday && nowOffsetMin >= 0 && nowOffsetMin <= (HOUR_END - HOUR_START) * 60;
+  const nowTop = (nowOffsetMin / 60) * HOUR_PX;
+  const colRef = useRef<HTMLDivElement>(null);
+  const [dragOverMin, setDragOverMin] = useState<number | null>(null);
+
+  function minutesFromPointerY(clientY: number): number {
+    const rect = colRef.current?.getBoundingClientRect();
+    if (!rect) return HOUR_START * 60;
+    const y = clientY - rect.top;
+    const rawMin = HOUR_START * 60 + (y / HOUR_PX) * 60;
+    return Math.max(HOUR_START * 60, Math.round(rawMin / SNAP_MIN) * SNAP_MIN);
+  }
+
+  function startFromMinutes(min: number): Date {
+    const d = new Date(day);
+    d.setHours(0, min, 0, 0);
+    return d;
+  }
 
   return (
     <div
+      ref={colRef}
       role="gridcell"
       className="relative border-l border-border"
       style={{ height: (HOUR_END - HOUR_START + 1) * HOUR_PX }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOverMin(minutesFromPointerY(e.clientY));
+      }}
+      onDragLeave={() => setDragOverMin(null)}
+      onDrop={(e) => {
+        e.preventDefault();
+        const min = dragOverMin ?? minutesFromPointerY(e.clientY);
+        setDragOverMin(null);
+        const raw = e.dataTransfer.getData("text/plain");
+        if (!raw) return;
+        const payload = JSON.parse(raw) as { kind: "appt" | "reservation"; id: string; start: string };
+        const newStart = startFromMinutes(min);
+        if (payload.kind === "appt") onDropAppt(payload.id, newStart);
+        else onDropReservation(payload.id, newStart);
+      }}
     >
-      {/* Hour slots */}
-      {hours.map((h) => {
-        const slotDate = new Date(day);
-        slotDate.setHours(h, 0, 0, 0);
+      {/* Hour slots: each hour is split into 4 quarter-hour hover/click
+          targets so the tooltip and the create-menu reflect the exact slot
+          under the cursor instead of only the top of the hour. */}
+      {hours.map((h) => (
+        <div key={h} className="relative" style={{ height: HOUR_PX }}>
+          {[0, 15, 30, 45].map((m) => {
+            const slotDate = new Date(day);
+            slotDate.setHours(h, m, 0, 0);
+            return (
+              <div
+                key={m}
+                className="absolute left-0 right-0"
+                style={{ top: (m / 60) * HOUR_PX, height: HOUR_PX / 4 }}
+              >
+                <EmptySlotTrigger
+                  label={`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`}
+                  onCreateAppt={() => onCreateAppt(slotDate, `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`)}
+                  onCreateReservation={() =>
+                    onCreateReservation(slotDate, `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`)
+                  }
+                  className="h-full w-full hover:bg-accent/40 transition-colors"
+                />
+              </div>
+            );
+          })}
+          <div className="absolute top-0 left-0 right-0 border-t border-border pointer-events-none" />
+        </div>
+      ))}
+
+      {/* Drag-over indicator line */}
+      {dragOverMin !== null && (
+        <div
+          className="absolute left-0 right-0 border-t-2 border-primary z-20 pointer-events-none"
+          style={{ top: ((dragOverMin - HOUR_START * 60) / 60) * HOUR_PX }}
+        />
+      )}
+
+      {/* Current time line */}
+      {showNowLine && (
+        <div
+          className="absolute left-0 right-0 z-10 pointer-events-none"
+          style={{ top: nowTop }}
+          aria-hidden="true"
+        >
+          <div className="relative h-0 border-t-[1.5px] border-orange-500">
+            <span className="absolute -left-[3px] -top-[4px] w-2 h-2 rounded-full bg-orange-500" />
+          </div>
+        </div>
+      )}
+
+      {/* Reservations (rendered behind appointments, same lane) */}
+      {reservations.map((r) => {
+        const start = new Date(r.start);
+        const startMins = start.getHours() * 60 + start.getMinutes();
+        const offsetMin = startMins - HOUR_START * 60;
+        if (offsetMin + r.durationMin <= 0) return null;
+        const top = Math.max(0, (offsetMin / 60) * HOUR_PX);
+        const height = (r.durationMin / 60) * HOUR_PX - 2;
+        const end = addMinutes(start, r.durationMin);
+        const overlapsAppt = appts.some((a) =>
+          rangesOverlap(start, r.durationMin, new Date(a.start), a.durationMin),
+        );
         return (
           <button
-            key={h}
-            onClick={() => onCreate(slotDate, `${String(h).padStart(2, "0")}:00`)}
-            className="block w-full border-t border-border hover:bg-accent/40 transition-colors"
-            style={{ height: HOUR_PX }}
-            aria-label={`Añadir cita a las ${String(h).padStart(2, "0")}:00`}
-          />
+            key={r.id}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "reservation", id: r.id, start: r.start }));
+            }}
+            onClick={() => onSelectReservation(r)}
+            className={`absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-hidden border z-[5] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-ring ${
+              overlapsAppt
+                ? "bg-amber-50 border-amber-300"
+                : "bg-muted/70 border-border"
+            }`}
+            style={{ top, height: Math.max(18, height) }}
+            aria-label={`Reserva de espacio "${r.title}" ${format(start, "HH:mm")}–${format(end, "HH:mm")}${overlapsAppt ? ", se solapa con una cita" : ""}`}
+          >
+            <p className="text-[10px] font-semibold leading-tight truncate flex items-center gap-1">
+              <Lock className="w-2.5 h-2.5 shrink-0" />
+              {format(start, "HH:mm")}–{format(end, "HH:mm")}
+              {overlapsAppt && <AlertTriangle className="w-2.5 h-2.5 text-amber-600 ml-auto shrink-0" />}
+            </p>
+            <p className="text-[10px] font-medium leading-tight truncate text-foreground/80">{r.title}</p>
+          </button>
         );
       })}
 
@@ -532,24 +919,26 @@ function DayColumn({
         return (
           <button
             key={a.id}
-            onClick={() => onSelect(a)}
-            className="absolute left-1 right-1 rounded-md px-2 py-1 text-left overflow-hidden transition-transform hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-ring"
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "appt", id: a.id, start: a.start }));
+            }}
+            onClick={() => onSelectAppt(a)}
+            className="absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-hidden bg-card border border-border z-[6] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring"
             style={{
               top,
-              height: Math.max(20, height),
-              backgroundColor: hexToRgba(a.patientColor, 0.2),
-              border: `2px solid ${a.patientColor}`,
-              color: a.patientColor,
+              height: Math.max(18, height),
+              borderLeft: `3px solid ${a.patientColor}`,
             }}
             aria-label={`Cita de ${a.patientName} ${format(start, "HH:mm")}–${format(end, "HH:mm")}`}
           >
-            <p className="text-[11px] font-semibold leading-tight truncate">
+            <p className="text-[10px] font-semibold leading-tight truncate">
               {format(start, "HH:mm")}–{format(end, "HH:mm")}
             </p>
-            <p className="text-[11px] font-medium leading-tight truncate">
+            <p className="text-[10px] font-medium leading-tight truncate">
               {a.patientName}
             </p>
-            <p className="text-[10px] opacity-80 truncate">{a.type}</p>
+            {!compact && <p className="text-[10px] opacity-80 truncate">{a.type}</p>}
           </button>
         );
       })}
@@ -557,7 +946,7 @@ function DayColumn({
   );
 }
 
-// ─── Detail dialog ───────────────────────────────────────────────────────────
+// ─── Appointment detail dialog ────────────────────────────────────────────────
 
 function AppointmentDetailDialog({
   appt,
@@ -566,11 +955,25 @@ function AppointmentDetailDialog({
   appt: AppointmentDTO | null;
   onClose: () => void;
 }) {
+  if (!appt) return null;
+  // Keying on appt.id resets internal state (isEditing) automatically
+  // whenever a different appointment is selected, without needing an
+  // effect to manually reset it.
+  return <AppointmentDetailDialogInner key={appt.id} appt={appt} onClose={onClose} />;
+}
+
+function AppointmentDetailDialogInner({
+  appt,
+  onClose,
+}: {
+  appt: AppointmentDTO;
+  onClose: () => void;
+}) {
   const del = useDeleteAppointment();
   const { selectPatient, navigate } = useNav();
+  const [isEditing, setIsEditing] = useState(false);
 
   async function handleDelete() {
-    if (!appt) return;
     try {
       await del.mutateAsync(appt.id);
       toast({ title: "Cita eliminada" });
@@ -580,7 +983,23 @@ function AppointmentDetailDialog({
     }
   }
 
-  if (!appt) return null;
+  if (isEditing) {
+    return (
+      <AppointmentFormDialog
+        mode="edit"
+        appt={appt}
+        open
+        onOpenChange={(o) => {
+          if (!o) {
+            setIsEditing(false);
+            onClose();
+          }
+        }}
+        onCancelEdit={() => setIsEditing(false)}
+      />
+    );
+  }
+
   const start = new Date(appt.start);
   const end = addMinutes(start, appt.durationMin);
 
@@ -638,6 +1057,9 @@ function AppointmentDetailDialog({
             Ver paciente
           </Button>
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+              <Pencil className="w-4 h-4 mr-1" /> Editar
+            </Button>
             <Button variant="outline" size="sm" onClick={onClose}>
               <X className="w-4 h-4 mr-1" /> Cerrar
             </Button>
@@ -656,71 +1078,187 @@ function AppointmentDetailDialog({
   );
 }
 
-// ─── Create dialog ───────────────────────────────────────────────────────────
+// ─── Reservation detail dialog ───────────────────────────────────────────────
 
-function CreateAppointmentDialog({
+function ReservationDetailDialog({
+  reservation,
+  onClose,
+}: {
+  reservation: SlotReservationDTO | null;
+  onClose: () => void;
+}) {
+  const del = useDeleteReservation();
+
+  async function handleDelete() {
+    if (!reservation) return;
+    try {
+      await del.mutateAsync(reservation.id);
+      toast({ title: "Reserva eliminada" });
+      onClose();
+    } catch {
+      toast({ title: "Error al eliminar", variant: "destructive" });
+    }
+  }
+
+  if (!reservation) return null;
+  const start = new Date(reservation.start);
+  const end = addMinutes(start, reservation.durationMin);
+
+  return (
+    <Dialog open={!!reservation} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-muted-foreground" />
+            {reservation.title}
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Detalle de la reserva de espacio &quot;{reservation.title}&quot;
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 text-sm">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-muted-foreground" />
+            <span>
+              {format(start, "EEEE d 'de' MMMM", { locale: es })} ·{" "}
+              {format(start, "HH:mm")}–{format(end, "HH:mm")} ({reservation.durationMin} min)
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Terapeuta:</span>
+            <span className="font-medium">{reservation.therapistName}</span>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            <X className="w-4 h-4 mr-1" /> Cerrar
+          </Button>
+          <Button variant="destructive" size="sm" onClick={handleDelete} disabled={del.isPending}>
+            Eliminar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Appointment form dialog (create & edit) ─────────────────────────────────
+
+function AppointmentFormDialog({
+  mode,
+  appt,
   open,
   onOpenChange,
   preset,
+  onCancelEdit,
 }: {
+  mode: "create" | "edit";
+  appt?: AppointmentDTO;
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  preset: { date: string; time: string };
+  preset?: { date: string; time: string };
+  onCancelEdit?: () => void;
 }) {
   const create = useCreateAppointment();
+  const update = useUpdateAppointment();
   const { data: patients } = usePatients();
   const { data: professionals } = useProfessionals();
+
+  const schema = mode === "edit" ? appointmentUpdateSchema : appointmentCreateSchema;
 
   const {
     register,
     handleSubmit,
     control,
     reset,
+    watch,
     formState: { errors },
-  } = useForm<z.input<typeof appointmentCreateSchema>, any, z.output<typeof appointmentCreateSchema>>({
-    resolver: zodResolver(appointmentCreateSchema),
-    defaultValues: {
-      patientId: "",
-      therapistId: "",
-      date: preset.date,
-      time: preset.time,
-      durationMin: 45,
-      type: "Sesión",
-      notes: "",
-    },
+  } = useForm<
+    z.input<typeof appointmentCreateSchema> | z.input<typeof appointmentUpdateSchema>,
+    any,
+    AppointmentCreateInput | AppointmentUpdateInput
+  >({
+    resolver: zodResolver(schema as any),
+    defaultValues:
+      mode === "edit" && appt
+        ? {
+            patientId: appt.patientId,
+            therapistId: appt.therapistId,
+            date: appt.start.slice(0, 10),
+            time: appt.start.slice(11, 16),
+            endTime: format(addMinutes(new Date(appt.start), appt.durationMin), "HH:mm"),
+            type: appt.type,
+            notes: appt.notes ?? "",
+          }
+        : {
+            patientId: "",
+            therapistId: "",
+            date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
+            time: preset?.time ?? "10:00",
+            endTime: preset?.time ? addMinutesToTimeStr(preset.time, 45) : "10:45",
+            type: "Sesión",
+            notes: "",
+          },
   });
 
-  // Sync preset whenever dialog opens
+  // Sync defaults whenever the dialog opens (new preset, or a different
+  // appointment being edited).
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (mode === "edit" && appt) {
+      reset({
+        patientId: appt.patientId,
+        therapistId: appt.therapistId,
+        date: appt.start.slice(0, 10),
+        time: appt.start.slice(11, 16),
+        endTime: format(addMinutes(new Date(appt.start), appt.durationMin), "HH:mm"),
+        type: appt.type,
+        notes: appt.notes ?? "",
+      });
+    } else if (mode === "create") {
       reset({
         patientId: "",
         therapistId: "",
-        date: preset.date,
-        time: preset.time,
-        durationMin: 45,
+        date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
+        time: preset?.time ?? "10:00",
+        endTime: preset?.time ? addMinutesToTimeStr(preset.time, 45) : "10:45",
         type: "Sesión",
         notes: "",
       });
     }
-  }, [open, preset, reset]);
+  }, [open, mode, appt?.id, preset?.date, preset?.time]);
 
-  async function onSubmit(values: AppointmentCreateInput) {
+  const watchedStartTime = watch("time");
+  const watchedEndTime = watch("endTime");
+  const computedDuration = computeDurationLabel(watchedStartTime, watchedEndTime);
+
+  async function onSubmit(values: AppointmentCreateInput | AppointmentUpdateInput) {
     try {
-      const created = await create.mutateAsync(values);
-      toast({ title: "Cita creada", description: created.patientName });
+      if (mode === "edit" && appt) {
+        await update.mutateAsync({ id: appt.id, data: values as AppointmentUpdateInput });
+        toast({ title: "Cita actualizada" });
+      } else {
+        const created = await create.mutateAsync(values as AppointmentCreateInput);
+        toast({ title: "Cita creada", description: created.patientName });
+      }
       onOpenChange(false);
     } catch {
-      toast({ title: "Error al crear cita", variant: "destructive" });
+      toast({ title: mode === "edit" ? "Error al actualizar la cita" : "Error al crear cita", variant: "destructive" });
     }
   }
+
+  const isPending = create.isPending || update.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Nueva cita</DialogTitle>
-          <DialogDescription>Programa una nueva sesión o valoración.</DialogDescription>
+          <DialogTitle>{mode === "edit" ? "Editar cita" : "Nueva cita"}</DialogTitle>
+          <DialogDescription>
+            {mode === "edit" ? "Corrige los datos de la cita." : "Programa una nueva sesión o valoración."}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
@@ -770,47 +1308,190 @@ function CreateAppointmentDialog({
             <Field label="Fecha" error={errors.date?.message} required>
               <Input type="date" {...register("date")} />
             </Field>
-            <Field label="Hora" error={errors.time?.message} required>
+            <Field label="Hora inicio" error={errors.time?.message} required>
               <Input type="time" {...register("time")} />
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Duración (min)" error={errors.durationMin?.message} required>
-              <Input type="number" min={15} max={240} step={5} {...register("durationMin")} />
+            <Field label="Hora fin" error={errors.endTime?.message} required>
+              <Input type="time" {...register("endTime")} />
             </Field>
-            <Field label="Tipo" error={errors.type?.message} required>
-              <Controller
-                control={control}
-                name="type"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger aria-label="Tipo de cita">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {APPOINTMENT_TYPES.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </Field>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Duración</Label>
+              <p className="h-9 flex items-center text-sm text-muted-foreground px-1">
+                {computedDuration ?? "—"}
+              </p>
+            </div>
           </div>
+
+          <Field label="Tipo" error={errors.type?.message} required>
+            <Controller
+              control={control}
+              name="type"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger aria-label="Tipo de cita">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {APPOINTMENT_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </Field>
 
           <Field label="Notas" error={errors.notes?.message}>
             <Textarea rows={2} {...register("notes")} placeholder="Opcional" />
           </Field>
 
           <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => (mode === "edit" ? onCancelEdit?.() : onOpenChange(false))}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Guardando…" : mode === "edit" ? "Guardar cambios" : "Crear cita"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Reservation form dialog (create only — title + time range) ─────────────
+
+function ReservationFormDialog({
+  open,
+  onOpenChange,
+  preset,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  preset: { date: string; time: string };
+}) {
+  const create = useCreateReservation();
+  const { data: professionals } = useProfessionals();
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<z.input<typeof slotReservationCreateSchema>, any, SlotReservationCreateInput>({
+    resolver: zodResolver(slotReservationCreateSchema),
+    defaultValues: {
+      therapistId: "",
+      title: "",
+      date: preset.date,
+      time: preset.time,
+      endTime: addMinutesToTimeStr(preset.time, 45),
+    },
+  });
+
+  useEffect(() => {
+    if (open) {
+      reset({
+        therapistId: "",
+        title: "",
+        date: preset.date,
+        time: preset.time,
+        endTime: addMinutesToTimeStr(preset.time, 45),
+      });
+    }
+  }, [open, preset, reset]);
+
+  const watchedStartTime = watch("time");
+  const watchedEndTime = watch("endTime");
+  const computedDuration = computeDurationLabel(watchedStartTime, watchedEndTime);
+
+  async function onSubmit(values: SlotReservationCreateInput) {
+    try {
+      await create.mutateAsync(values);
+      toast({ title: "Reserva creada" });
+      onOpenChange(false);
+    } catch {
+      toast({ title: "Error al crear la reserva", variant: "destructive" });
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-muted-foreground" />
+            Reserva de espacio
+          </DialogTitle>
+          <DialogDescription>
+            Bloquea un rato para que no se pueda confundir con una cita disponible.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+          <Field label="Título" error={errors.title?.message} required>
+            <Input placeholder="p. ej. Roco, Formación, Reunión de equipo…" {...register("title")} />
+          </Field>
+
+          <Field label="Terapeuta" error={errors.therapistId?.message} required>
+            <Controller
+              control={control}
+              name="therapistId"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger aria-label="Terapeuta">
+                    <SelectValue placeholder="Selecciona terapeuta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(professionals ?? []).filter((p) => p.isActive).map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Fecha" error={errors.date?.message} required>
+              <Input type="date" {...register("date")} />
+            </Field>
+            <Field label="Hora inicio" error={errors.time?.message} required>
+              <Input type="time" {...register("time")} />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Hora fin" error={errors.endTime?.message} required>
+              <Input type="time" {...register("endTime")} />
+            </Field>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Duración</Label>
+              <p className="h-9 flex items-center text-sm text-muted-foreground px-1">
+                {computedDuration ?? "—"}
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <Button type="submit" disabled={create.isPending}>
-              {create.isPending ? "Guardando…" : "Crear cita"}
+              {create.isPending ? "Guardando…" : "Crear reserva"}
             </Button>
           </DialogFooter>
         </form>

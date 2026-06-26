@@ -140,6 +140,16 @@ export interface AppointmentDTO {
   notes: string | null;
 }
 
+export interface SlotReservationDTO {
+  id: string;
+  therapistId: string;
+  therapistName: string;
+  therapistColor: string;
+  title: string;
+  start: string; // ISO
+  durationMin: number;
+}
+
 export interface AuditLogDTO {
   id: string;
   professionalId: string | null;

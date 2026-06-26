@@ -168,15 +168,30 @@ export type AssessmentUpdateInput = z.infer<typeof assessmentUpdateSchema>;
 
 // ─── Appointment ─────────────────────────────────────────────────────────────
 
-export const appointmentCreateSchema = z.object({
-  patientId: z.string().min(1, "Paciente obligatorio"),
-  therapistId: z.string().min(1, "Terapeuta obligatorio"),
-  date: z.string().min(1, "La fecha es obligatoria"),
-  time: z.string().min(1, "La hora es obligatoria"),
-  durationMin: z.coerce.number().int().min(15).max(240).default(45),
-  type: z.enum(APPOINTMENT_TYPES).default("Sesión"),
-  notes: z.string().optional().default(""),
-});
+// Computes minutes between two "HH:mm" strings on the same day. Used by the
+// schemas below so the person only ever types a start and an end time —
+// duration is always derived, never typed in directly.
+function diffMinutes(start: string, end: string): number {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  return eh * 60 + em - (sh * 60 + sm);
+}
+
+export const appointmentCreateSchema = z
+  .object({
+    patientId: z.string().min(1, "Paciente obligatorio"),
+    therapistId: z.string().min(1, "Terapeuta obligatorio"),
+    date: z.string().min(1, "La fecha es obligatoria"),
+    time: z.string().min(1, "La hora de inicio es obligatoria"),
+    endTime: z.string().min(1, "La hora de fin es obligatoria"),
+    type: z.enum(APPOINTMENT_TYPES).default("Sesión"),
+    notes: z.string().optional().default(""),
+  })
+  .refine((d) => diffMinutes(d.time, d.endTime) >= 15, {
+    message: "La hora de fin debe ser al menos 15 minutos después del inicio",
+    path: ["endTime"],
+  })
+  .transform((d) => ({ ...d, durationMin: diffMinutes(d.time, d.endTime) }));
 export type AppointmentCreateInput = z.infer<typeof appointmentCreateSchema>;
 
 export const appointmentMoveSchema = z.object({
@@ -184,3 +199,41 @@ export const appointmentMoveSchema = z.object({
   start: z.string(), // ISO datetime
 });
 export type AppointmentMoveInput = z.infer<typeof appointmentMoveSchema>;
+
+export const appointmentUpdateSchema = z
+  .object({
+    patientId: z.string().min(1, "Paciente obligatorio"),
+    therapistId: z.string().min(1, "Terapeuta obligatorio"),
+    date: z.string().min(1, "La fecha es obligatoria"),
+    time: z.string().min(1, "La hora de inicio es obligatoria"),
+    endTime: z.string().min(1, "La hora de fin es obligatoria"),
+    type: z.enum(APPOINTMENT_TYPES).default("Sesión"),
+    notes: z.string().optional().default(""),
+  })
+  .refine((d) => diffMinutes(d.time, d.endTime) >= 15, {
+    message: "La hora de fin debe ser al menos 15 minutos después del inicio",
+    path: ["endTime"],
+  })
+  .transform((d) => ({ ...d, durationMin: diffMinutes(d.time, d.endTime) }));
+export type AppointmentUpdateInput = z.infer<typeof appointmentUpdateSchema>;
+
+export const slotReservationCreateSchema = z
+  .object({
+    therapistId: z.string().min(1, "Terapeuta obligatorio"),
+    title: z.string().min(1, "El título es obligatorio"),
+    date: z.string().min(1, "La fecha es obligatoria"),
+    time: z.string().min(1, "La hora de inicio es obligatoria"),
+    endTime: z.string().min(1, "La hora de fin es obligatoria"),
+  })
+  .refine((d) => diffMinutes(d.time, d.endTime) >= 15, {
+    message: "La hora de fin debe ser al menos 15 minutos después del inicio",
+    path: ["endTime"],
+  })
+  .transform((d) => ({ ...d, durationMin: diffMinutes(d.time, d.endTime) }));
+export type SlotReservationCreateInput = z.infer<typeof slotReservationCreateSchema>;
+
+export const slotReservationMoveSchema = z.object({
+  id: z.string(),
+  start: z.string(), // ISO datetime
+});
+export type SlotReservationMoveInput = z.infer<typeof slotReservationMoveSchema>;

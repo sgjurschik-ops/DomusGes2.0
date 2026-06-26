@@ -231,3 +231,19 @@ export function mapAppointment(a: AppointmentWithRels) {
     notes: a.notes,
   };
 }
+
+type SlotReservationWithRels = Prisma.SlotReservationGetPayload<{
+  include: { therapist: { select: { name: true; color: true } } };
+}>;
+
+export function mapSlotReservation(r: SlotReservationWithRels) {
+  return {
+    id: r.id,
+    therapistId: r.therapistId,
+    therapistName: r.therapist.name,
+    therapistColor: r.therapist.color,
+    title: r.title,
+    start: r.start.toISOString(),
+    durationMin: r.durationMin,
+  };
+}
