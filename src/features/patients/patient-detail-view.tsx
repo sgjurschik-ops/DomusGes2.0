@@ -532,11 +532,17 @@ function ProgressChart({
   // own tracker, e.g. recharts/recharts#5402).
   function renderClickableDot(scale: string) {
     return function ClickableDot(props: any) {
-      const id = props.payload?.[`${scale}__id`];
-      if (id == null) return <Dot {...props} r={0} />;
+      // React 19 no longer allows forwarding `key` through a prop spread —
+      // it must be passed directly to JSX. Recharts includes `key` in the
+      // props object it gives each dot, so it has to be pulled out here
+      // before spreading the rest onto <Dot>.
+      const { key, ...rest } = props;
+      const id = rest.payload?.[`${scale}__id`];
+      if (id == null) return <Dot key={key} {...rest} r={0} />;
       return (
         <Dot
-          {...props}
+          key={key}
+          {...rest}
           r={4}
           style={{ cursor: "pointer" }}
           onClick={() => onOpenAssessment(id)}
