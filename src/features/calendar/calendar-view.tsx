@@ -863,6 +863,15 @@ function DayColumn({
     previewDurationMin: number;
   } | null>(null);
 
+  // The browser fires a native "click" right after "mouseup", even when
+  // that mouseup ends a drag. By the time the click handler below runs,
+  // `resizing` state has already been cleared by onUp, so checking
+  // `!resizing` there is too late to suppress it. This ref is set the
+  // instant a resize finishes and is checked (then cleared) by onClick,
+  // so the one click that follows a resize gesture is swallowed without
+  // affecting any other click.
+  const justResizedRef = useRef(false);
+
   function minutesFromPointerY(clientY: number): number {
     const rect = colRef.current?.getBoundingClientRect();
     if (!rect) return HOUR_START * 60;
@@ -914,6 +923,7 @@ function DayColumn({
     }
 
     function onUp() {
+      justResizedRef.current = true;
       setResizing((r) => {
         if (!r) return null;
         const newStart = startFromMinutes(r.previewStartMin);
@@ -930,6 +940,14 @@ function DayColumn({
       document.removeEventListener("mouseup", onUp);
     };
   }, [resizing?.id]);
+
+  function handleBlockClick(openDetail: () => void) {
+    if (justResizedRef.current) {
+      justResizedRef.current = false;
+      return;
+    }
+    openDetail();
+  }
 
   return (
     <div
@@ -1027,7 +1045,7 @@ function DayColumn({
             onDragStart={(e) => {
               e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "reservation", id: r.id, start: r.start }));
             }}
-            onClick={() => !resizing && onSelectReservation(r)}
+            onClick={() => handleBlockClick(() => onSelectReservation(r))}
             role="button"
             tabIndex={0}
             className={`group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible border z-[5] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-ring ${
@@ -1076,7 +1094,7 @@ function DayColumn({
             onDragStart={(e) => {
               e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "appt", id: a.id, start: a.start }));
             }}
-            onClick={() => !resizing && onSelectAppt(a)}
+            onClick={() => handleBlockClick(() => onSelectAppt(a))}
             role="button"
             tabIndex={0}
             className="group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible bg-card border border-border z-[6] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring"
