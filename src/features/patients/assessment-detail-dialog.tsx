@@ -54,7 +54,7 @@ export function AssessmentDetailDialog({ assessmentId, patientId, onClose }: Pro
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className={isEditing ? "max-w-4xl max-h-[85vh] overflow-y-auto" : "max-w-2xl max-h-[85vh] overflow-y-auto"}>
+      <DialogContent className={isEditing ? "max-w-4xl sm:max-w-4xl min-w-0 max-h-[85vh] overflow-y-auto" : "max-w-2xl sm:max-w-2xl min-w-0 max-h-[85vh] overflow-y-auto"}>
         <DialogHeader>
           <DialogTitle>Detalle de la evaluación</DialogTitle>
           <DialogDescription>

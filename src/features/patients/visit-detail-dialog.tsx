@@ -41,7 +41,7 @@ export function VisitDetailDialog({ visitId, patientId, onClose }: Props) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className={isEditing ? "max-w-4xl max-h-[85vh] overflow-y-auto" : "max-w-2xl max-h-[85vh] overflow-y-auto"}>
+      <DialogContent className={isEditing ? "max-w-4xl sm:max-w-4xl min-w-0 max-h-[85vh] overflow-y-auto" : "max-w-2xl sm:max-w-2xl min-w-0 max-h-[85vh] overflow-y-auto"}>
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar seguimiento" : "Detalle del seguimiento"}</DialogTitle>
           <DialogDescription>
@@ -212,9 +212,9 @@ function VisitEditForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-[1.8fr_1fr_1.1fr_0.9fr] gap-3">
-        <div className="space-y-1.5 col-span-2 sm:col-span-1">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 min-w-0">
+      <div className="grid grid-cols-2 sm:grid-cols-[2fr_1fr_1.2fr_1fr] gap-3">
+        <div className="space-y-1.5 col-span-2 sm:col-span-1 min-w-0">
           <Label className="text-xs">Terapeuta <span className="text-destructive">*</span></Label>
           <Controller
             control={control}
