@@ -19,7 +19,7 @@ import {
   addMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Lock, AlertTriangle, Trash2, Copy, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Lock, AlertTriangle, Trash2, Copy, Check, Calendar as CalendarIcon } from "lucide-react";
 
 import {
   useAppointments,
@@ -77,6 +77,8 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
   appointmentCreateSchema,
   type AppointmentCreateInput,
@@ -232,6 +234,7 @@ export function CalendarView() {
   const [view, setView] = useState<ViewMode>("week");
   const [cursor, setCursor] = useState<Date>(today);
   const [filterTherapistId, setFilterTherapistId] = useState<string>("all");
+  const [miniCalOpen, setMiniCalOpen] = useState(false);
   const [selectedAppt, setSelectedAppt] = useState<AppointmentDTO | null>(null);
   const [selectedReservation, setSelectedReservation] = useState<SlotReservationDTO | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -398,10 +401,48 @@ export function CalendarView() {
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-lg font-semibold capitalize">{title}</h2>
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold capitalize">{title}</h2>
+            <Button size="sm" onClick={() => openCreateAppt()}>
+              <Plus className="w-4 h-4 mr-1" />
+              Nueva cita
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => openCreateReservation()}>
+              <Lock className="w-4 h-4 mr-1" />
+              Reserva de espacio
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 flex-wrap pb-3 border-b">
+          <div className="flex items-center gap-1.5">
+            <Popover open={miniCalOpen} onOpenChange={setMiniCalOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  aria-label="Abrir calendario"
+                >
+                  <CalendarIcon className="w-4 h-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={cursor}
+                  onSelect={(d) => {
+                    if (d) {
+                      setCursor(d);
+                      setMiniCalOpen(false);
+                    }
+                  }}
+                  locale={es}
+                />
+              </PopoverContent>
+            </Popover>
             <Button
               variant="outline"
               size="icon"
@@ -425,40 +466,29 @@ export function CalendarView() {
             </Button>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Button size="sm" onClick={() => openCreateAppt()}>
-              <Plus className="w-4 h-4 mr-1" />
-              Nueva cita
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => openCreateReservation()}>
-              <Lock className="w-4 h-4 mr-1" />
-              Reserva de espacio
-            </Button>
+          <div className="flex items-center gap-2">
+            <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
+              <TabsList>
+                <TabsTrigger value="month">Mes</TabsTrigger>
+                <TabsTrigger value="week">Semana</TabsTrigger>
+                <TabsTrigger value="day">Día</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <Select value={filterTherapistId} onValueChange={setFilterTherapistId}>
+              <SelectTrigger aria-label="Filtrar por terapeuta" className="w-[200px] h-8 text-muted-foreground">
+                <SelectValue placeholder="Todos los terapeutas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los terapeutas</SelectItem>
+                {(professionals ?? []).filter((p) => p.isActive).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-2 flex-wrap pb-3 border-b">
-          <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
-            <TabsList>
-              <TabsTrigger value="month">Mes</TabsTrigger>
-              <TabsTrigger value="week">Semana</TabsTrigger>
-              <TabsTrigger value="day">Día</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <Select value={filterTherapistId} onValueChange={setFilterTherapistId}>
-            <SelectTrigger aria-label="Filtrar por terapeuta" className="w-[200px] h-8 text-muted-foreground">
-              <SelectValue placeholder="Todos los terapeutas" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los terapeutas</SelectItem>
-              {(professionals ?? []).filter((p) => p.isActive).map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
@@ -580,7 +610,7 @@ function EmptySlotTrigger({
           aria-label={`Añadir en ${label}`}
         >
           {hover && (
-            <span className="pointer-events-none absolute z-20 left-1 top-0 -translate-y-1/2 bg-popover border border-border rounded px-1.5 py-0.5 text-[10px] font-medium text-foreground shadow-sm whitespace-nowrap">
+            <span className="pointer-events-none absolute z-20 left-1 top-0 -translate-y-1/2 bg-popover border border-border rounded px-1.5 py-0.5 text-[11px] font-medium text-foreground shadow-sm whitespace-nowrap">
               {label}
             </span>
           )}
@@ -710,7 +740,7 @@ function MonthView({
                             );
                           }}
                           onClick={() => onSelectReservation(r)}
-                          className={`flex items-center gap-1.5 text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate transition-colors hover:opacity-80 ${
+                          className={`flex items-center gap-1.5 text-left text-[12px] leading-tight px-1.5 py-0.5 rounded border truncate transition-colors hover:opacity-80 ${
                             overlapsAppt
                               ? "bg-amber-50 border-amber-300"
                               : r.categoryColor
@@ -753,7 +783,7 @@ function MonthView({
                           );
                         }}
                         onClick={() => onSelectAppt(a)}
-                        className={`relative flex items-center gap-1.5 text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate transition-colors hover:bg-muted/60 cursor-grab active:cursor-grabbing ${
+                        className={`relative flex items-center gap-1.5 text-left text-[12px] leading-tight px-1.5 py-0.5 rounded border truncate transition-colors hover:bg-muted/60 cursor-grab active:cursor-grabbing ${
                           a.status === "cancelada"
                             ? "bg-muted/40 border-border opacity-60"
                             : a.status === "no_show"
@@ -790,7 +820,7 @@ function MonthView({
                   </ContextMenu>
                 ))}
                 {overflow > 0 && (
-                  <span className="text-[11px] text-muted-foreground px-1.5">
+                  <span className="text-[12px] text-muted-foreground px-1.5">
                     +{overflow} más
                   </span>
                 )}
@@ -846,7 +876,7 @@ function WeekView({
                     isToday ? "text-primary bg-accent/40" : "text-foreground"
                   }`}
                 >
-                  <div className="text-[10px] font-medium uppercase text-muted-foreground">
+                  <div className="text-[11px] font-medium uppercase text-muted-foreground">
                     {WEEKDAYS[(d.getDay() + 6) % 7]}
                   </div>
                   <div
@@ -868,7 +898,7 @@ function WeekView({
               {hours.map((h) => (
                 <div
                   key={h}
-                  className="text-[10px] text-muted-foreground text-right pr-1.5 border-t border-border"
+                  className="text-[11px] text-muted-foreground text-right pr-1.5 border-t border-border"
                   style={{ height: HOUR_PX }}
                 >
                   {String(h).padStart(2, "0")}:00
@@ -1246,12 +1276,12 @@ function DayColumn({
                   onStart={() => beginResize("reservation", r.id, "top", startMins, r.durationMin)}
                 />
                 <div className="overflow-hidden h-full">
-                  <p className="text-[10px] font-semibold leading-tight truncate flex items-center gap-1">
+                  <p className="text-[11px] font-semibold leading-tight truncate flex items-center gap-1">
                     <Lock className="w-2.5 h-2.5 shrink-0" />
                     {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
                     {overlapsAppt && <AlertTriangle className="w-2.5 h-2.5 text-amber-600 ml-auto shrink-0" />}
                   </p>
-                  <p className="text-[10px] font-medium leading-tight truncate text-foreground/80">{r.title}</p>
+                  <p className="text-[11px] font-medium leading-tight truncate text-foreground/80">{r.title}</p>
                 </div>
                 <ResizeHandle
                   position="bottom"
@@ -1319,13 +1349,13 @@ function DayColumn({
                   </span>
                 )}
                 <div className="overflow-hidden h-full">
-                  <p className={`text-[10px] font-semibold leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
+                  <p className={`text-[11px] font-semibold leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
                     {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
                   </p>
-                  <p className={`text-[10px] font-medium leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
+                  <p className={`text-[11px] font-medium leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
                     {a.patientName}
                   </p>
-                  {!compact && <p className="text-[10px] opacity-80 truncate">{a.type}</p>}
+                  {!compact && <p className="text-[11px] opacity-80 truncate">{a.type}</p>}
                 </div>
                 <ResizeHandle
                   position="bottom"
@@ -1420,7 +1450,7 @@ function AppointmentDetailDialogInner({
       <DialogContent>
         <Select value={appt.status} onValueChange={(v) => handleStatusChange(v as AppointmentStatus)}>
           <SelectTrigger
-            className={`absolute top-3 right-10 h-6 w-auto gap-1 border-none px-2 text-[11px] font-medium shadow-none focus:ring-0 ${
+            className={`absolute top-3 right-10 h-6 w-auto gap-1 border-none px-2 text-[12px] font-medium shadow-none focus:ring-0 ${
               appt.status === "completada"
                 ? "bg-green-100 text-green-800"
                 : appt.status === "cancelada"
@@ -1774,11 +1804,33 @@ function AppointmentFormDialog({
             </Field>
           </div>
 
-          <Field label="Fecha" error={errors.date?.message} required>
-            <Input type="date" {...register("date")} />
-          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Fecha" error={errors.date?.message} required>
+              <Input type="date" {...register("date")} />
+            </Field>
+            <Field label="Tipo" error={errors.type?.message} required>
+              <Controller
+                control={control}
+                name="type"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger aria-label="Tipo de cita">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {APPOINTMENT_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+          </div>
 
-          <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+          <div className="grid grid-cols-[1.2fr_1.2fr_0.8fr] gap-2 items-end">
             <Field label="Hora inicio" error={errors.time?.message} required>
               <Controller
                 control={control}
@@ -1797,33 +1849,12 @@ function AppointmentFormDialog({
                 )}
               />
             </Field>
-            <div className="space-y-1.5 pb-2">
-              <span className="inline-flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm text-muted-foreground whitespace-nowrap">
+            <Field label="Duración">
+              <span className="flex h-9 items-center justify-center rounded-md bg-muted/40 px-2 text-sm text-muted-foreground whitespace-nowrap">
                 {computedDuration ?? "—"}
               </span>
-            </div>
+            </Field>
           </div>
-
-          <Field label="Tipo" error={errors.type?.message} required>
-            <Controller
-              control={control}
-              name="type"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger aria-label="Tipo de cita">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {APPOINTMENT_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
 
           <Field label="Notas" error={errors.notes?.message}>
             <Textarea rows={2} {...register("notes")} placeholder="Opcional" />
@@ -2006,7 +2037,7 @@ function ReservationFormDialog({
             <Input type="date" {...register("date")} />
           </Field>
 
-          <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+          <div className="grid grid-cols-[1.2fr_1.2fr_0.8fr] gap-2 items-end">
             <Field label="Hora inicio" error={errors.time?.message} required>
               <Controller
                 control={control}
@@ -2025,11 +2056,11 @@ function ReservationFormDialog({
                 )}
               />
             </Field>
-            <div className="space-y-1.5 pb-2">
-              <span className="inline-flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm text-muted-foreground whitespace-nowrap">
+            <Field label="Duración">
+              <span className="flex h-9 items-center justify-center rounded-md bg-muted/40 px-2 text-sm text-muted-foreground whitespace-nowrap">
                 {computedDuration ?? "—"}
               </span>
-            </div>
+            </Field>
           </div>
 
           <DialogFooter>
