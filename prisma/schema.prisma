@@ -30,6 +30,7 @@ model Professional {
   visits       Visit[]
   assessments  Assessment[]
   appointments Appointment[]
+  slotReservations SlotReservation[]
   auditLogs    AuditLog[]
 
   @@index([isActive])
@@ -69,6 +70,7 @@ model Visit {
   therapistId   String
   date          DateTime
   durationMin   Int      @default(45)
+  title         String?  // Optional so existing rows created before this field remain valid
   notes         String
   interventions String   @default("[]") // JSON-encoded string[]
   score         Int?     // 0-10 subjective progress
@@ -125,6 +127,21 @@ model Appointment {
 
   @@index([therapistId, start])
   @@index([patientId, start])
+  @@index([start])
+}
+
+model SlotReservation {
+  id          String   @id @default(cuid())
+  therapistId String
+  title       String
+  start       DateTime
+  durationMin Int      @default(45)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  therapist   Professional @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([therapistId, start])
   @@index([start])
 }
 
