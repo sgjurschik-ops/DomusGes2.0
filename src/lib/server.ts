@@ -28,6 +28,50 @@ export async function getCurrentProfessional(): Promise<ProfessionalDTO | null> 
   };
 }
 
+// ─── Timezone-safe local datetime construction ─────────────────────────────
+//
+// All "date" + "time" form fields represent wall-clock time in Madrid (the
+// clinic's timezone), but `new Date("YYYY-MM-DDTHH:mm")` is interpreted in
+// whatever timezone the *process* running this code happens to be in. That's
+// Europe/Madrid on a developer's Mac, but Vercel's serverless functions run
+// in UTC — so the exact same code silently shifted every appointment by the
+// Madrid UTC offset (1h in winter, 2h in summer DST) once deployed. This
+// helper computes Madrid's real offset for the given date (handling the
+// CET/CEST transition correctly) and builds the Date explicitly from that,
+// so the result is correct regardless of the server's own timezone.
+export function buildMadridDateTime(dateStr: string, timeStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const [hour, minute] = timeStr.split(":").map(Number);
+
+  // Find Madrid's current UTC offset by formatting the same instant in both
+  // UTC and Europe/Madrid, then comparing — this naturally accounts for
+  // daylight saving without hardcoding transition dates.
+  const naiveUtc = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const madridParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Madrid",
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(naiveUtc);
+
+  const get = (type: string) => Number(madridParts.find((p) => p.type === type)?.value);
+  const madridAsUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour"),
+    get("minute"),
+  );
+  const offsetMs = madridAsUtc - naiveUtc.getTime();
+
+  // The wall-clock time the person typed, minus Madrid's offset, gives the
+  // correct UTC instant.
+  return new Date(naiveUtc.getTime() - offsetMs);
+}
+
 export async function requireProfessional(): Promise<ProfessionalDTO> {
   const prof = await getCurrentProfessional();
   if (!prof) throw new Error("UNAUTHORIZED");

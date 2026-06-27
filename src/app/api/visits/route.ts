@@ -1,7 +1,7 @@
 // /api/visits — list & create
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapVisit } from "@/lib/server";
+import { requireProfessional, audit, mapVisit, buildMadridDateTime } from "@/lib/server";
 import { visitCreateSchema } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
@@ -33,13 +33,14 @@ export async function POST(req: NextRequest) {
     );
   }
   const d = parsed.data;
-  const date = new Date(`${d.date}T${d.time}`);
+  const date = buildMadridDateTime(d.date, d.time);
   const row = await db.visit.create({
     data: {
       patientId: d.patientId,
       therapistId: d.therapistId,
       date,
       durationMin: d.durationMin,
+      title: d.title,
       notes: d.notes,
       interventions: JSON.stringify(d.interventions),
     },

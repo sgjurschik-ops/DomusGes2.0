@@ -1,7 +1,7 @@
 // /api/reservations — list (with filters) & create
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapSlotReservation } from "@/lib/server";
+import { requireProfessional, audit, mapSlotReservation, buildMadridDateTime } from "@/lib/server";
 import { slotReservationCreateSchema } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     );
   }
   const d = parsed.data;
-  const start = new Date(`${d.date}T${d.time}`);
+  const start = buildMadridDateTime(d.date, d.time);
   const row = await db.slotReservation.create({
     data: {
       therapistId: d.therapistId,

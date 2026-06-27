@@ -1,7 +1,7 @@
 // /api/appointments/[id] — move (drag-drop), status update, full update & delete
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapAppointment } from "@/lib/server";
+import { requireProfessional, audit, mapAppointment, buildMadridDateTime } from "@/lib/server";
 import { appointmentMoveSchema, appointmentStatusUpdateSchema, appointmentUpdateSchema } from "@/lib/schemas";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -69,7 +69,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
     );
   }
   const d = parsed.data;
-  const start = new Date(`${d.date}T${d.time}`);
+  const start = buildMadridDateTime(d.date, d.time);
   const row = await db.appointment.update({
     where: { id },
     data: {

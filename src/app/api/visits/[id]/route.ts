@@ -1,7 +1,7 @@
 // /api/visits/[id] — get, update & delete a single visit
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapVisit } from "@/lib/server";
+import { requireProfessional, audit, mapVisit, buildMadridDateTime } from "@/lib/server";
 import { visitUpdateSchema } from "@/lib/schemas";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -40,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     );
   }
   const d = parsed.data;
-  const date = new Date(`${d.date}T${d.time}`);
+  const date = buildMadridDateTime(d.date, d.time);
 
   const row = await db.visit.update({
     where: { id },

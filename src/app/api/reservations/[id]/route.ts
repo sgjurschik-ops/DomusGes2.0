@@ -1,7 +1,7 @@
 // /api/reservations/[id] — move (drag-drop), full update & delete
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapSlotReservation } from "@/lib/server";
+import { requireProfessional, audit, mapSlotReservation, buildMadridDateTime } from "@/lib/server";
 import { slotReservationMoveSchema, slotReservationUpdateSchema } from "@/lib/schemas";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -44,7 +44,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
     );
   }
   const d = parsed.data;
-  const start = new Date(`${d.date}T${d.time}`);
+  const start = buildMadridDateTime(d.date, d.time);
   const row = await db.slotReservation.update({
     where: { id },
     data: {

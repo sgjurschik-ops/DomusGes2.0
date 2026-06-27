@@ -1654,8 +1654,8 @@ function AppointmentFormDialog({
         ? {
             patientId: appt.patientId,
             therapistId: appt.therapistId,
-            date: appt.start.slice(0, 10),
-            time: appt.start.slice(11, 16),
+            date: format(new Date(appt.start), "yyyy-MM-dd"),
+            time: format(new Date(appt.start), "HH:mm"),
             endTime: format(addMinutes(new Date(appt.start), appt.durationMin), "HH:mm"),
             type: appt.type,
             notes: appt.notes ?? "",
@@ -1679,8 +1679,8 @@ function AppointmentFormDialog({
       reset({
         patientId: appt.patientId,
         therapistId: appt.therapistId,
-        date: appt.start.slice(0, 10),
-        time: appt.start.slice(11, 16),
+        date: format(new Date(appt.start), "yyyy-MM-dd"),
+        time: format(new Date(appt.start), "HH:mm"),
         endTime: format(addMinutes(new Date(appt.start), appt.durationMin), "HH:mm"),
         type: appt.type,
         notes: appt.notes ?? "",
@@ -1891,8 +1891,8 @@ function ReservationFormDialog({
             therapistId: reservation.therapistId,
             categoryId: reservation.categoryId ?? undefined,
             title: reservation.title,
-            date: reservation.start.slice(0, 10),
-            time: reservation.start.slice(11, 16),
+            date: format(new Date(reservation.start), "yyyy-MM-dd"),
+            time: format(new Date(reservation.start), "HH:mm"),
             endTime: format(addMinutes(new Date(reservation.start), reservation.durationMin), "HH:mm"),
           }
         : {
@@ -1912,8 +1912,8 @@ function ReservationFormDialog({
         therapistId: reservation.therapistId,
         categoryId: reservation.categoryId ?? undefined,
         title: reservation.title,
-        date: reservation.start.slice(0, 10),
-        time: reservation.start.slice(11, 16),
+        date: format(new Date(reservation.start), "yyyy-MM-dd"),
+        time: format(new Date(reservation.start), "HH:mm"),
         endTime: format(addMinutes(new Date(reservation.start), reservation.durationMin), "HH:mm"),
       });
     } else if (mode === "create") {

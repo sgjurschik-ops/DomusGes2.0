@@ -1,7 +1,7 @@
 // /api/appointments — list (with filters) & create
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapAppointment } from "@/lib/server";
+import { requireProfessional, audit, mapAppointment, buildMadridDateTime } from "@/lib/server";
 import { appointmentCreateSchema } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     );
   }
   const d = parsed.data;
-  const start = new Date(`${d.date}T${d.time}`);
+  const start = buildMadridDateTime(d.date, d.time);
   const row = await db.appointment.create({
     data: {
       patientId: d.patientId,
