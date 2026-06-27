@@ -24,7 +24,10 @@ export async function GET(req: NextRequest) {
 
   const rows = await db.slotReservation.findMany({
     where,
-    include: { therapist: { select: { name: true, color: true } } },
+    include: {
+      therapist: { select: { name: true, color: true } },
+      category: { select: { id: true, name: true, color: true } },
+    },
     orderBy: { start: "asc" },
     take: 500,
   });
@@ -47,11 +50,15 @@ export async function POST(req: NextRequest) {
   const row = await db.slotReservation.create({
     data: {
       therapistId: d.therapistId,
+      categoryId: d.categoryId || null,
       title: d.title,
       start,
       durationMin: d.durationMin,
     },
-    include: { therapist: { select: { name: true, color: true } } },
+    include: {
+      therapist: { select: { name: true, color: true } },
+      category: { select: { id: true, name: true, color: true } },
+    },
   });
   await audit(prof.id, "reservation.create", "SlotReservation", row.id, { therapistId: row.therapistId });
   return NextResponse.json(mapSlotReservation(row), { status: 201 });
