@@ -201,6 +201,11 @@ export const appointmentMoveSchema = z.object({
 });
 export type AppointmentMoveInput = z.infer<typeof appointmentMoveSchema>;
 
+export const appointmentStatusUpdateSchema = z.object({
+  status: z.enum(APPOINTMENT_STATUSES),
+});
+export type AppointmentStatusUpdateInput = z.infer<typeof appointmentStatusUpdateSchema>;
+
 export const appointmentUpdateSchema = z
   .object({
     patientId: z.string().min(1, "Paciente obligatorio"),

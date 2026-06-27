@@ -19,12 +19,13 @@ import {
   addMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Lock, AlertTriangle, Trash2, Copy } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Lock, AlertTriangle, Trash2, Copy, Check } from "lucide-react";
 
 import {
   useAppointments,
   useCreateAppointment,
   useUpdateAppointment,
+  useUpdateAppointmentStatus,
   useMoveAppointment,
   useDeleteAppointment,
   useReservations,
@@ -86,8 +87,9 @@ import {
   slotReservationUpdateSchema,
   type SlotReservationUpdateInput,
   APPOINTMENT_TYPES,
+  APPOINTMENT_STATUSES,
 } from "@/lib/schemas";
-import type { AppointmentDTO, SlotReservationDTO, ReservationCategoryDTO } from "@/types/domain";
+import type { AppointmentDTO, AppointmentStatus, SlotReservationDTO, ReservationCategoryDTO } from "@/types/domain";
 
 type ViewMode = "month" | "week" | "day";
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -166,6 +168,15 @@ function generateTimeOptions(): string[] {
   return options;
 }
 const TIME_OPTIONS = generateTimeOptions();
+
+// Spanish display labels for each appointment status, used by both the
+// quick status picker and the calendar block styling.
+const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
+  programada: "Programada",
+  completada: "Completada",
+  cancelada: "Cancelada",
+  no_show: "No asistió",
+};
 
 // Dropdown for picking a time in 15-minute steps. If the current value
 // doesn't fall on a 15-minute mark (e.g. an older record saved at :05),
@@ -742,17 +753,30 @@ function MonthView({
                           );
                         }}
                         onClick={() => onSelectAppt(a)}
-                        className="flex items-center gap-1.5 text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border bg-card truncate transition-colors hover:bg-muted/60 cursor-grab active:cursor-grabbing"
-                        title={`${a.patientName} · ${format(new Date(a.start), "HH:mm")}`}
+                        className={`relative flex items-center gap-1.5 text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate transition-colors hover:bg-muted/60 cursor-grab active:cursor-grabbing ${
+                          a.status === "cancelada"
+                            ? "bg-muted/40 border-border opacity-60"
+                            : a.status === "no_show"
+                              ? "bg-red-50 border-red-200"
+                              : "bg-card border-border"
+                        }`}
+                        title={`${a.patientName} · ${format(new Date(a.start), "HH:mm")} · ${APPOINTMENT_STATUS_LABELS[a.status]}`}
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
                           style={{ backgroundColor: a.patientColor }}
                         />
-                        <span className="font-semibold shrink-0">
+                        <span className={`font-semibold shrink-0 ${a.status === "cancelada" ? "line-through" : ""}`}>
                           {format(new Date(a.start), "HH:mm")}
                         </span>
-                        <span className="truncate text-foreground/90">{a.patientName}</span>
+                        <span className={`truncate text-foreground/90 ${a.status === "cancelada" ? "line-through" : ""}`}>
+                          {a.patientName}
+                        </span>
+                        {a.status === "completada" && (
+                          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-600 flex items-center justify-center shrink-0">
+                            <Check className="w-2 h-2 text-white" strokeWidth={3} />
+                          </span>
+                        )}
                       </button>
                     </ContextMenuTrigger>
                     <ContextMenuContent>
@@ -1271,23 +1295,34 @@ function DayColumn({
                 onClick={() => handleBlockClick(() => onSelectAppt(a))}
                 role="button"
                 tabIndex={0}
-                className="group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible bg-card border border-border z-[6] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring"
+                className={`group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible border z-[6] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring ${
+                  a.status === "cancelada"
+                    ? "bg-muted/40 border-border opacity-60"
+                    : a.status === "no_show"
+                      ? "bg-red-50 border-red-200"
+                      : "bg-card border-border"
+                }`}
                 style={{
                   top,
                   height: Math.max(18, height),
                   borderLeft: `3px solid ${a.patientColor}`,
                 }}
-                aria-label={`Cita de ${a.patientName} ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}`}
+                aria-label={`Cita de ${a.patientName} ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}, ${APPOINTMENT_STATUS_LABELS[a.status]}`}
               >
                 <ResizeHandle
                   position="top"
                   onStart={() => beginResize("appt", a.id, "top", startMins, a.durationMin)}
                 />
+                {a.status === "completada" && (
+                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-green-600 flex items-center justify-center shrink-0 z-10">
+                    <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                  </span>
+                )}
                 <div className="overflow-hidden h-full">
-                  <p className="text-[10px] font-semibold leading-tight truncate">
+                  <p className={`text-[10px] font-semibold leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
                     {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
                   </p>
-                  <p className="text-[10px] font-medium leading-tight truncate">
+                  <p className={`text-[10px] font-medium leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
                     {a.patientName}
                   </p>
                   {!compact && <p className="text-[10px] opacity-80 truncate">{a.type}</p>}
@@ -1337,8 +1372,18 @@ function AppointmentDetailDialogInner({
   onClose: () => void;
 }) {
   const del = useDeleteAppointment();
+  const updateStatus = useUpdateAppointmentStatus();
   const { selectPatient, navigate } = useNav();
   const [isEditing, setIsEditing] = useState(false);
+
+  async function handleStatusChange(status: AppointmentStatus) {
+    try {
+      await updateStatus.mutateAsync({ id: appt.id, status });
+      toast({ title: "Estado actualizado" });
+    } catch {
+      toast({ title: "Error al actualizar el estado", variant: "destructive" });
+    }
+  }
 
   async function handleDelete() {
     try {
@@ -1373,6 +1418,28 @@ function AppointmentDetailDialogInner({
   return (
     <Dialog open={!!appt} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
+        <Select value={appt.status} onValueChange={(v) => handleStatusChange(v as AppointmentStatus)}>
+          <SelectTrigger
+            className={`absolute top-3 right-10 h-6 w-auto gap-1 border-none px-2 text-[11px] font-medium shadow-none focus:ring-0 ${
+              appt.status === "completada"
+                ? "bg-green-100 text-green-800"
+                : appt.status === "cancelada"
+                  ? "bg-muted text-muted-foreground"
+                  : appt.status === "no_show"
+                    ? "bg-red-100 text-red-800"
+                    : "bg-muted/60 text-muted-foreground"
+            }`}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            {APPOINTMENT_STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {APPOINTMENT_STATUS_LABELS[s]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <Avatar name={appt.patientName} color={appt.patientColor} size={36} />

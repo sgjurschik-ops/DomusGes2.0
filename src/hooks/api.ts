@@ -52,7 +52,7 @@ export function useCurrentSession() {
 
 // ─── Patients ────────────────────────────────────────────────────────────────
 
-import type { PatientDTO, VisitDTO, AssessmentDTO, AppointmentDTO, SlotReservationDTO, ReservationCategoryDTO, ProfessionalDTO, AuditLogDTO } from "@/types/domain";
+import type { PatientDTO, VisitDTO, AssessmentDTO, AppointmentDTO, AppointmentStatus, SlotReservationDTO, ReservationCategoryDTO, ProfessionalDTO, AuditLogDTO } from "@/types/domain";
 import type {
   PatientCreateInput, VisitCreateInput, VisitUpdateInput, AssessmentCreateInput, AssessmentUpdateInput,
   AppointmentCreateInput, SlotReservationCreateInput, SlotReservationUpdateInput, AppointmentUpdateInput, ProfessionalCreateInput, ProfessionalUpdateInput,
@@ -258,6 +258,18 @@ export function useUpdateAppointment() {
       fetcher<AppointmentDTO>(`/api/appointments/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["appointments"] }),
+  });
+}
+
+export function useUpdateAppointmentStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: AppointmentStatus }) =>
+      fetcher<AppointmentDTO>(`/api/appointments/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["appointments"] }),
   });

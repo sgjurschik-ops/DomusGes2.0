@@ -1,8 +1,8 @@
-// /api/appointments/[id] — move (drag-drop), full update & delete
+// /api/appointments/[id] — move (drag-drop), status update, full update & delete
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireProfessional, audit, mapAppointment } from "@/lib/server";
-import { appointmentMoveSchema, appointmentUpdateSchema } from "@/lib/schemas";
+import { appointmentMoveSchema, appointmentStatusUpdateSchema, appointmentUpdateSchema } from "@/lib/schemas";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -10,6 +10,31 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id } = await params;
   const body = await req.json();
+
+  // Two different partial-update shapes share this verb: { start, durationMin }
+  // for drag-and-drop move/resize, and { status } for the quick status picker
+  // in the appointment detail view. Distinguish by which field is present
+  // rather than adding a third HTTP verb for one extra field.
+  if (typeof body === "object" && body !== null && "status" in body && !("start" in body)) {
+    const parsed = appointmentStatusUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "VALIDATION", issues: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
+    }
+    const row = await db.appointment.update({
+      where: { id },
+      data: { status: parsed.data.status },
+      include: {
+        patient: { select: { firstName: true, lastName: true, color: true, address: true } },
+        therapist: { select: { name: true } },
+      },
+    });
+    await audit(prof.id, "appointment.statusChange", "Appointment", id, { status: parsed.data.status });
+    return NextResponse.json(mapAppointment(row));
+  }
+
   const parsed = appointmentMoveSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
