@@ -144,7 +144,7 @@ function computeDurationLabel(start?: string, end?: string): string | null {
 // Minutes elapsed since midnight, refreshed every minute, so the "current
 // time" line in week/day view stays accurate if the page is left open.
 
-// Generates "HH:mm" options every 30 minutes across the day, used by
+// Generates "HH:mm" options every 15 minutes across the day, used by
 // TimeSelect so people pick a start/end time from a dropdown instead of
 // typing it in by hand. Starts at 00:00 and covers the full 24h so an
 // existing appointment/reservation outside the usual 7–20h agenda window
@@ -153,7 +153,7 @@ function computeDurationLabel(start?: string, end?: string): string | null {
 function generateTimeOptions(): string[] {
   const options: string[] = [];
   for (let h = 0; h < 24; h++) {
-    for (const m of [0, 30]) {
+    for (const m of [0, 15, 30, 45]) {
       options.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
     }
   }
@@ -161,8 +161,8 @@ function generateTimeOptions(): string[] {
 }
 const TIME_OPTIONS = generateTimeOptions();
 
-// Dropdown for picking a time in 30-minute steps. If the current value
-// doesn't fall on a 30-minute mark (e.g. an older record saved at :15),
+// Dropdown for picking a time in 15-minute steps. If the current value
+// doesn't fall on a 15-minute mark (e.g. an older record saved at :05),
 // it's still included as an extra option so the field never silently
 // shows something different from what's actually saved.
 function TimeSelect({
@@ -212,7 +212,7 @@ function useNowMinutes(): number {
 
 export function CalendarView() {
   const today = new Date();
-  const [view, setView] = useState<ViewMode>("month");
+  const [view, setView] = useState<ViewMode>("week");
   const [cursor, setCursor] = useState<Date>(today);
   const [filterTherapistId, setFilterTherapistId] = useState<string>("all");
   const [selectedAppt, setSelectedAppt] = useState<AppointmentDTO | null>(null);
