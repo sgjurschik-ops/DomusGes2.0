@@ -19,7 +19,7 @@ import {
   addMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Lock, AlertTriangle, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Lock, AlertTriangle, Trash2, Copy } from "lucide-react";
 
 import {
   useAppointments,
@@ -70,6 +70,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   appointmentCreateSchema,
   type AppointmentCreateInput,
@@ -227,6 +233,8 @@ export function CalendarView() {
   const { data: professionals } = useProfessionals();
   const moveAppt = useMoveAppointment();
   const moveReservation = useMoveReservation();
+  const createAppt = useCreateAppointment();
+  const createReservation = useCreateReservation();
 
   // Compute the visible window for fetching appointments.
   const { from, to } = useMemo(() => {
@@ -316,6 +324,41 @@ export function CalendarView() {
     }
   }
 
+  async function handleDuplicateAppt(a: AppointmentDTO) {
+    try {
+      const newStart = addMinutes(new Date(a.start), 60);
+      await createAppt.mutateAsync({
+        patientId: a.patientId,
+        therapistId: a.therapistId,
+        date: format(newStart, "yyyy-MM-dd"),
+        time: format(newStart, "HH:mm"),
+        endTime: format(addMinutes(newStart, a.durationMin), "HH:mm"),
+        type: a.type,
+        notes: a.notes ?? "",
+      } as any);
+      toast({ title: "Cita duplicada" });
+    } catch {
+      toast({ title: "Error al duplicar la cita", variant: "destructive" });
+    }
+  }
+
+  async function handleDuplicateReservation(r: SlotReservationDTO) {
+    try {
+      const newStart = addMinutes(new Date(r.start), 60);
+      await createReservation.mutateAsync({
+        therapistId: r.therapistId,
+        categoryId: r.categoryId ?? undefined,
+        title: r.title,
+        date: format(newStart, "yyyy-MM-dd"),
+        time: format(newStart, "HH:mm"),
+        endTime: format(addMinutes(newStart, r.durationMin), "HH:mm"),
+      } as any);
+      toast({ title: "Reserva duplicada" });
+    } catch {
+      toast({ title: "Error al duplicar la reserva", variant: "destructive" });
+    }
+  }
+
   const title = useMemo(() => {
     if (view === "month") return format(cursor, "MMMM yyyy", { locale: es });
     if (view === "week") {
@@ -337,6 +380,8 @@ export function CalendarView() {
     onDropReservation: handleDropReservation,
     onResizeAppt: handleResizeAppt,
     onResizeReservation: handleResizeReservation,
+    onDuplicateAppt: handleDuplicateAppt,
+    onDuplicateReservation: handleDuplicateReservation,
   };
 
   return (
@@ -457,6 +502,8 @@ type SharedViewProps = {
   onDropReservation: (id: string, newStart: Date) => void;
   onResizeAppt: (id: string, newStart: Date, newDurationMin: number) => void;
   onResizeReservation: (id: string, newStart: Date, newDurationMin: number) => void;
+  onDuplicateAppt: (a: AppointmentDTO) => void;
+  onDuplicateReservation: (r: SlotReservationDTO) => void;
 };
 
 // ─── Empty-slot trigger: hover tooltip with the hour + click menu ───────────
@@ -554,6 +601,8 @@ function MonthView({
   onCreateReservation,
   onDropAppt,
   onDropReservation,
+  onDuplicateAppt,
+  onDuplicateReservation,
 }: SharedViewProps & { cursor: Date }) {
   const monthStart = startOfMonth(cursor);
   const monthEnd = endOfMonth(cursor);
@@ -639,60 +688,82 @@ function MonthView({
                     rangesOverlap(new Date(r.start), r.durationMin, new Date(a.start), a.durationMin),
                   );
                   return (
-                    <button
-                      key={r.id}
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData(
-                          "text/plain",
-                          JSON.stringify({ kind: "reservation", id: r.id, start: r.start }),
-                        );
-                      }}
-                      onClick={() => onSelectReservation(r)}
-                      className={`flex items-center gap-1.5 text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate transition-colors hover:opacity-80 ${
-                        overlapsAppt
-                          ? "bg-amber-50 border-amber-300"
-                          : r.categoryColor
-                            ? "border-transparent"
-                            : "bg-muted/60 border-border"
-                      }`}
-                      style={
-                        !overlapsAppt && r.categoryColor
-                          ? { backgroundColor: `${r.categoryColor}33`, borderColor: `${r.categoryColor}80` }
-                          : undefined
-                      }
-                      title={`${r.title} · ${format(new Date(r.start), "HH:mm")}${r.categoryName ? ` · ${r.categoryName}` : ""}${overlapsAppt ? " · Se solapa con una cita" : ""}`}
-                    >
-                      <Lock className="w-3 h-3 shrink-0 text-muted-foreground" />
-                      <span className="font-semibold shrink-0">{format(new Date(r.start), "HH:mm")}</span>
-                      <span className="truncate text-foreground/80">{r.title}</span>
-                      {overlapsAppt && <AlertTriangle className="w-3 h-3 shrink-0 text-amber-600 ml-auto" />}
-                    </button>
+                    <ContextMenu key={r.id}>
+                      <ContextMenuTrigger asChild>
+                        <button
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData(
+                              "text/plain",
+                              JSON.stringify({ kind: "reservation", id: r.id, start: r.start }),
+                            );
+                          }}
+                          onClick={() => onSelectReservation(r)}
+                          className={`flex items-center gap-1.5 text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border truncate transition-colors hover:opacity-80 ${
+                            overlapsAppt
+                              ? "bg-amber-50 border-amber-300"
+                              : r.categoryColor
+                                ? "border-transparent"
+                                : "bg-muted/60 border-border"
+                          }`}
+                          style={
+                            !overlapsAppt && r.categoryColor
+                              ? { backgroundColor: `${r.categoryColor}33`, borderColor: `${r.categoryColor}80` }
+                              : undefined
+                          }
+                          title={`${r.title} · ${format(new Date(r.start), "HH:mm")}${r.categoryName ? ` · ${r.categoryName}` : ""}${overlapsAppt ? " · Se solapa con una cita" : ""}`}
+                        >
+                          <Lock className="w-3 h-3 shrink-0 text-muted-foreground" />
+                          <span className="font-semibold shrink-0">{format(new Date(r.start), "HH:mm")}</span>
+                          <span className="truncate text-foreground/80">{r.title}</span>
+                          {overlapsAppt && <AlertTriangle className="w-3 h-3 shrink-0 text-amber-600 ml-auto" />}
+                        </button>
+                      </ContextMenuTrigger>
+                      <ContextMenuContent>
+                        <ContextMenuItem onClick={() => onDuplicateReservation(r)}>
+                          <Copy className="w-4 h-4 mr-2" /> Duplicar reserva
+                        </ContextMenuItem>
+                        <ContextMenuItem onClick={() => onSelectReservation(r)}>
+                          <Pencil className="w-4 h-4 mr-2" /> Editar reserva
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
                   );
                 })}
                 {dayAppts.slice(0, Math.max(0, 3 - dayReservations.length)).map((a) => (
-                  <button
-                    key={a.id}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData(
-                        "text/plain",
-                        JSON.stringify({ kind: "appt", id: a.id, start: a.start }),
-                      );
-                    }}
-                    onClick={() => onSelectAppt(a)}
-                    className="flex items-center gap-1.5 text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border bg-card truncate transition-colors hover:bg-muted/60 cursor-grab active:cursor-grabbing"
-                    title={`${a.patientName} · ${format(new Date(a.start), "HH:mm")}`}
-                  >
-                    <span
-                      className="w-1.5 h-1.5 rounded-full shrink-0"
-                      style={{ backgroundColor: a.patientColor }}
-                    />
-                    <span className="font-semibold shrink-0">
-                      {format(new Date(a.start), "HH:mm")}
-                    </span>
-                    <span className="truncate text-foreground/90">{a.patientName}</span>
-                  </button>
+                  <ContextMenu key={a.id}>
+                    <ContextMenuTrigger asChild>
+                      <button
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData(
+                            "text/plain",
+                            JSON.stringify({ kind: "appt", id: a.id, start: a.start }),
+                          );
+                        }}
+                        onClick={() => onSelectAppt(a)}
+                        className="flex items-center gap-1.5 text-left text-[11px] leading-tight px-1.5 py-0.5 rounded border bg-card truncate transition-colors hover:bg-muted/60 cursor-grab active:cursor-grabbing"
+                        title={`${a.patientName} · ${format(new Date(a.start), "HH:mm")}`}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full shrink-0"
+                          style={{ backgroundColor: a.patientColor }}
+                        />
+                        <span className="font-semibold shrink-0">
+                          {format(new Date(a.start), "HH:mm")}
+                        </span>
+                        <span className="truncate text-foreground/90">{a.patientName}</span>
+                      </button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem onClick={() => onDuplicateAppt(a)}>
+                        <Copy className="w-4 h-4 mr-2" /> Duplicar cita
+                      </ContextMenuItem>
+                      <ContextMenuItem onClick={() => onSelectAppt(a)}>
+                        <Pencil className="w-4 h-4 mr-2" /> Editar cita
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 ))}
                 {overflow > 0 && (
                   <span className="text-[11px] text-muted-foreground px-1.5">
@@ -722,6 +793,8 @@ function WeekView({
   onDropReservation,
   onResizeAppt,
   onResizeReservation,
+  onDuplicateAppt,
+  onDuplicateReservation,
 }: SharedViewProps & { cursor: Date }) {
   const weekStart = startOfWeek(cursor, { weekStartsOn: 1 });
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -794,6 +867,8 @@ function WeekView({
                 onDropReservation={onDropReservation}
                 onResizeAppt={onResizeAppt}
                 onResizeReservation={onResizeReservation}
+                onDuplicateAppt={onDuplicateAppt}
+                onDuplicateReservation={onDuplicateReservation}
                 compact
               />
             ))}
@@ -818,6 +893,8 @@ function DayView({
   onDropReservation,
   onResizeAppt,
   onResizeReservation,
+  onDuplicateAppt,
+  onDuplicateReservation,
 }: SharedViewProps & { cursor: Date }) {
   const today = new Date();
   const dayAppts = apptsForDay(appts, cursor);
@@ -872,6 +949,8 @@ function DayView({
               onDropReservation={onDropReservation}
               onResizeAppt={onResizeAppt}
               onResizeReservation={onResizeReservation}
+              onDuplicateAppt={onDuplicateAppt}
+              onDuplicateReservation={onDuplicateReservation}
             />
           </div>
         </div>
@@ -894,6 +973,8 @@ function DayColumn({
   onDropReservation,
   onResizeAppt,
   onResizeReservation,
+  onDuplicateAppt,
+  onDuplicateReservation,
   compact = false,
 }: {
   day: Date;
@@ -907,6 +988,8 @@ function DayColumn({
   onDropReservation: (id: string, newStart: Date) => void;
   onResizeAppt: (id: string, newStart: Date, newDurationMin: number) => void;
   onResizeReservation: (id: string, newStart: Date, newDurationMin: number) => void;
+  onDuplicateAppt: (a: AppointmentDTO) => void;
+  onDuplicateReservation: (r: SlotReservationDTO) => void;
   compact?: boolean;
 }) {
   const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
@@ -1108,48 +1191,59 @@ function DayColumn({
           rangesOverlap(effectiveStart, effectiveDuration, new Date(a.start), a.durationMin),
         );
         return (
-          <div
-            key={r.id}
-            draggable={!resizing}
-            onDragStart={(e) => {
-              e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "reservation", id: r.id, start: r.start }));
-            }}
-            onClick={() => handleBlockClick(() => onSelectReservation(r))}
-            role="button"
-            tabIndex={0}
-            className={`group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible border z-[5] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-ring ${
-              overlapsAppt
-                ? "bg-amber-50 border-amber-300"
-                : r.categoryColor
-                  ? "border-transparent"
-                  : "bg-muted/70 border-border"
-            }`}
-            style={{
-              top,
-              height: Math.max(18, height),
-              ...(!overlapsAppt && r.categoryColor
-                ? { backgroundColor: `${r.categoryColor}33`, borderColor: `${r.categoryColor}80` }
-                : {}),
-            }}
-            aria-label={`Reserva de espacio "${r.title}" ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}${r.categoryName ? `, ${r.categoryName}` : ""}${overlapsAppt ? ", se solapa con una cita" : ""}`}
-          >
-            <ResizeHandle
-              position="top"
-              onStart={() => beginResize("reservation", r.id, "top", startMins, r.durationMin)}
-            />
-            <div className="overflow-hidden h-full">
-              <p className="text-[10px] font-semibold leading-tight truncate flex items-center gap-1">
-                <Lock className="w-2.5 h-2.5 shrink-0" />
-                {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
-                {overlapsAppt && <AlertTriangle className="w-2.5 h-2.5 text-amber-600 ml-auto shrink-0" />}
-              </p>
-              <p className="text-[10px] font-medium leading-tight truncate text-foreground/80">{r.title}</p>
-            </div>
-            <ResizeHandle
-              position="bottom"
-              onStart={() => beginResize("reservation", r.id, "bottom", startMins, r.durationMin)}
-            />
-          </div>
+          <ContextMenu key={r.id}>
+            <ContextMenuTrigger asChild>
+              <div
+                draggable={!resizing}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "reservation", id: r.id, start: r.start }));
+                }}
+                onClick={() => handleBlockClick(() => onSelectReservation(r))}
+                role="button"
+                tabIndex={0}
+                className={`group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible border z-[5] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-ring ${
+                  overlapsAppt
+                    ? "bg-amber-50 border-amber-300"
+                    : r.categoryColor
+                      ? "border-transparent"
+                      : "bg-muted/70 border-border"
+                }`}
+                style={{
+                  top,
+                  height: Math.max(18, height),
+                  ...(!overlapsAppt && r.categoryColor
+                    ? { backgroundColor: `${r.categoryColor}33`, borderColor: `${r.categoryColor}80` }
+                    : {}),
+                }}
+                aria-label={`Reserva de espacio "${r.title}" ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}${r.categoryName ? `, ${r.categoryName}` : ""}${overlapsAppt ? ", se solapa con una cita" : ""}`}
+              >
+                <ResizeHandle
+                  position="top"
+                  onStart={() => beginResize("reservation", r.id, "top", startMins, r.durationMin)}
+                />
+                <div className="overflow-hidden h-full">
+                  <p className="text-[10px] font-semibold leading-tight truncate flex items-center gap-1">
+                    <Lock className="w-2.5 h-2.5 shrink-0" />
+                    {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
+                    {overlapsAppt && <AlertTriangle className="w-2.5 h-2.5 text-amber-600 ml-auto shrink-0" />}
+                  </p>
+                  <p className="text-[10px] font-medium leading-tight truncate text-foreground/80">{r.title}</p>
+                </div>
+                <ResizeHandle
+                  position="bottom"
+                  onStart={() => beginResize("reservation", r.id, "bottom", startMins, r.durationMin)}
+                />
+              </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem onClick={() => onDuplicateReservation(r)}>
+                <Copy className="w-4 h-4 mr-2" /> Duplicar reserva
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => onSelectReservation(r)}>
+                <Pencil className="w-4 h-4 mr-2" /> Editar reserva
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         );
       })}
 
@@ -1167,41 +1261,52 @@ function DayColumn({
         const effectiveStart = startFromMinutes(effectiveStartMin);
         const end = addMinutes(effectiveStart, effectiveDuration);
         return (
-          <div
-            key={a.id}
-            draggable={!resizing}
-            onDragStart={(e) => {
-              e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "appt", id: a.id, start: a.start }));
-            }}
-            onClick={() => handleBlockClick(() => onSelectAppt(a))}
-            role="button"
-            tabIndex={0}
-            className="group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible bg-card border border-border z-[6] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring"
-            style={{
-              top,
-              height: Math.max(18, height),
-              borderLeft: `3px solid ${a.patientColor}`,
-            }}
-            aria-label={`Cita de ${a.patientName} ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}`}
-          >
-            <ResizeHandle
-              position="top"
-              onStart={() => beginResize("appt", a.id, "top", startMins, a.durationMin)}
-            />
-            <div className="overflow-hidden h-full">
-              <p className="text-[10px] font-semibold leading-tight truncate">
-                {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
-              </p>
-              <p className="text-[10px] font-medium leading-tight truncate">
-                {a.patientName}
-              </p>
-              {!compact && <p className="text-[10px] opacity-80 truncate">{a.type}</p>}
-            </div>
-            <ResizeHandle
-              position="bottom"
-              onStart={() => beginResize("appt", a.id, "bottom", startMins, a.durationMin)}
-            />
-          </div>
+          <ContextMenu key={a.id}>
+            <ContextMenuTrigger asChild>
+              <div
+                draggable={!resizing}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "appt", id: a.id, start: a.start }));
+                }}
+                onClick={() => handleBlockClick(() => onSelectAppt(a))}
+                role="button"
+                tabIndex={0}
+                className="group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible bg-card border border-border z-[6] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring"
+                style={{
+                  top,
+                  height: Math.max(18, height),
+                  borderLeft: `3px solid ${a.patientColor}`,
+                }}
+                aria-label={`Cita de ${a.patientName} ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}`}
+              >
+                <ResizeHandle
+                  position="top"
+                  onStart={() => beginResize("appt", a.id, "top", startMins, a.durationMin)}
+                />
+                <div className="overflow-hidden h-full">
+                  <p className="text-[10px] font-semibold leading-tight truncate">
+                    {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
+                  </p>
+                  <p className="text-[10px] font-medium leading-tight truncate">
+                    {a.patientName}
+                  </p>
+                  {!compact && <p className="text-[10px] opacity-80 truncate">{a.type}</p>}
+                </div>
+                <ResizeHandle
+                  position="bottom"
+                  onStart={() => beginResize("appt", a.id, "bottom", startMins, a.durationMin)}
+                />
+              </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem onClick={() => onDuplicateAppt(a)}>
+                <Copy className="w-4 h-4 mr-2" /> Duplicar cita
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => onSelectAppt(a)}>
+                <Pencil className="w-4 h-4 mr-2" /> Editar cita
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         );
       })}
     </div>
