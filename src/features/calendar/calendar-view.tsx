@@ -256,16 +256,6 @@ function computeDurationLabel(start?: string, end?: string): string | null {
   return `${h} h ${m} min`;
 }
 
-// Same diff as computeDurationLabel but returns raw minutes, used to keep
-// an appointment/reservation's existing duration when the person changes
-// its start time (rather than always resetting to a fixed default).
-function diffMinutesClientSide(start: string, end: string): number {
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 0;
-  return eh * 60 + em - (sh * 60 + sm);
-}
-
 // Minutes elapsed since midnight, refreshed every minute, so the "current
 // time" line in week/day view stays accurate if the page is left open.
 
@@ -1824,7 +1814,6 @@ function AppointmentFormDialog({
     reset,
     watch,
     setValue,
-    getValues,
     formState: { errors },
   } = useForm<
     z.input<typeof appointmentCreateSchema> | z.input<typeof appointmentUpdateSchema>,
@@ -1983,7 +1972,7 @@ function AppointmentFormDialog({
             </Field>
           </div>
 
-          <div className="grid grid-cols-[1.2fr_1.2fr_0.8fr] gap-3 items-end">
+          <div className="grid grid-cols-[1.3fr_1.3fr_1fr] gap-2 items-end">
             <Field label="Hora inicio" error={errors.time?.message} required>
               <Controller
                 control={control}
@@ -1992,12 +1981,8 @@ function AppointmentFormDialog({
                   <TimeSelect
                     value={field.value}
                     onChange={(v) => {
-                      const prevStart = field.value;
-                      const prevEnd = getValues("endTime");
-                      const prevDuration =
-                        prevStart && prevEnd ? diffMinutesClientSide(prevStart, prevEnd) : 0;
                       field.onChange(v);
-                      setValue("endTime", addMinutesToTimeStr(v, prevDuration > 0 ? prevDuration : 60));
+                      setValue("endTime", addMinutesToTimeStr(v, 60));
                     }}
                     ariaLabel="Hora inicio"
                   />
@@ -2073,7 +2058,6 @@ function ReservationFormDialog({
     reset,
     watch,
     setValue,
-    getValues,
     formState: { errors },
   } = useForm<
     z.input<typeof slotReservationCreateSchema> | z.input<typeof slotReservationUpdateSchema>,
@@ -2202,7 +2186,7 @@ function ReservationFormDialog({
             <Input type="date" {...register("date")} />
           </Field>
 
-          <div className="grid grid-cols-[1.2fr_1.2fr_0.8fr] gap-3 items-end">
+          <div className="grid grid-cols-[1.3fr_1.3fr_1fr] gap-2 items-end">
             <Field label="Hora inicio" error={errors.time?.message} required>
               <Controller
                 control={control}
@@ -2211,12 +2195,8 @@ function ReservationFormDialog({
                   <TimeSelect
                     value={field.value}
                     onChange={(v) => {
-                      const prevStart = field.value;
-                      const prevEnd = getValues("endTime");
-                      const prevDuration =
-                        prevStart && prevEnd ? diffMinutesClientSide(prevStart, prevEnd) : 0;
                       field.onChange(v);
-                      setValue("endTime", addMinutesToTimeStr(v, prevDuration > 0 ? prevDuration : 60));
+                      setValue("endTime", addMinutesToTimeStr(v, 60));
                     }}
                     ariaLabel="Hora inicio"
                   />
