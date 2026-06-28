@@ -48,6 +48,7 @@ model Patient {
   address       String?
   diagnosis     String?
   objective     String?
+  alerts        String[] @default([])
   startDate     DateTime @default(now())
   referentName  String?
   referentPhone String?

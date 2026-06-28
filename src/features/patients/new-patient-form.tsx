@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -19,7 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, X, Plus } from "lucide-react";
 import {
   patientCreateSchema,
   type PatientCreateInput,
@@ -63,6 +63,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
       address: "",
       diagnosis: "",
       objective: "",
+      alerts: [],
       startDate: new Date().toISOString().slice(0, 10),
       referentName: "",
       referentPhone: "",
@@ -83,6 +84,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
       address: patient.address ?? "",
       diagnosis: patient.diagnosis ?? "",
       objective: patient.objective ?? "",
+      alerts: patient.alerts ?? [],
       startDate: patient.startDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
       referentName: patient.referentName ?? "",
       referentPhone: patient.referentPhone ?? "",
@@ -209,6 +211,15 @@ export function NewPatientForm({ mode = "create" }: Props) {
             <Field label="Objetivo terapéutico" error={errors.objective?.message} className="sm:col-span-2">
               <Textarea id="objective" rows={2} {...register("objective")} />
             </Field>
+            <Field label="Alertas" error={errors.alerts?.message} className="sm:col-span-2">
+              <Controller
+                control={control}
+                name="alerts"
+                render={({ field }) => (
+                  <AlertsEditor value={field.value} onChange={field.onChange} />
+                )}
+              />
+            </Field>
             <Field label="Fecha de inicio" error={errors.startDate?.message} required>
               <Input id="startDate" type="date" {...register("startDate")} />
             </Field>
@@ -296,6 +307,73 @@ function Field({
       </Label>
       {children}
       {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
+    </div>
+  );
+}
+
+// Free-text chips for short clinical alerts (e.g. "Riesgo de caídas",
+// "Alergia a penicilina"). Type a phrase, press Enter or the + button to
+// add it; click the × on a chip to remove it. No predefined list — every
+// alert is whatever text the person types.
+function AlertsEditor({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (alerts: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+
+  function addAlert() {
+    const text = draft.trim();
+    if (!text) return;
+    if (!value.includes(text)) onChange([...value, text]);
+    setDraft("");
+  }
+
+  function removeAlert(alert: string) {
+    onChange(value.filter((a) => a !== alert));
+  }
+
+  return (
+    <div className="space-y-2">
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {value.map((alert) => (
+            <span
+              key={alert}
+              className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs bg-amber-50 border border-amber-200 text-amber-900"
+            >
+              {alert}
+              <button
+                type="button"
+                onClick={() => removeAlert(alert)}
+                className="rounded-full hover:bg-amber-200/60 p-0.5"
+                aria-label={`Quitar alerta "${alert}"`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addAlert();
+            }
+          }}
+          placeholder="p. ej. Riesgo de caídas, Alergia a penicilina…"
+          className="text-sm"
+        />
+        <Button type="button" variant="outline" size="sm" onClick={addAlert}>
+          <Plus className="w-3.5 h-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }

@@ -76,6 +76,7 @@ export interface PatientDTO {
   address: string | null;
   diagnosis: string | null;
   objective: string | null;
+  alerts: string[];
   startDate: string; // ISO
   referentName: string | null;
   referentPhone: string | null;
