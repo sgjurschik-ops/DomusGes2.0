@@ -13,12 +13,14 @@ interface NavState {
   selectedPatientId: string | null;
   newVisitPatientId: string | null;
   sidebarOpen: boolean;
+  sidebarCollapsed: boolean;
   calendarSelectedDate: string | null; // ISO yyyy-mm-dd for calendar/today
   // Actions
   navigate: (view: View) => void;
   selectPatient: (patientId: string | null) => void;
   setNewVisitPatient: (patientId: string | null) => void;
   setSidebarOpen: (open: boolean) => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   setCalendarSelectedDate: (date: string | null) => void;
   back: () => void;
 }
@@ -45,6 +47,18 @@ function writeHashState(view: View, patientId: string | null) {
   }
 }
 
+// Reads the saved sidebar collapsed preference so it persists across page
+// reloads and sessions, not just while navigating within one visit.
+const SIDEBAR_COLLAPSED_KEY = "domusges:sidebarCollapsed";
+function readSidebarCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+}
+function writeSidebarCollapsed(collapsed: boolean) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+}
+
 const initial = readHashState();
 
 export const useNav = create<NavState>((set, get) => ({
@@ -52,6 +66,7 @@ export const useNav = create<NavState>((set, get) => ({
   selectedPatientId: initial.selectedPatientId,
   newVisitPatientId: null,
   sidebarOpen: false,
+  sidebarCollapsed: readSidebarCollapsed(),
   calendarSelectedDate: null,
   navigate: (view) => {
     writeHashState(view, view === "patient-detail" ? get().selectedPatientId : null);
@@ -63,6 +78,10 @@ export const useNav = create<NavState>((set, get) => ({
   },
   setNewVisitPatient: (patientId) => set({ newVisitPatientId: patientId }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
+  setSidebarCollapsed: (collapsed) => {
+    writeSidebarCollapsed(collapsed);
+    set({ sidebarCollapsed: collapsed });
+  },
   setCalendarSelectedDate: (date) => set({ calendarSelectedDate: date }),
   back: () => {
     const v = get().view;
