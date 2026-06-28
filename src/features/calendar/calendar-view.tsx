@@ -1972,7 +1972,7 @@ function AppointmentFormDialog({
             </Field>
           </div>
 
-          <div className="grid grid-cols-[1.3fr_1.3fr_1fr] gap-2 items-end">
+          <div className="grid grid-cols-3 gap-1.5 items-end">
             <Field label="Hora inicio" error={errors.time?.message} required>
               <Controller
                 control={control}
@@ -2186,7 +2186,7 @@ function ReservationFormDialog({
             <Input type="date" {...register("date")} />
           </Field>
 
-          <div className="grid grid-cols-[1.3fr_1.3fr_1fr] gap-2 items-end">
+          <div className="grid grid-cols-3 gap-1.5 items-end">
             <Field label="Hora inicio" error={errors.time?.message} required>
               <Controller
                 control={control}
