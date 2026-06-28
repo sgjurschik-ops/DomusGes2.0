@@ -71,10 +71,13 @@ export function Sidebar() {
       >
         {/* Brand */}
         <div className={cn(
-          "flex items-center justify-between border-b border-sidebar-border py-5",
-          sidebarCollapsed ? "px-3 lg:px-0 lg:justify-center" : "px-5",
+          "flex items-center justify-between border-b border-sidebar-border py-4",
+          sidebarCollapsed ? "px-3 lg:flex-col lg:gap-2 lg:py-4" : "px-5 py-5",
         )}>
-          <div className="flex items-center gap-2.5">
+          <div className={cn(
+            "flex items-center gap-2.5",
+            sidebarCollapsed && "lg:flex-col lg:gap-2",
+          )}>
             <div className="w-9 h-9 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shrink-0">
               <Activity className="w-5 h-5" />
             </div>
@@ -82,6 +85,24 @@ export function Sidebar() {
               <p className="font-bold text-sm whitespace-nowrap">DomusGes</p>
               <p className="text-[10px] text-sidebar-foreground/60 uppercase tracking-wider whitespace-nowrap">Seguimiento</p>
             </div>
+
+            {/* Desktop collapse/expand toggle — directly under the logo
+                when collapsed, so it never overlaps the icon regardless of
+                the sidebar's narrow width. */}
+            {sidebarCollapsed && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="hidden lg:flex w-7 h-7 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                    onClick={() => setSidebarCollapsed(false)}
+                    aria-label="Expandir menú"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Expandir menú</TooltipContent>
+              </Tooltip>
+            )}
           </div>
 
           {/* Mobile close button */}
@@ -93,22 +114,9 @@ export function Sidebar() {
             <X className="w-5 h-5" />
           </button>
 
-          {/* Desktop collapse/expand toggle — sits in the same top-right
-              spot as the mobile close button, but never both at once. */}
-          {sidebarCollapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="hidden lg:flex w-7 h-7 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors lg:absolute lg:top-4 lg:right-2"
-                  onClick={() => setSidebarCollapsed(false)}
-                  aria-label="Expandir menú"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Expandir menú</TooltipContent>
-            </Tooltip>
-          ) : (
+          {/* Desktop collapse toggle when expanded — same row as the logo,
+              right-aligned, since there's room here. */}
+          {!sidebarCollapsed && (
             <button
               className="hidden lg:flex w-7 h-7 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
               onClick={() => setSidebarCollapsed(true)}
