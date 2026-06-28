@@ -213,11 +213,19 @@ function computeOverlapLayout<T>(
 // no matter how many share the slot.
 function computeLaneStyle(lane: number, laneCount: number): { left: string; width: string } {
   if (laneCount <= 1) return { left: "4px", width: "calc(100% - 8px)" };
-  const stepPct = 100 / (laneCount + 1); // each lane shifts by less than a full share, creating the overlap
-  const widthPct = 100 - stepPct * (laneCount - 1) * 0.6; // later lanes still wide enough to read
+  // Each lane starts at lane/laneCount of the column and extends most of
+  // the way to the right edge (not just to the next lane's start), which
+  // is what creates the overlap — but it must never reach past 100%, or
+  // the block visually spills into the next day's column.
+  const startPct = (lane / laneCount) * 100;
+  const widthPct = 100 - startPct; // exact remaining space, guaranteed to fit
+  // Pull the right edge in by a fixed amount (not a percentage of the
+  // remaining width) so the overlap "step" looks the same regardless of
+  // lane count, while still never exceeding the column.
+  const trimPct = lane < laneCount - 1 ? Math.min(20, widthPct * 0.3) : 0;
   return {
-    left: `calc(${lane * stepPct}% + 4px)`,
-    width: `calc(${Math.max(widthPct, 55)}% - 8px)`,
+    left: `calc(${startPct}% + 4px)`,
+    width: `calc(${Math.max(widthPct - trimPct, 100 / laneCount)}% - 8px)`,
   };
 }
 
@@ -246,6 +254,16 @@ function computeDurationLabel(start?: string, end?: string): string | null {
   if (h === 0) return `${m} min`;
   if (m === 0) return `${h} h`;
   return `${h} h ${m} min`;
+}
+
+// Same diff as computeDurationLabel but returns raw minutes, used to keep
+// an appointment/reservation's existing duration when the person changes
+// its start time (rather than always resetting to a fixed default).
+function diffMinutesClientSide(start: string, end: string): number {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 0;
+  return eh * 60 + em - (sh * 60 + sm);
 }
 
 // Minutes elapsed since midnight, refreshed every minute, so the "current
@@ -1805,6 +1823,8 @@ function AppointmentFormDialog({
     control,
     reset,
     watch,
+    setValue,
+    getValues,
     formState: { errors },
   } = useForm<
     z.input<typeof appointmentCreateSchema> | z.input<typeof appointmentUpdateSchema>,
@@ -1892,7 +1912,7 @@ function AppointmentFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Paciente" error={errors.patientId?.message} required>
               <Controller
@@ -1963,13 +1983,24 @@ function AppointmentFormDialog({
             </Field>
           </div>
 
-          <div className="grid grid-cols-[1.2fr_1.2fr_0.8fr] gap-2 items-end">
+          <div className="grid grid-cols-[1.2fr_1.2fr_0.8fr] gap-3 items-end">
             <Field label="Hora inicio" error={errors.time?.message} required>
               <Controller
                 control={control}
                 name="time"
                 render={({ field }) => (
-                  <TimeSelect value={field.value} onChange={field.onChange} ariaLabel="Hora inicio" />
+                  <TimeSelect
+                    value={field.value}
+                    onChange={(v) => {
+                      const prevStart = field.value;
+                      const prevEnd = getValues("endTime");
+                      const prevDuration =
+                        prevStart && prevEnd ? diffMinutesClientSide(prevStart, prevEnd) : 0;
+                      field.onChange(v);
+                      setValue("endTime", addMinutesToTimeStr(v, prevDuration > 0 ? prevDuration : 60));
+                    }}
+                    ariaLabel="Hora inicio"
+                  />
                 )}
               />
             </Field>
@@ -2042,6 +2073,7 @@ function ReservationFormDialog({
     reset,
     watch,
     setValue,
+    getValues,
     formState: { errors },
   } = useForm<
     z.input<typeof slotReservationCreateSchema> | z.input<typeof slotReservationUpdateSchema>,
@@ -2132,7 +2164,7 @@ function ReservationFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Field label="Título" error={errors.title?.message} required>
             <Input placeholder="p. ej. Roco, Formación, Reunión de equipo…" {...register("title")} />
           </Field>
@@ -2170,13 +2202,24 @@ function ReservationFormDialog({
             <Input type="date" {...register("date")} />
           </Field>
 
-          <div className="grid grid-cols-[1.2fr_1.2fr_0.8fr] gap-2 items-end">
+          <div className="grid grid-cols-[1.2fr_1.2fr_0.8fr] gap-3 items-end">
             <Field label="Hora inicio" error={errors.time?.message} required>
               <Controller
                 control={control}
                 name="time"
                 render={({ field }) => (
-                  <TimeSelect value={field.value} onChange={field.onChange} ariaLabel="Hora inicio" />
+                  <TimeSelect
+                    value={field.value}
+                    onChange={(v) => {
+                      const prevStart = field.value;
+                      const prevEnd = getValues("endTime");
+                      const prevDuration =
+                        prevStart && prevEnd ? diffMinutesClientSide(prevStart, prevEnd) : 0;
+                      field.onChange(v);
+                      setValue("endTime", addMinutesToTimeStr(v, prevDuration > 0 ? prevDuration : 60));
+                    }}
+                    ariaLabel="Hora inicio"
+                  />
                 )}
               />
             </Field>
