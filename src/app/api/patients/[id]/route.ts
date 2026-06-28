@@ -1,77 +1,99 @@
-// /api/patients — list & create
+// /api/patients/[id] — detail, update, delete
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapPatient, getPatientTimelineMap } from "@/lib/server";
-import { patientCreateSchema } from "@/lib/schemas";
+import { requireProfessional, requireAdmin, audit, mapPatient, getPatientTimelineMap } from "@/lib/server";
 
-export async function GET() {
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function GET(_req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
-  const rows = await db.patient.findMany({
+  const { id } = await params;
+  const row = await db.patient.findUnique({
+    where: { id },
     include: {
-      therapists: { select: { id: true, name: true } },
+      therapists: { select: { id: true, name: true, color: true, role: true } },
       _count: { select: { visits: true } },
     },
-    orderBy: { lastName: "asc" },
   });
-  const { lastVisitMap, nextApptMap } = await getPatientTimelineMap(rows.map((r) => r.id));
-  await audit(prof.id, "patient.list", "Patient", null);
+  if (!row) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  const { lastVisitMap, nextApptMap } = await getPatientTimelineMap([row.id]);
+  await audit(prof.id, "patient.view", "Patient", row.id);
   return NextResponse.json(
-    rows.map((r) =>
-      mapPatient(r, {
-        lastVisitDate: lastVisitMap.get(r.id) ?? null,
-        nextAppointmentDate: nextApptMap.get(r.id) ?? null,
-      }),
-    ),
+    mapPatient(row, {
+      lastVisitDate: lastVisitMap.get(row.id) ?? null,
+      nextAppointmentDate: nextApptMap.get(row.id) ?? null,
+    }),
   );
 }
 
-export async function POST(req: NextRequest) {
+export async function PATCH(req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
-  let body: unknown;
+  const { id } = await params;
+
+  let body: any;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
-  const parsed = patientCreateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "VALIDATION", issues: parsed.error.flatten().fieldErrors },
-      { status: 400 },
-    );
-  }
-  const d = parsed.data;
-  const row = await db.patient.create({
+
+  const row = await db.patient.update({
+    where: { id },
     data: {
-      firstName: d.firstName,
-      lastName: d.lastName,
-      birthDate: new Date(d.birthDate),
-      specialty: d.specialty,
-      status: d.status,
-      phone: d.phone || null,
-      address: d.address || null,
-      diagnosis: d.diagnosis || null,
-      objective: d.objective || null,
-      alerts: d.alerts,
-      startDate: new Date(d.startDate),
-      referentName: d.referentName || null,
-      referentPhone: d.referentPhone || null,
-      color: ["#1a5c58", "#5b3fa0", "#c17f3a", "#b03060", "#2a6b3f", "#1a5c80"][
-        Math.floor(Math.random() * 6)
-      ],
-      therapists: { connect: d.therapistIds.map((id) => ({ id })) },
+      firstName: body.firstName,
+      lastName: body.lastName,
+      birthDate: body.birthDate ? new Date(body.birthDate) : undefined,
+      specialty: body.specialty,
+      status: body.status,
+      phone: body.phone || null,
+      address: body.address || null,
+      diagnosis: body.diagnosis || null,
+      objective: body.objective || null,
+      alerts: Array.isArray(body.alerts) ? body.alerts : undefined,
+      startDate: body.startDate ? new Date(body.startDate) : undefined,
+      referentName: body.referentName || null,
+      referentPhone: body.referentPhone || null,
+      therapists: Array.isArray(body.therapistIds)
+  ? { set: body.therapistIds.map((id: string) => ({ id })) }
+  : undefined,
     },
     include: {
       therapists: { select: { id: true, name: true } },
       _count: { select: { visits: true } },
     },
   });
-  await audit(prof.id, "patient.create", "Patient", row.id, { name: `${row.firstName} ${row.lastName}` });
-  // A brand-new patient has no visits or appointments yet, so both are null —
-  // no extra query needed here.
+
+  const { lastVisitMap, nextApptMap } = await getPatientTimelineMap([row.id]);
+  await audit(prof.id, "patient.update", "Patient", row.id);
+
   return NextResponse.json(
-    mapPatient(row, { lastVisitDate: null, nextAppointmentDate: null }),
-    { status: 201 },
+    mapPatient(row, {
+      lastVisitDate: lastVisitMap.get(row.id) ?? null,
+      nextAppointmentDate: nextApptMap.get(row.id) ?? null,
+    }),
   );
+}
+
+export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  const prof = await requireAdmin();
+  const { id } = await params;
+
+  await db.$transaction(async (tx) => {
+    await tx.appointment.deleteMany({ where: { patientId: id } });
+    await tx.assessment.deleteMany({ where: { patientId: id } });
+    await tx.visit.deleteMany({ where: { patientId: id } });
+
+    await tx.patient.update({
+      where: { id },
+      data: {
+        therapists: { set: [] },
+      },
+    });
+
+    await tx.patient.delete({ where: { id } });
+  });
+
+  await audit(prof.id, "patient.delete", "Patient", id);
+
+  return NextResponse.json({ ok: true });
 }
