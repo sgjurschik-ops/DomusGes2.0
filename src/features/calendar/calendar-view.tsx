@@ -124,6 +124,103 @@ function rangesOverlap(
   return aStart.getTime() < bEnd && bStart.getTime() < aEnd;
 }
 
+// Google Calendar-style overlap layout: events that overlap in time are
+// assigned to side-by-side "lanes" within their overlap group, each lane
+// narrower and slightly offset so every event stays at least partially
+// visible instead of one fully hiding behind another. Two events that
+// don't overlap each other directly but each overlap a third (e.g. A+B
+// and B+C) still share one group, since B's lane choice constrains both.
+//
+// Returns, for each item (by its original index), the lane it was
+// assigned and the total lane count of its group — from these two numbers
+// the caller derives a width percentage and left offset.
+function computeOverlapLayout<T>(
+  items: T[],
+  getStart: (item: T) => Date,
+  getDurationMin: (item: T) => number,
+): { lane: number; laneCount: number }[] {
+  const n = items.length;
+  const result: { lane: number; laneCount: number }[] = items.map(() => ({ lane: 0, laneCount: 1 }));
+  if (n === 0) return result;
+
+  const order = items
+    .map((item, i) => ({ i, start: getStart(item), end: addMinutes(getStart(item), getDurationMin(item)) }))
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  // Union-find to group items that are connected through any chain of
+  // overlaps, even if two particular items don't directly overlap.
+  const parent = Array.from({ length: n }, (_, i) => i);
+  function find(x: number): number {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]];
+      x = parent[x];
+    }
+    return x;
+  }
+  function union(a: number, b: number) {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[ra] = rb;
+  }
+
+  for (let a = 0; a < order.length; a++) {
+    for (let b = a + 1; b < order.length; b++) {
+      if (order[b].start.getTime() >= order[a].end.getTime()) break;
+      union(order[a].i, order[b].i);
+    }
+  }
+
+  const groups = new Map<number, number[]>();
+  for (const { i } of order) {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root)!.push(i);
+  }
+
+  for (const indices of groups.values()) {
+    if (indices.length === 1) continue; // common case: no overlap, default lane 0/1 stands
+    const sorted = [...indices].sort(
+      (ia, ib) => getStart(items[ia]).getTime() - getStart(items[ib]).getTime(),
+    );
+    const laneEndTimes: number[] = []; // end time currently occupying each lane
+    const laneOf = new Map<number, number>();
+    for (const idx of sorted) {
+      const start = getStart(items[idx]).getTime();
+      const end = addMinutes(getStart(items[idx]), getDurationMin(items[idx])).getTime();
+      let lane = laneEndTimes.findIndex((endTime) => endTime <= start);
+      if (lane === -1) {
+        lane = laneEndTimes.length;
+        laneEndTimes.push(end);
+      } else {
+        laneEndTimes[lane] = end;
+      }
+      laneOf.set(idx, lane);
+    }
+    const laneCount = laneEndTimes.length;
+    for (const idx of sorted) {
+      result[idx] = { lane: laneOf.get(idx)!, laneCount };
+    }
+  }
+
+  return result;
+}
+
+// Translates a lane assignment into left/width percentages with the
+// partial-overlap look from the reference screenshot: lanes don't split
+// the column into equal, non-touching slices — each successive lane
+// starts further right and is narrower, while still overlapping the
+// previous one by a fixed margin so part of every event stays visible
+// no matter how many share the slot.
+function computeLaneStyle(lane: number, laneCount: number): { left: string; width: string } {
+  if (laneCount <= 1) return { left: "4px", width: "calc(100% - 8px)" };
+  const stepPct = 100 / (laneCount + 1); // each lane shifts by less than a full share, creating the overlap
+  const widthPct = 100 - stepPct * (laneCount - 1) * 0.6; // later lanes still wide enough to read
+  return {
+    left: `calc(${lane * stepPct}% + 4px)`,
+    width: `calc(${Math.max(widthPct, 55)}% - 8px)`,
+  };
+}
+
 // Adds `minutes` to a "HH:mm" string, used only to seed a sensible default
 // end time (start + 45min) when a create dialog first opens.
 function addMinutesToTimeStr(time: string, minutes: number): string {
@@ -1055,6 +1152,32 @@ function DayColumn({
   const colRef = useRef<HTMLDivElement>(null);
   const [dragOverMin, setDragOverMin] = useState<number | null>(null);
 
+  // Combine appointments and reservations into one timeline for overlap
+  // layout purposes — they occupy the same visual column, so a reservation
+  // overlapping an appointment needs to make room for it just as much as
+  // two appointments would for each other.
+  type LaneItem = { kind: "appt" | "reservation"; id: string; start: Date; durationMin: number };
+  const laneItems: LaneItem[] = useMemo(
+    () => [
+      ...appts.map((a) => ({ kind: "appt" as const, id: a.id, start: new Date(a.start), durationMin: a.durationMin })),
+      ...reservations.map((r) => ({
+        kind: "reservation" as const,
+        id: r.id,
+        start: new Date(r.start),
+        durationMin: r.durationMin,
+      })),
+    ],
+    [appts, reservations],
+  );
+  const overlapLayout = useMemo(
+    () => computeOverlapLayout(laneItems, (it) => it.start, (it) => it.durationMin),
+    [laneItems],
+  );
+  function laneFor(kind: "appt" | "reservation", id: string): { lane: number; laneCount: number } {
+    const idx = laneItems.findIndex((it) => it.kind === kind && it.id === id);
+    return idx === -1 ? { lane: 0, laneCount: 1 } : overlapLayout[idx];
+  }
+
   // Resize-by-dragging-the-edge state. Tracks which block is being resized,
   // which edge (top = change start, bottom = change end/duration), and a
   // live preview of the in-progress start/duration so the block redraws
@@ -1244,6 +1367,8 @@ function DayColumn({
         const overlapsAppt = appts.some((a) =>
           rangesOverlap(effectiveStart, effectiveDuration, new Date(a.start), a.durationMin),
         );
+        const { lane, laneCount } = laneFor("reservation", r.id);
+        const laneStyle = computeLaneStyle(lane, laneCount);
         return (
           <ContextMenu key={r.id}>
             <ContextMenuTrigger asChild>
@@ -1255,7 +1380,7 @@ function DayColumn({
                 onClick={() => handleBlockClick(() => onSelectReservation(r))}
                 role="button"
                 tabIndex={0}
-                className={`group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible border z-[5] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-ring ${
+                className={`group absolute rounded-md px-1.5 py-1 text-left overflow-visible border z-[5] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] hover:z-20 focus:outline-none focus:ring-2 focus:ring-ring ${
                   overlapsAppt
                     ? "bg-amber-50 border-amber-300"
                     : r.categoryColor
@@ -1265,6 +1390,9 @@ function DayColumn({
                 style={{
                   top,
                   height: Math.max(18, height),
+                  left: laneStyle.left,
+                  width: laneStyle.width,
+                  zIndex: 5 + lane,
                   ...(!overlapsAppt && r.categoryColor
                     ? { backgroundColor: `${r.categoryColor}33`, borderColor: `${r.categoryColor}80` }
                     : {}),
@@ -1314,6 +1442,8 @@ function DayColumn({
         const height = (effectiveDuration / 60) * HOUR_PX - 2;
         const effectiveStart = startFromMinutes(effectiveStartMin);
         const end = addMinutes(effectiveStart, effectiveDuration);
+        const { lane, laneCount } = laneFor("appt", a.id);
+        const laneStyle = computeLaneStyle(lane, laneCount);
         return (
           <ContextMenu key={a.id}>
             <ContextMenuTrigger asChild>
@@ -1325,7 +1455,7 @@ function DayColumn({
                 onClick={() => handleBlockClick(() => onSelectAppt(a))}
                 role="button"
                 tabIndex={0}
-                className={`group absolute left-1 right-1 rounded-md px-1.5 py-1 text-left overflow-visible border z-[6] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring ${
+                className={`group absolute rounded-md px-1.5 py-1 text-left overflow-visible border z-[6] cursor-grab active:cursor-grabbing transition-transform hover:scale-[1.01] hover:z-20 hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring ${
                   a.status === "cancelada"
                     ? "bg-muted/40 border-border opacity-60"
                     : a.status === "no_show"
@@ -1335,6 +1465,9 @@ function DayColumn({
                 style={{
                   top,
                   height: Math.max(18, height),
+                  left: laneStyle.left,
+                  width: laneStyle.width,
+                  zIndex: 6 + lane,
                   borderLeft: `3px solid ${a.patientColor}`,
                 }}
                 aria-label={`Cita de ${a.patientName} ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}, ${APPOINTMENT_STATUS_LABELS[a.status]}`}
