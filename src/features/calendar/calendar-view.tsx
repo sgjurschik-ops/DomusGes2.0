@@ -303,7 +303,7 @@ function TimeSelect({
     : [...TIME_OPTIONS, value].sort();
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger aria-label={ariaLabel}>
+      <SelectTrigger aria-label={ariaLabel} className="w-full">
         <SelectValue placeholder="Hora" />
       </SelectTrigger>
       <SelectContent className="max-h-72">
