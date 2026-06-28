@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Activity, Eye, EyeOff, KeyRound } from "lucide-react";
+import { Activity, Eye, EyeOff } from "lucide-react";
 import { loginSchema, type LoginInput } from "@/lib/schemas";
 
 export function LoginView() {
@@ -119,15 +119,6 @@ export function LoginView() {
                 {submitting ? "Entrando…" : "Entrar"}
               </Button>
             </form>
-
-            <div className="mt-6 rounded-md border border-dashed border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1.5 font-medium text-foreground mb-1">
-                <KeyRound className="w-3.5 h-3.5" /> Acceso demo
-              </div>
-              <p><span className="font-mono">admin@domusges.es</span> · <span className="font-mono">admin2026</span></p>
-              <p><span className="font-mono">ana@domusges.es</span> · <span className="font-mono">demo2026</span></p>
-              <p className="mt-1 italic">(en producción estas credenciales se eliminan y cada usuario usa la suya.)</p>
-            </div>
           </CardContent>
         </Card>
 

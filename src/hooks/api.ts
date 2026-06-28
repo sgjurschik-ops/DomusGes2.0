@@ -50,13 +50,23 @@ export function useCurrentSession() {
   };
 }
 
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (data: ChangePasswordInput) =>
+      fetcher<{ ok: true }>("/api/me/password", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+  });
+}
+
 // ─── Patients ────────────────────────────────────────────────────────────────
 
 import type { PatientDTO, VisitDTO, AssessmentDTO, AppointmentDTO, AppointmentStatus, SlotReservationDTO, ReservationCategoryDTO, ProfessionalDTO, AuditLogDTO } from "@/types/domain";
 import type {
   PatientCreateInput, VisitCreateInput, VisitUpdateInput, AssessmentCreateInput, AssessmentUpdateInput,
   AppointmentCreateInput, SlotReservationCreateInput, SlotReservationUpdateInput, AppointmentUpdateInput, ProfessionalCreateInput, ProfessionalUpdateInput,
-  ReservationCategoryCreateInput, ReservationCategoryUpdateInput,
+  ReservationCategoryCreateInput, ReservationCategoryUpdateInput, ChangePasswordInput,
 } from "@/lib/schemas";
 
 export const patientKeys = {

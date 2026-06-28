@@ -12,6 +12,7 @@ import {
   useCurrentSession,
   useProfessionals,
   useUpdateProfessional,
+  useChangePassword,
   ApiError,
 } from "@/hooks/api";
 import { toast } from "@/hooks/use-toast";
@@ -19,6 +20,8 @@ import { Avatar, formatDate } from "@/components/domain";
 import {
   professionalUpdateSchema,
   type ProfessionalUpdateInput,
+  changePasswordSchema,
+  type ChangePasswordInput,
   PROFESSIONAL_COLORS,
 } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
@@ -55,6 +58,9 @@ import {
   Phone,
   ShieldCheck,
   Building2,
+  Eye,
+  EyeOff,
+  KeyRound,
 } from "lucide-react";
 
 const CENTRE_STORAGE_KEY = "domusges.settings.centre";
@@ -456,6 +462,117 @@ function CentreTab() {
 
 // ─── Account section ─────────────────────────────────────────────────────────
 
+function ChangePasswordCard() {
+  const changePassword = useChangePassword();
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+    setError,
+  } = useForm<ChangePasswordInput>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
+  });
+
+  async function onSubmit(values: ChangePasswordInput) {
+    try {
+      await changePassword.mutateAsync(values);
+      toast({ title: "Contraseña actualizada" });
+      reset();
+    } catch (e) {
+      const issues = e instanceof ApiError ? (e.body as { issues?: { currentPassword?: string[] } })?.issues : undefined;
+      if (issues?.currentPassword?.[0]) {
+        setError("currentPassword", { message: issues.currentPassword[0] });
+      } else {
+        toast({ title: "No se pudo cambiar la contraseña", variant: "destructive" });
+      }
+    }
+  }
+
+  return (
+    <div className="p-3 rounded-lg border space-y-3">
+      <div className="flex items-center gap-2">
+        <KeyRound className="w-4 h-4 text-muted-foreground" />
+        <p className="text-sm font-medium">Cambiar contraseña</p>
+      </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="currentPassword" className="text-xs">Contraseña actual</Label>
+          <div className="relative">
+            <Input
+              id="currentPassword"
+              type={showCurrent ? "text" : "password"}
+              autoComplete="current-password"
+              className="pr-10"
+              aria-invalid={!!errors.currentPassword}
+              {...register("currentPassword")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowCurrent((v) => !v)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+              aria-label={showCurrent ? "Ocultar contraseña" : "Mostrar contraseña"}
+            >
+              {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          {errors.currentPassword && (
+            <p className="text-xs text-destructive" role="alert">{errors.currentPassword.message}</p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="newPassword" className="text-xs">Nueva contraseña</Label>
+            <div className="relative">
+              <Input
+                id="newPassword"
+                type={showNew ? "text" : "password"}
+                autoComplete="new-password"
+                className="pr-10"
+                aria-invalid={!!errors.newPassword}
+                {...register("newPassword")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNew((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                aria-label={showNew ? "Ocultar contraseña" : "Mostrar contraseña"}
+              >
+                {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {errors.newPassword && (
+              <p className="text-xs text-destructive" role="alert">{errors.newPassword.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="confirmPassword" className="text-xs">Confirmar contraseña</Label>
+            <Input
+              id="confirmPassword"
+              type={showNew ? "text" : "password"}
+              autoComplete="new-password"
+              aria-invalid={!!errors.confirmPassword}
+              {...register("confirmPassword")}
+            />
+            {errors.confirmPassword && (
+              <p className="text-xs text-destructive" role="alert">{errors.confirmPassword.message}</p>
+            )}
+          </div>
+        </div>
+
+        <Button type="submit" size="sm" disabled={changePassword.isPending}>
+          {changePassword.isPending ? "Guardando…" : "Cambiar contraseña"}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
 function AccountSection() {
   const [signingOut, setSigningOut] = useState(false);
 
@@ -485,6 +602,8 @@ function AccountSection() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        <ChangePasswordCard />
+
         <div className="flex items-center justify-between gap-4 flex-wrap p-3 rounded-lg border">
           <div>
             <p className="text-sm font-medium">Cerrar sesión en todos los dispositivos</p>

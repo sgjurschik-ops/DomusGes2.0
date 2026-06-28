@@ -83,6 +83,8 @@ export function Sidebar() {
               <p className="text-[10px] text-sidebar-foreground/60 uppercase tracking-wider whitespace-nowrap">Seguimiento</p>
             </div>
           </div>
+
+          {/* Mobile close button */}
           <button
             className="lg:hidden text-sidebar-foreground/80 hover:text-sidebar-foreground"
             onClick={() => setSidebarOpen(false)}
@@ -90,33 +92,32 @@ export function Sidebar() {
           >
             <X className="w-5 h-5" />
           </button>
-        </div>
 
-        {/* Collapse/expand toggle — desktop only; mobile already has its
-            own open/close via the overlay button and Escape key. */}
-        {sidebarCollapsed ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setSidebarCollapsed(false)}
-                className="hidden lg:flex items-center justify-center gap-2 px-3 py-2 mx-3 mt-2 rounded-lg text-xs font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-                aria-label="Expandir menú"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Expandir menú</TooltipContent>
-          </Tooltip>
-        ) : (
-          <button
-            onClick={() => setSidebarCollapsed(true)}
-            className="hidden lg:flex items-center gap-2 px-3 py-2 mx-3 mt-2 rounded-lg text-xs font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-            aria-label="Comprimir menú"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            <span>Comprimir</span>
-          </button>
-        )}
+          {/* Desktop collapse/expand toggle — sits in the same top-right
+              spot as the mobile close button, but never both at once. */}
+          {sidebarCollapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className="hidden lg:flex w-7 h-7 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors lg:absolute lg:top-4 lg:right-2"
+                  onClick={() => setSidebarCollapsed(false)}
+                  aria-label="Expandir menú"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Expandir menú</TooltipContent>
+            </Tooltip>
+          ) : (
+            <button
+              className="hidden lg:flex w-7 h-7 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+              onClick={() => setSidebarCollapsed(true)}
+              aria-label="Comprimir menú"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Secciones">
