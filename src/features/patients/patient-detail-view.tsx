@@ -20,6 +20,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { assessmentCreateSchema, type AssessmentCreateInput, ASSESSMENT_SCALES, STRUCTURED_SCALES } from "@/lib/schemas";
@@ -27,7 +37,7 @@ import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { VisitDetailDialog } from "./visit-detail-dialog";
-import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Dot,
@@ -45,6 +55,7 @@ export function PatientDetailView() {
   const updatePatient = useUpdatePatient();
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
   const [openVisitId, setOpenVisitId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   if (!selectedPatientId) {
     return <p className="text-sm text-muted-foreground">Selecciona un paciente.</p>;
@@ -83,6 +94,22 @@ export function PatientDetailView() {
               <p className="text-sm text-muted-foreground mt-1">
                 {patient.age} años · {patient.totalVisits} seguimientos · Inicio {formatDate(patient.startDate)}
               </p>
+
+              {/* Alerts — shown first, above clinical info, so they're the
+                  very first thing seen before a session */}
+              {patient.alerts.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {patient.alerts.map((alert) => (
+                    <span
+                      key={alert}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-amber-100 border border-amber-300 text-amber-900 font-medium"
+                    >
+                      <AlertTriangle className="w-3 h-3" />
+                      {alert}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* Clinical info first — what matters most before a session */}
               <div className="mt-3 rounded-md bg-accent/40 px-3 py-2.5 space-y-2">
@@ -140,26 +167,7 @@ export function PatientDetailView() {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
-                    onClick={async () => {
-                      const ok = confirm(
-                        `¿Seguro que quieres eliminar a ${patient.fullName}? Esta acción no se puede deshacer.`,
-                      );
-                      if (!ok) return;
-                      try {
-                        await deletePatient.mutateAsync(patient.id);
-                        toast({
-                          title: "Paciente eliminado",
-                          description: `${patient.fullName} ha sido eliminado.`,
-                        });
-                        navigate("patients");
-                      } catch {
-                        toast({
-                          title: "Error",
-                          description: "No se ha podido eliminar el paciente.",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
+                    onClick={() => setDeleteDialogOpen(true)}
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Eliminar
@@ -333,6 +341,50 @@ export function PatientDetailView() {
           onClose={() => setOpenVisitId(null)}
         />
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar a {patient.fullName}?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>Esta acción no se puede deshacer. Se eliminarán también:</p>
+                <ul className="list-disc pl-5 space-y-0.5">
+                  <li>{visits?.length ?? 0} seguimiento{(visits?.length ?? 0) === 1 ? "" : "s"} registrado{(visits?.length ?? 0) === 1 ? "" : "s"}</li>
+                  <li>{assessments?.length ?? 0} evaluación{(assessments?.length ?? 0) === 1 ? "" : "es"} de escalas</li>
+                  <li>Su perfil ocupacional, si lo tiene completado</li>
+                  <li>Sus citas programadas en la Agenda</li>
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deletePatient.isPending}
+              onClick={async () => {
+                try {
+                  await deletePatient.mutateAsync(patient.id);
+                  toast({
+                    title: "Paciente eliminado",
+                    description: `${patient.fullName} ha sido eliminado.`,
+                  });
+                  navigate("patients");
+                } catch {
+                  toast({
+                    title: "Error",
+                    description: "No se ha podido eliminar el paciente.",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              {deletePatient.isPending ? "Eliminando…" : "Eliminar definitivamente"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
