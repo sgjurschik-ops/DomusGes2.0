@@ -208,7 +208,7 @@ export function PatientsListView() {
                               {p.alerts.slice(0, 2).map((alert) => (
                                 <span
                                   key={alert}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-amber-50 border border-amber-200 text-amber-900 whitespace-nowrap"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-amber-100 border border-amber-300 text-amber-900 whitespace-nowrap"
                                 >
                                   <AlertTriangle className="w-2.5 h-2.5" />
                                   {alert}
@@ -270,7 +270,7 @@ export function PatientsListView() {
                         {p.alerts.map((alert) => (
                           <span
                             key={alert}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-amber-50 border border-amber-200 text-amber-900"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-amber-100 border border-amber-300 text-amber-900"
                           >
                             <AlertTriangle className="w-2.5 h-2.5" />
                             {alert}
