@@ -205,7 +205,7 @@ export function PatientsListView() {
                               <p className="font-medium truncate">{p.fullName}</p>
                               <SpecialtyBadge specialty={p.specialty} />
                               <StatusBadge status={p.status} />
-                              {p.alerts.slice(0, 2).map((alert) => (
+                              {(p.alerts ?? []).slice(0, 2).map((alert) => (
                                 <span
                                   key={alert}
                                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-amber-100 border border-amber-300 text-amber-900 whitespace-nowrap"
@@ -214,9 +214,9 @@ export function PatientsListView() {
                                   {alert}
                                 </span>
                               ))}
-                              {p.alerts.length > 2 && (
+                              {(p.alerts ?? []).length > 2 && (
                                 <span className="text-[11px] text-muted-foreground">
-                                  +{p.alerts.length - 2}
+                                  +{(p.alerts ?? []).length - 2}
                                 </span>
                               )}
                             </div>
@@ -265,9 +265,9 @@ export function PatientsListView() {
                       <SpecialtyBadge specialty={p.specialty} />
                       <StatusBadge status={p.status} />
                     </div>
-                    {p.alerts.length > 0 && (
+                    {(p.alerts ?? []).length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {p.alerts.map((alert) => (
+                        {(p.alerts ?? []).map((alert) => (
                           <span
                             key={alert}
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-amber-100 border border-amber-300 text-amber-900"

@@ -97,9 +97,9 @@ export function PatientDetailView() {
 
               {/* Alerts — shown first, above clinical info, so they're the
                   very first thing seen before a session */}
-              {patient.alerts.length > 0 && (
+              {(patient.alerts ?? []).length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {patient.alerts.map((alert) => (
+                  {(patient.alerts ?? []).map((alert) => (
                     <span
                       key={alert}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-amber-100 border border-amber-300 text-amber-900 font-medium"
