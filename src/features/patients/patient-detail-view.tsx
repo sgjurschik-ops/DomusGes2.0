@@ -37,7 +37,8 @@ import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { VisitDetailDialog } from "./visit-detail-dialog";
-import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle } from "lucide-react";
+import { PatientReportDialog } from "./patient-report-dialog";
+import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle, FileDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Dot,
@@ -56,6 +57,7 @@ export function PatientDetailView() {
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
   const [openVisitId, setOpenVisitId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
   if (!selectedPatientId) {
     return <p className="text-sm text-muted-foreground">Selecciona un paciente.</p>;
@@ -152,6 +154,11 @@ export function PatientDetailView() {
               >
                 <Plus className="w-4 h-4 mr-1.5" />
                 Registrar seguimiento
+              </Button>
+
+              <Button variant="outline" size="sm" onClick={() => setReportDialogOpen(true)}>
+                <FileDown className="w-4 h-4 mr-1.5" />
+                Generar informe
               </Button>
 
               <DropdownMenu>
@@ -385,6 +392,13 @@ export function PatientDetailView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PatientReportDialog
+        open={reportDialogOpen}
+        onOpenChange={setReportDialogOpen}
+        patientId={patient.id}
+        patientName={patient.fullName}
+      />
     </div>
   );
 }
