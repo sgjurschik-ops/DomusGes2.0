@@ -69,7 +69,7 @@ const SECTIONS: { title: string; fields: [string, string][] }[] = [
       ["maritalStatus", "Estado civil"],
       ["partnerInfo", "Nombre y edad / información pareja"],
       ["livingSituation", "Convivencia actual"],
-      ["familyComposition", "Composición familiar"],
+      ["familyCompositionText", "Composición familiar"],
       ["supportNetwork", "Red de apoyo / amistades"],
       ["bestRelationship", "Con quién tiene mejor relación"],
       ["worstRelationship", "Con quién tiene peor relación"],
@@ -80,7 +80,7 @@ const SECTIONS: { title: string; fields: [string, string][] }[] = [
     fields: [
       ["educationLevel", "Estudios realizados"],
       ["otherEducation", "Otros estudios, cursos o talleres"],
-      ["workHistory", "Trabajos realizados"],
+      ["workHistoryText", "Trabajos realizados"],
       ["currentWorkSituation", "Situación laboral actual"],
       ["currentOccupation", "Trabajo u ocupación actual"],
       ["approximateIncome", "Ingresos aproximados"],
@@ -91,7 +91,9 @@ const SECTIONS: { title: string; fields: [string, string][] }[] = [
   {
     title: "Hábitos y rutinas",
     fields: [
-      ["dailyRoutine", "Día normal con horarios aproximados"],
+      ["routineMorning", "Mañana"],
+      ["routineAfternoon", "Tarde"],
+      ["routineEvening", "Noche"],
       ["selfCare", "Autocuidado"],
       ["leisure", "Ocio"],
       ["domesticTasks", "Tareas domésticas"],
@@ -115,9 +117,6 @@ const SECTIONS: { title: string; fields: [string, string][] }[] = [
     title: "Objetivos y planificación",
     fields: [
       ["desiredImprovements", "Qué le gustaría conseguir o mejorar"],
-      ["shortTermGoal1", "Objetivo 1"],
-      ["shortTermGoal2", "Objetivo 2"],
-      ["shortTermGoal3", "Objetivo 3"],
     ],
   },
 ];
@@ -241,6 +240,35 @@ function layoutFields(fields: FieldBlock[]): Table[] {
   return rows;
 }
 
+// familyComposition/workHistory are saved as JSON-encoded arrays of
+// structured rows from the on-screen editor — render each row as a short
+// "label: value, value, value" line for the Word report.
+function formatFamilyComposition(raw: string | null | undefined): string {
+  const rows = safeParseArray<{ name?: string; relationship?: string; occupation?: string; notes?: string }>(raw);
+  if (rows.length === 0) return "";
+  return rows
+    .map((r) => [r.name, r.relationship, r.occupation, r.notes].filter(Boolean).join(" — "))
+    .join("\n");
+}
+
+function formatWorkHistory(raw: string | null | undefined): string {
+  const rows = safeParseArray<{ company?: string; role?: string; year?: string; notes?: string }>(raw);
+  if (rows.length === 0) return "";
+  return rows
+    .map((r) => [r.company, r.role, r.year, r.notes].filter(Boolean).join(" — "))
+    .join("\n");
+}
+
+function safeParseArray<T>(raw: string | null | undefined): T[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id } = await params;
@@ -250,12 +278,21 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   }
 
-  const profile = await db.occupationalProfile.findUnique({ where: { patientId: id } });
+  const profile = await db.occupationalProfile.findUnique({
+    where: { patientId: id },
+    include: { goals: { orderBy: { createdAt: "asc" } } },
+  });
 
   const data: Record<string, any> = { ...(profile ?? {}) };
   // Mirror the boolean -> readable text conversion used on screen.
   data.currentlyDrivesText =
     data.currentlyDrives === true ? "Sí" : data.currentlyDrives === false ? "No" : "";
+
+  // familyComposition/workHistory are stored as JSON-encoded arrays of
+  // structured rows — render each row as one line so the report reads as
+  // a short list, same shape as the editor on screen.
+  data.familyCompositionText = formatFamilyComposition(profile?.familyComposition);
+  data.workHistoryText = formatWorkHistory(profile?.workHistory);
 
   const today = new Date().toLocaleDateString("es-ES", {
     day: "2-digit",
@@ -332,6 +369,64 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     } else {
       bodyBlocks.push(...layoutFields(blocks));
     }
+  }
+
+  // ── Goals table: rendered separately from the section loop above since
+  // each goal has structured fields (area/status/date) that don't fit the
+  // simple label-value fieldBlock pattern ────────────────────────────────
+  const goals: { text: string; area: string; status: string; targetDate: Date | null }[] =
+    profile?.goals ?? [];
+  if (goals.length > 0) {
+    bodyBlocks.push(
+      new Table({
+        width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+        borders: {
+          top: { style: BorderStyle.SINGLE, size: 2, color: BORDER_GRAY },
+          bottom: { style: BorderStyle.SINGLE, size: 2, color: BORDER_GRAY },
+          left: { style: BorderStyle.NONE },
+          right: { style: BorderStyle.NONE },
+          insideHorizontal: { style: BorderStyle.SINGLE, size: 2, color: BORDER_GRAY },
+          insideVertical: { style: BorderStyle.NONE },
+        },
+        rows: [
+          new TableRow({
+            children: ["Objetivo", "Área", "Estado", "Fecha"].map((h) =>
+              new TableCell({
+                width: { size: h === "Objetivo" ? CONTENT_WIDTH * 0.45 : CONTENT_WIDTH * 0.183, type: WidthType.DXA },
+                children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, size: 17, color: LABEL_COLOR })] })],
+              }),
+            ),
+          }),
+          ...goals.map(
+            (g) =>
+              new TableRow({
+                children: [
+                  new Paragraph({ children: [new TextRun({ text: g.text || "—", size: 19 })] }),
+                  new Paragraph({ children: [new TextRun({ text: g.area, size: 19 })] }),
+                  new Paragraph({ children: [new TextRun({ text: g.status, size: 19 })] }),
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: g.targetDate
+                          ? new Date(g.targetDate).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })
+                          : "—",
+                        size: 19,
+                      }),
+                    ],
+                  }),
+                ].map(
+                  (p, idx) =>
+                    new TableCell({
+                      width: { size: idx === 0 ? CONTENT_WIDTH * 0.45 : CONTENT_WIDTH * 0.183, type: WidthType.DXA },
+                      children: [p],
+                    }),
+                ),
+              }),
+          ),
+        ],
+      }),
+      new Paragraph({ spacing: { after: 160 } }),
+    );
   }
 
   // ── Footer: professional, date, signature ─────────────────────────────
