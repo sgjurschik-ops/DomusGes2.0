@@ -193,21 +193,23 @@ model OccupationalProfile {
   otherSocialInfo String?
   livingSituation String?
 
-  familyComposition String? // JSON
+  familyComposition String? // JSON-encoded FamilyMember[]: { name, relationship, occupation, notes }[]
   supportNetwork String? // JSON
   bestRelationship String?
   worstRelationship String?
 
   educationLevel String?
   otherEducation String?
-  workHistory String? // JSON
+  workHistory String? // JSON-encoded WorkHistoryEntry[]: { company, role, year, notes }[]
   currentWorkSituation String?
   currentOccupation String?
   approximateIncome String?
   moneyManager String?
   incomeOrganization String?
 
-  dailyRoutine String?
+  routineMorning String?
+  routineAfternoon String?
+  routineEvening String?
   selfCare String?
   domesticTasks String?
   responsibilities String?
@@ -223,12 +225,25 @@ model OccupationalProfile {
   trainingPast String?
 
   desiredImprovements String?
-  shortTermGoal1 String?
-  shortTermGoal2 String?
-  shortTermGoal3 String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  goals   OccupationalGoal[]
+}
+
+model OccupationalGoal {
+  id                     String   @id @default(cuid())
+  occupationalProfileId  String
+  text                   String
+  area                   String   // "Social-familiar" | "Laboral y económica" | "Hábitos y rutinas" | "Intereses y motivaciones" | "Datos generales"
+  status                 String   @default("En curso") // En curso | Conseguido | Abandonado
+  targetDate             DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  occupationalProfile    OccupationalProfile @relation(fields: [occupationalProfileId], references: [id], onDelete: Cascade)
+
+  @@index([occupationalProfileId])
 }

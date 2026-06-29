@@ -17,6 +17,8 @@ import {
   CalendarClock,
   Heart,
   Target,
+  Plus,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -32,6 +34,55 @@ function countFilled(profile: Profile, fields: string[]) {
     return true; // booleans (e.g. currentlyDrives) count as filled once set
   }).length;
   return { filled, total: fields.length };
+}
+
+// Areas a goal can be linked to — mirrors the profile's own section titles,
+// so "which area does this objective belong to" always matches a real
+// section the person can see, rather than a free-floating list.
+const GOAL_AREAS = [
+  "Datos generales",
+  "Social-familiar",
+  "Laboral y económica",
+  "Hábitos y rutinas",
+  "Intereses y motivaciones",
+] as const;
+type GoalArea = typeof GOAL_AREAS[number];
+const GOAL_STATUSES = ["En curso", "Conseguido", "Abandonado"] as const;
+type GoalStatus = typeof GOAL_STATUSES[number];
+
+interface Goal {
+  id?: string;
+  text: string;
+  area: GoalArea;
+  status: GoalStatus;
+  targetDate: string | null; // yyyy-mm-dd or null
+}
+
+interface FamilyMember {
+  name: string;
+  relationship: string;
+  occupation: string;
+  notes: string;
+}
+
+interface WorkHistoryEntry {
+  company: string;
+  role: string;
+  year: string;
+  notes: string;
+}
+
+// Safely parses a JSON-encoded array field, falling back to [] for blank,
+// null, or pre-existing free-text values that don't parse as JSON (older
+// profiles saved before this structured format existed).
+function parseJsonArray<T>(raw: string | null | undefined): T[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 const emptyProfile: Profile = {
@@ -56,7 +107,9 @@ const emptyProfile: Profile = {
   approximateIncome: "",
   moneyManager: "",
   incomeOrganization: "",
-  dailyRoutine: "",
+  routineMorning: "",
+  routineAfternoon: "",
+  routineEvening: "",
   selfCare: "",
   domesticTasks: "",
   responsibilities: "",
@@ -70,9 +123,7 @@ const emptyProfile: Profile = {
   trainingCurrent: "",
   trainingPast: "",
   desiredImprovements: "",
-  shortTermGoal1: "",
-  shortTermGoal2: "",
-  shortTermGoal3: "",
+  goals: [],
 };
 
 export function OccupationalProfileTab({ patientId }: { patientId: string }) {
@@ -86,7 +137,21 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       setLoading(true);
       const res = await fetch(`/api/patients/${patientId}/occupational-profile`);
       const data = await res.json();
-      setProfile({ ...emptyProfile, ...(data ?? {}) });
+      setProfile({
+        ...emptyProfile,
+        ...(data ?? {}),
+        familyComposition: parseJsonArray<FamilyMember>(data?.familyComposition),
+        workHistory: parseJsonArray<WorkHistoryEntry>(data?.workHistory),
+        goals: Array.isArray(data?.goals)
+          ? data.goals.map((g: any) => ({
+              id: g.id,
+              text: g.text,
+              area: g.area,
+              status: g.status,
+              targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
+            }))
+          : [],
+      });
       setLoading(false);
     }
 
@@ -97,6 +162,17 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
     setProfile((prev) => ({ ...prev, [field]: value }));
   }
 
+  // The form keeps familyComposition/workHistory as in-memory arrays for
+  // easy editing, but the database column is a JSON string — serialize
+  // only at the save boundary, not throughout the component.
+  function buildSavePayload() {
+    return {
+      ...profile,
+      familyComposition: JSON.stringify(profile.familyComposition ?? []),
+      workHistory: JSON.stringify(profile.workHistory ?? []),
+    };
+  }
+
   async function save() {
     setSaving(true);
 
@@ -104,13 +180,27 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       const res = await fetch(`/api/patients/${patientId}/occupational-profile`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profile),
+        body: JSON.stringify(buildSavePayload()),
       });
 
       if (!res.ok) throw new Error("SAVE_ERROR");
 
       const saved = await res.json();
-      setProfile({ ...emptyProfile, ...(saved ?? {}) });
+      setProfile({
+        ...emptyProfile,
+        ...(saved ?? {}),
+        familyComposition: parseJsonArray<FamilyMember>(saved?.familyComposition),
+        workHistory: parseJsonArray<WorkHistoryEntry>(saved?.workHistory),
+        goals: Array.isArray(saved?.goals)
+          ? saved.goals.map((g: any) => ({
+              id: g.id,
+              text: g.text,
+              area: g.area,
+              status: g.status,
+              targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
+            }))
+          : [],
+      });
 
       toast({
         title: "Perfil ocupacional guardado",
@@ -135,11 +225,25 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       const saveRes = await fetch(`/api/patients/${patientId}/occupational-profile`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profile),
+        body: JSON.stringify(buildSavePayload()),
       });
       if (!saveRes.ok) throw new Error("SAVE_ERROR");
       const saved = await saveRes.json();
-      setProfile({ ...emptyProfile, ...(saved ?? {}) });
+      setProfile({
+        ...emptyProfile,
+        ...(saved ?? {}),
+        familyComposition: parseJsonArray<FamilyMember>(saved?.familyComposition),
+        workHistory: parseJsonArray<WorkHistoryEntry>(saved?.workHistory),
+        goals: Array.isArray(saved?.goals)
+          ? saved.goals.map((g: any) => ({
+              id: g.id,
+              text: g.text,
+              area: g.area,
+              status: g.status,
+              targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
+            }))
+          : [],
+      });
 
       const res = await fetch(`/api/patients/${patientId}/occupational-profile/report`);
       if (!res.ok) throw new Error("REPORT_ERROR");
@@ -267,15 +371,10 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
           </Select>
         </Field>
 
-        <Field label="Composición familiar">
-          <Textarea
-            rows={4}
-            placeholder="Ejemplo: Madre — convive — apoyo alto / Hermana — contacto semanal..."
-            value={profile.familyComposition ?? ""}
-            onChange={(e) => update("familyComposition", e.target.value)}
-            className={!profile.familyComposition ? "bg-muted/60" : ""}
-          />
-        </Field>
+        <FamilyMembersEditor
+          value={profile.familyComposition ?? []}
+          onChange={(members) => update("familyComposition", members)}
+        />
 
         <Field label="Red de apoyo / amistades">
           <Textarea
@@ -332,15 +431,10 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
           <Textarea value={profile.otherEducation ?? ""} onChange={(e) => update("otherEducation", e.target.value)} className={!profile.otherEducation ? "bg-muted/60" : ""} />
         </Field>
 
-        <Field label="Trabajos realizados">
-          <Textarea
-            rows={4}
-            placeholder="Trabajo — año — duración..."
-            value={profile.workHistory ?? ""}
-            onChange={(e) => update("workHistory", e.target.value)}
-            className={!profile.workHistory ? "bg-muted/60" : ""}
-          />
-        </Field>
+        <WorkHistoryEditor
+          value={profile.workHistory ?? []}
+          onChange={(entries) => update("workHistory", entries)}
+        />
 
         <Field label="Situación laboral actual">
           <Input value={profile.currentWorkSituation ?? ""} onChange={(e) => update("currentWorkSituation", e.target.value)} className={!profile.currentWorkSituation ? "bg-muted/60" : ""} />
@@ -370,7 +464,9 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         icon={CalendarClock}
         profile={profile}
         fields={[
-          "dailyRoutine",
+          "routineMorning",
+          "routineAfternoon",
+          "routineEvening",
           "selfCare",
           "leisure",
           "domesticTasks",
@@ -379,9 +475,17 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
           "socialParticipation",
         ]}
       >
-        <Field label="Día normal con horarios aproximados">
-          <Textarea rows={5} value={profile.dailyRoutine ?? ""} onChange={(e) => update("dailyRoutine", e.target.value)} className={!profile.dailyRoutine ? "bg-muted/60" : ""} />
-        </Field>
+        <div className="grid sm:grid-cols-3 gap-3">
+          <Field label="Mañana">
+            <Textarea rows={4} value={profile.routineMorning ?? ""} onChange={(e) => update("routineMorning", e.target.value)} className={!profile.routineMorning ? "bg-muted/60" : ""} />
+          </Field>
+          <Field label="Tarde">
+            <Textarea rows={4} value={profile.routineAfternoon ?? ""} onChange={(e) => update("routineAfternoon", e.target.value)} className={!profile.routineAfternoon ? "bg-muted/60" : ""} />
+          </Field>
+          <Field label="Noche">
+            <Textarea rows={4} value={profile.routineEvening ?? ""} onChange={(e) => update("routineEvening", e.target.value)} className={!profile.routineEvening ? "bg-muted/60" : ""} />
+          </Field>
+        </div>
 
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Autocuidado">
@@ -446,23 +550,16 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         description="Objetivos ocupacionales y planificación inicial."
         icon={Target}
         profile={profile}
-        fields={["desiredImprovements", "shortTermGoal1", "shortTermGoal2", "shortTermGoal3"]}
+        fields={["desiredImprovements"]}
       >
         <Field label="Qué le gustaría conseguir o mejorar">
           <Textarea rows={3} value={profile.desiredImprovements ?? ""} onChange={(e) => update("desiredImprovements", e.target.value)} className={!profile.desiredImprovements ? "bg-muted/60" : ""} />
         </Field>
 
-        <div className="grid sm:grid-cols-3 gap-3">
-          <Field label="Objetivo 1">
-            <Textarea value={profile.shortTermGoal1 ?? ""} onChange={(e) => update("shortTermGoal1", e.target.value)} className={!profile.shortTermGoal1 ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Objetivo 2">
-            <Textarea value={profile.shortTermGoal2 ?? ""} onChange={(e) => update("shortTermGoal2", e.target.value)} className={!profile.shortTermGoal2 ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Objetivo 3">
-            <Textarea value={profile.shortTermGoal3 ?? ""} onChange={(e) => update("shortTermGoal3", e.target.value)} className={!profile.shortTermGoal3 ? "bg-muted/60" : ""} />
-          </Field>
-        </div>
+        <GoalsEditor
+          value={profile.goals ?? []}
+          onChange={(goals) => update("goals", goals)}
+        />
       </Section>
 
       <div className="flex justify-end gap-2">
@@ -547,6 +644,178 @@ function Field({
     <div className="space-y-1.5">
       <Label className="text-xs">{label}</Label>
       {children}
+    </div>
+  );
+}
+
+// Repeatable list editor for family members — one row per person, with a
+// free-text "Otros" column for whatever doesn't fit a dedicated field
+// (support level, cohabitation, contact frequency, etc.) instead of
+// modeling every possible attribute as its own column.
+function FamilyMembersEditor({
+  value,
+  onChange,
+}: {
+  value: FamilyMember[];
+  onChange: (members: FamilyMember[]) => void;
+}) {
+  function addRow() {
+    onChange([...value, { name: "", relationship: "", occupation: "", notes: "" }]);
+  }
+  function updateRow(i: number, patch: Partial<FamilyMember>) {
+    onChange(value.map((m, idx) => (idx === i ? { ...m, ...patch } : m)));
+  }
+  function removeRow(i: number) {
+    onChange(value.filter((_, idx) => idx !== i));
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">Composición familiar</Label>
+      {value.length === 0 && (
+        <p className="text-xs text-muted-foreground italic">Sin familiares añadidos.</p>
+      )}
+      <div className="space-y-2">
+        {value.map((member, i) => (
+          <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr_1.4fr_auto] gap-2 items-start">
+            <Input placeholder="Nombre" value={member.name} onChange={(e) => updateRow(i, { name: e.target.value })} />
+            <Input placeholder="Relación (ej. Madre)" value={member.relationship} onChange={(e) => updateRow(i, { relationship: e.target.value })} />
+            <Input placeholder="Ocupación" value={member.occupation} onChange={(e) => updateRow(i, { occupation: e.target.value })} />
+            <Input placeholder="Otros (convivencia, apoyo, contacto...)" value={member.notes} onChange={(e) => updateRow(i, { notes: e.target.value })} />
+            <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => removeRow(i)} aria-label="Quitar familiar">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={addRow}>
+        <Plus className="w-3.5 h-3.5 mr-1.5" /> Añadir familiar
+      </Button>
+    </div>
+  );
+}
+
+// Same repeatable-row pattern for work history.
+function WorkHistoryEditor({
+  value,
+  onChange,
+}: {
+  value: WorkHistoryEntry[];
+  onChange: (entries: WorkHistoryEntry[]) => void;
+}) {
+  function addRow() {
+    onChange([...value, { company: "", role: "", year: "", notes: "" }]);
+  }
+  function updateRow(i: number, patch: Partial<WorkHistoryEntry>) {
+    onChange(value.map((w, idx) => (idx === i ? { ...w, ...patch } : w)));
+  }
+  function removeRow(i: number) {
+    onChange(value.filter((_, idx) => idx !== i));
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">Trabajos realizados</Label>
+      {value.length === 0 && (
+        <p className="text-xs text-muted-foreground italic">Sin trabajos añadidos.</p>
+      )}
+      <div className="space-y-2">
+        {value.map((entry, i) => (
+          <div key={i} className="grid grid-cols-[1.3fr_1.3fr_0.7fr_1.4fr_auto] gap-2 items-start">
+            <Input placeholder="Empresa" value={entry.company} onChange={(e) => updateRow(i, { company: e.target.value })} />
+            <Input placeholder="Funciones" value={entry.role} onChange={(e) => updateRow(i, { role: e.target.value })} />
+            <Input placeholder="Año" value={entry.year} onChange={(e) => updateRow(i, { year: e.target.value })} />
+            <Input placeholder="Otros" value={entry.notes} onChange={(e) => updateRow(i, { notes: e.target.value })} />
+            <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => removeRow(i)} aria-label="Quitar trabajo">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={addRow}>
+        <Plus className="w-3.5 h-3.5 mr-1.5" /> Añadir trabajo
+      </Button>
+    </div>
+  );
+}
+
+// Goals editor: free text + status + optional target date + which profile
+// area it relates to, replacing the old 3 fixed "Objetivo 1/2/3" boxes
+// with an open-ended, trackable list.
+const GOAL_STATUS_STYLES: Record<GoalStatus, string> = {
+  "En curso": "bg-sky-100 text-sky-900 border-sky-200",
+  "Conseguido": "bg-emerald-100 text-emerald-900 border-emerald-200",
+  "Abandonado": "bg-zinc-100 text-zinc-700 border-zinc-200",
+};
+
+function GoalsEditor({
+  value,
+  onChange,
+}: {
+  value: Goal[];
+  onChange: (goals: Goal[]) => void;
+}) {
+  function addRow() {
+    onChange([...value, { text: "", area: "Datos generales", status: "En curso", targetDate: null }]);
+  }
+  function updateRow(i: number, patch: Partial<Goal>) {
+    onChange(value.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
+  }
+  function removeRow(i: number) {
+    onChange(value.filter((_, idx) => idx !== i));
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs">Objetivos</Label>
+      {value.length === 0 && (
+        <p className="text-xs text-muted-foreground italic">Sin objetivos añadidos.</p>
+      )}
+      <div className="space-y-2">
+        {value.map((goal, i) => (
+          <div key={i} className="rounded-md border bg-muted/30 p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <Textarea
+                rows={2}
+                placeholder="Describe el objetivo…"
+                value={goal.text}
+                onChange={(e) => updateRow(i, { text: e.target.value })}
+                className="flex-1"
+              />
+              <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive shrink-0" onClick={() => removeRow(i)} aria-label="Quitar objetivo">
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-2">
+              <Select value={goal.area} onValueChange={(v) => updateRow(i, { area: v as GoalArea })}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {GOAL_AREAS.map((a) => (
+                    <SelectItem key={a} value={a}>{a}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={goal.status} onValueChange={(v) => updateRow(i, { status: v as GoalStatus })}>
+                <SelectTrigger className={`h-8 text-xs ${GOAL_STATUS_STYLES[goal.status]}`}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {GOAL_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="date"
+                className="h-8 text-xs"
+                value={goal.targetDate ?? ""}
+                onChange={(e) => updateRow(i, { targetDate: e.target.value || null })}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={addRow}>
+        <Plus className="w-3.5 h-3.5 mr-1.5" /> Añadir objetivo
+      </Button>
     </div>
   );
 }
