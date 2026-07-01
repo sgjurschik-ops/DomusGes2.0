@@ -207,9 +207,8 @@ model OccupationalProfile {
   moneyManager String?
   incomeOrganization String?
 
-  routineMorning String?
-  routineAfternoon String?
-  routineEvening String?
+  weeklyRoutine String? // JSON-encoded RoutineCell[]: { day, hour, activity, category }[]
+                        // day: 0=Lunes..6=Domingo, hour: 0-23, category: Autocuidado|Productivo|Ocio
   selfCare String?
   domesticTasks String?
   responsibilities String?

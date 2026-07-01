@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
 import {
   Save,
@@ -31,6 +32,7 @@ function countFilled(profile: Profile, fields: string[]) {
     const v = profile[f];
     if (v === undefined || v === null) return false;
     if (typeof v === "string") return v.trim() !== "";
+    if (Array.isArray(v)) return v.length > 0;
     return true; // booleans (e.g. currentlyDrives) count as filled once set
   }).length;
   return { filled, total: fields.length };
@@ -72,6 +74,30 @@ interface WorkHistoryEntry {
   notes: string;
 }
 
+// Weekly occupational-balance grid (168 cells: 7 days × 24 hours, starting
+// at 07:00 like a standard weekly routine sheet). Each cell records a
+// short free-text activity plus a category that colors the cell and
+// drives the autocuidado/productivo/ocio balance report.
+const ROUTINE_CATEGORIES = ["Autocuidado", "Productivo", "Ocio"] as const;
+type RoutineCategory = typeof ROUTINE_CATEGORIES[number];
+const ROUTINE_CATEGORY_COLORS: Record<RoutineCategory, string> = {
+  Autocuidado: "#fde2c8",
+  Productivo: "#bcdcf7",
+  Ocio: "#c9eccb",
+};
+const ROUTINE_DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+// Hours displayed top-to-bottom, starting at 07:00 and wrapping to 06:00
+// the next day — matches how people naturally describe "my day" (wake up
+// to going back to sleep) rather than a literal midnight-to-midnight grid.
+const ROUTINE_HOURS = Array.from({ length: 24 }, (_, i) => (7 + i) % 24);
+
+interface RoutineCell {
+  day: number; // 0=Lunes..6=Domingo
+  hour: number; // 0-23
+  activity: string;
+  category: RoutineCategory | "";
+}
+
 // Safely parses a JSON-encoded array field, falling back to [] for blank,
 // null, or pre-existing free-text values that don't parse as JSON (older
 // profiles saved before this structured format existed).
@@ -107,9 +133,7 @@ const emptyProfile: Profile = {
   approximateIncome: "",
   moneyManager: "",
   incomeOrganization: "",
-  routineMorning: "",
-  routineAfternoon: "",
-  routineEvening: "",
+  weeklyRoutine: [] as RoutineCell[],
   selfCare: "",
   domesticTasks: "",
   responsibilities: "",
@@ -142,6 +166,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         ...(data ?? {}),
         familyComposition: parseJsonArray<FamilyMember>(data?.familyComposition),
         workHistory: parseJsonArray<WorkHistoryEntry>(data?.workHistory),
+        weeklyRoutine: parseJsonArray<RoutineCell>(data?.weeklyRoutine),
         goals: Array.isArray(data?.goals)
           ? data.goals.map((g: any) => ({
               id: g.id,
@@ -170,6 +195,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       ...profile,
       familyComposition: JSON.stringify(profile.familyComposition ?? []),
       workHistory: JSON.stringify(profile.workHistory ?? []),
+      weeklyRoutine: JSON.stringify(profile.weeklyRoutine ?? []),
     };
   }
 
@@ -191,6 +217,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         ...(saved ?? {}),
         familyComposition: parseJsonArray<FamilyMember>(saved?.familyComposition),
         workHistory: parseJsonArray<WorkHistoryEntry>(saved?.workHistory),
+        weeklyRoutine: parseJsonArray<RoutineCell>(saved?.weeklyRoutine),
         goals: Array.isArray(saved?.goals)
           ? saved.goals.map((g: any) => ({
               id: g.id,
@@ -234,6 +261,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         ...(saved ?? {}),
         familyComposition: parseJsonArray<FamilyMember>(saved?.familyComposition),
         workHistory: parseJsonArray<WorkHistoryEntry>(saved?.workHistory),
+        weeklyRoutine: parseJsonArray<RoutineCell>(saved?.weeklyRoutine),
         goals: Array.isArray(saved?.goals)
           ? saved.goals.map((g: any) => ({
               id: g.id,
@@ -464,9 +492,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         icon={CalendarClock}
         profile={profile}
         fields={[
-          "routineMorning",
-          "routineAfternoon",
-          "routineEvening",
+          "weeklyRoutine",
           "selfCare",
           "leisure",
           "domesticTasks",
@@ -475,17 +501,10 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
           "socialParticipation",
         ]}
       >
-        <div className="grid sm:grid-cols-3 gap-3">
-          <Field label="Mañana">
-            <Textarea rows={4} value={profile.routineMorning ?? ""} onChange={(e) => update("routineMorning", e.target.value)} className={!profile.routineMorning ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Tarde">
-            <Textarea rows={4} value={profile.routineAfternoon ?? ""} onChange={(e) => update("routineAfternoon", e.target.value)} className={!profile.routineAfternoon ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Noche">
-            <Textarea rows={4} value={profile.routineEvening ?? ""} onChange={(e) => update("routineEvening", e.target.value)} className={!profile.routineEvening ? "bg-muted/60" : ""} />
-          </Field>
-        </div>
+        <WeeklyRoutineEditor
+          value={profile.weeklyRoutine ?? []}
+          onChange={(cells) => update("weeklyRoutine", cells)}
+        />
 
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Autocuidado">
@@ -816,6 +835,413 @@ function GoalsEditor({
       <Button type="button" variant="outline" size="sm" onClick={addRow}>
         <Plus className="w-3.5 h-3.5 mr-1.5" /> Añadir objetivo
       </Button>
+    </div>
+  );
+}
+
+// Weekly occupational-balance grid: 7 days × 24 hours (168 cells). Each
+// cell is a small colored square; clicking it opens a popover to set the
+// activity text and category, rather than showing an inline input+select
+// in every cell, which would be unusable at this density. Two shortcuts
+// make filling 168 cells practical: copying an entire day-column to the
+// weekday columns, and copying a single cell to other days at the same
+// hour.
+function WeeklyRoutineEditor({
+  value,
+  onChange,
+}: {
+  value: RoutineCell[];
+  onChange: (cells: RoutineCell[]) => void;
+}) {
+  const [openCell, setOpenCell] = useState<{ day: number; hour: number } | null>(null);
+  const [copySourceDay, setCopySourceDay] = useState<number | null>(null);
+  const [copyTargetDays, setCopyTargetDays] = useState<Set<number>>(new Set());
+
+  // Click-and-drag range selection: mousedown on a cell starts a drag,
+  // mouseenter on cells in the *same column* while dragging extends the
+  // selection, mouseup opens a single popover to fill the whole range at
+  // once. A plain click without dragging still edits just one cell,
+  // handled by the existing per-cell Popover further down.
+  const [dragDay, setDragDay] = useState<number | null>(null);
+  const [dragStartHour, setDragStartHour] = useState<number | null>(null);
+  const [dragEndHour, setDragEndHour] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [rangeDraft, setRangeDraft] = useState<{ activity: string; category: RoutineCategory | "" }>({
+    activity: "",
+    category: "",
+  });
+
+  const selection = dragDay !== null && dragStartHour !== null && dragEndHour !== null
+    ? { day: dragDay, from: Math.min(dragStartHour, dragEndHour), to: Math.max(dragStartHour, dragEndHour) }
+    : null;
+  // The fill panel only shows for a genuine multi-cell drag, once the
+  // mouse button has been released — while still dragging, the cells
+  // just highlight without opening anything yet.
+  const rangeReady = !isDragging && selection !== null && selection.from !== selection.to;
+
+  function cellAt(day: number, hour: number): RoutineCell | undefined {
+    return value.find((c) => c.day === day && c.hour === hour);
+  }
+
+  function isCellSelected(day: number, hour: number): boolean {
+    if (!selection) return false;
+    return day === selection.day && hour >= selection.from && hour <= selection.to;
+  }
+
+  function startDrag(day: number, hour: number) {
+    setOpenCell(null);
+    setDragDay(day);
+    setDragStartHour(hour);
+    setDragEndHour(hour);
+    setIsDragging(true);
+  }
+
+  function extendDrag(day: number, hour: number) {
+    if (!isDragging || day !== dragDay) return;
+    setDragEndHour(hour);
+  }
+
+  function endDrag() {
+    if (!isDragging) return;
+    setIsDragging(false);
+    // A "drag" that never left its starting cell is just a click — clear
+    // the range so the normal single-cell popover handles it instead.
+    if (dragStartHour === dragEndHour) {
+      setDragDay(null);
+      setDragStartHour(null);
+      setDragEndHour(null);
+      return;
+    }
+    setRangeDraft({ activity: "", category: "" });
+  }
+
+  function clearSelection() {
+    setDragDay(null);
+    setDragStartHour(null);
+    setDragEndHour(null);
+  }
+
+  function moveCell(fromDay: number, fromHour: number, toDay: number, toHour: number) {
+    const source = cellAt(fromDay, fromHour);
+    if (!source) return;
+    const dest = cellAt(toDay, toHour);
+    if (dest && (dest.activity || dest.category)) {
+      const ok = confirm(
+        `La celda de destino (${ROUTINE_DAYS[toDay]} ${String(toHour).padStart(2, "0")}:00) ya tiene "${dest.activity || dest.category}". ¿Sobrescribirla?`,
+      );
+      if (!ok) return;
+    }
+    const withoutBoth = value.filter(
+      (c) => !(c.day === fromDay && c.hour === fromHour) && !(c.day === toDay && c.hour === toHour),
+    );
+    onChange([...withoutBoth, { ...source, day: toDay, hour: toHour }]);
+  }
+
+  function applyRange() {
+    if (!selection) return;
+    const text = rangeDraft.activity.trim();
+    if (!text && !rangeDraft.category) {
+      clearSelection();
+      return;
+    }
+    const hours: number[] = [];
+    for (let h = selection.from; h <= selection.to; h++) hours.push(h);
+    const withoutRange = value.filter((c) => !(c.day === selection.day && hours.includes(c.hour)));
+    const filled = hours.map((h) => ({
+      day: selection.day,
+      hour: h,
+      activity: text,
+      category: rangeDraft.category,
+    }));
+    onChange([...withoutRange, ...filled]);
+    clearSelection();
+  }
+
+  useEffect(() => {
+    if (!isDragging) return;
+    function onUp() {
+      endDrag();
+    }
+    document.addEventListener("mouseup", onUp);
+    return () => document.removeEventListener("mouseup", onUp);
+  }, [isDragging, dragStartHour, dragEndHour]);
+
+  function setCell(day: number, hour: number, patch: Partial<RoutineCell>) {
+    const existing = cellAt(day, hour);
+    const next: RoutineCell = {
+      day,
+      hour,
+      activity: existing?.activity ?? "",
+      category: existing?.category ?? "",
+      ...patch,
+    };
+    const withoutThis = value.filter((c) => !(c.day === day && c.hour === hour));
+    // Drop fully-empty cells instead of storing them, so saved JSON stays
+    // proportional to how much of the routine was actually described.
+    if (!next.activity.trim() && !next.category) {
+      onChange(withoutThis);
+    } else {
+      onChange([...withoutThis, next]);
+    }
+  }
+
+  function copyColumnToWeekdays(sourceDay: number) {
+    const sourceCells = value.filter((c) => c.day === sourceDay);
+    const weekdays = [1, 2, 3, 4]; // Tue–Fri, relative to a Monday source
+    const withoutWeekdays = value.filter((c) => !weekdays.includes(c.day));
+    const copied = weekdays.flatMap((targetDay) =>
+      sourceCells.map((c) => ({ ...c, day: targetDay })),
+    );
+    onChange([...withoutWeekdays, ...copied]);
+    toast({ title: "Día copiado a martes–viernes" });
+  }
+
+  function copyCellToDays(sourceDay: number, hour: number, targetDays: number[]) {
+    const source = cellAt(sourceDay, hour);
+    if (!source) return;
+    const withoutTargets = value.filter((c) => !(targetDays.includes(c.day) && c.hour === hour));
+    const copied = targetDays.map((d) => ({ ...source, day: d }));
+    onChange([...withoutTargets, ...copied]);
+    setCopySourceDay(null);
+    setCopyTargetDays(new Set());
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs">Rutina semanal (equilibrio ocupacional)</Label>
+      <p className="text-xs text-muted-foreground">
+        Haz clic en una celda para editarla, o arrastra sobre varias horas seguidas del mismo día para rellenarlas todas a la vez.
+      </p>
+
+      <div className="overflow-x-auto rounded-md border">
+        <table className="border-collapse text-[11px] w-full">
+          <thead>
+            <tr>
+              <th className="sticky left-0 bg-card border-b border-r p-1 w-12 text-muted-foreground font-normal"></th>
+              {ROUTINE_DAYS.map((dayName, day) => (
+                <th key={day} className="border-b p-1 min-w-[88px] font-medium">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span>{dayName.slice(0, 3)}</span>
+                    {day === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => copyColumnToWeekdays(0)}
+                        className="text-[9px] text-muted-foreground underline decoration-dotted hover:text-foreground"
+                        title="Copiar Lunes a Martes–Viernes"
+                      >
+                        copiar a Mar–Vie
+                      </button>
+                    )}
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {ROUTINE_HOURS.map((hour) => (
+              <tr key={hour}>
+                <td className="sticky left-0 bg-card border-r p-1 text-right text-muted-foreground whitespace-nowrap">
+                  {String(hour).padStart(2, "0")}:00
+                </td>
+                {ROUTINE_DAYS.map((_, day) => {
+                  const cell = cellAt(day, hour);
+                  const bg = cell?.category ? ROUTINE_CATEGORY_COLORS[cell.category] : undefined;
+                  const isOpen = openCell?.day === day && openCell?.hour === hour;
+                  const selected = isCellSelected(day, hour);
+                  // The range-fill popover anchors to the last cell of the
+                  // drag so it appears floating next to the selection, not
+                  // as a fixed block below the table.
+                  const isRangeAnchor = rangeReady && selection &&
+                    day === selection.day && hour === selection.to;
+                  return (
+                    <td key={day} className="border-t p-0.5 align-top relative">
+                      <Popover
+                        open={isOpen && !isDragging && !rangeReady}
+                        onOpenChange={(o) => setOpenCell(o ? { day, hour } : null)}
+                      >
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            draggable={!!(cell?.activity || cell?.category)}
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("text/plain", JSON.stringify({ day, hour }));
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              const raw = e.dataTransfer.getData("text/plain");
+                              if (!raw) return;
+                              const source = JSON.parse(raw) as { day: number; hour: number };
+                              if (source.day === day && source.hour === hour) return;
+                              moveCell(source.day, source.hour, day, hour);
+                            }}
+                            onMouseDown={(e) => {
+                              // Filled cells are draggable (to move them) —
+                              // letting the native HTML5 drag start cleanly
+                              // means NOT calling preventDefault or starting
+                              // a range-selection drag here. Only empty
+                              // cells use the mouse-based range selection.
+                              if (cell?.activity || cell?.category) return;
+                              e.preventDefault();
+                              startDrag(day, hour);
+                            }}
+                            onMouseEnter={() => extendDrag(day, hour)}
+                            onClick={() => {
+                              // A genuine click (no drag) still opens the
+                              // single-cell popover via Radix's own trigger
+                              // handling; nothing extra needed here.
+                            }}
+                            className={`w-full h-7 rounded-sm border text-left px-1 truncate select-none ${
+                              selected ? "border-foreground ring-1 ring-foreground/40" : "border-transparent hover:border-border"
+                            } ${cell?.activity || cell?.category ? "cursor-grab active:cursor-grabbing" : ""}`}
+                            style={{ backgroundColor: bg }}
+                            title={cell?.activity || undefined}
+                          >
+                            {cell?.activity || ""}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 space-y-2.5" side="right" align="start">
+                          <p className="text-xs font-medium">
+                            {ROUTINE_DAYS[day]} · {String(hour).padStart(2, "0")}:00
+                          </p>
+                          <Input
+                            placeholder="Actividad (ej. Desayuno, Trabajo…)"
+                            value={cell?.activity ?? ""}
+                            onChange={(e) => setCell(day, hour, { activity: e.target.value })}
+                            className="h-8 text-xs"
+                            autoFocus
+                          />
+                          <div className="flex gap-1.5">
+                            {ROUTINE_CATEGORIES.map((cat) => (
+                              <button
+                                key={cat}
+                                type="button"
+                                onClick={() => setCell(day, hour, { category: cat })}
+                                className={`flex-1 h-7 rounded-md text-[10px] border-2 transition-all ${
+                                  cell?.category === cat ? "border-foreground/50" : "border-transparent"
+                                }`}
+                                style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }}
+                              >
+                                {cat}
+                              </button>
+                            ))}
+                          </div>
+                          {cell && (cell.activity || cell.category) && (
+                            <div className="flex items-center justify-between pt-1 border-t">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCopySourceDay(day);
+                                  setCopyTargetDays(new Set());
+                                }}
+                                className="text-[11px] text-muted-foreground hover:text-foreground underline decoration-dotted"
+                              >
+                                Copiar esta hora a otros días…
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCell(day, hour, { activity: "", category: "" })}
+                                className="text-[11px] text-destructive hover:underline"
+                              >
+                                Vaciar
+                              </button>
+                            </div>
+                          )}
+                          {copySourceDay === day && (
+                            <div className="space-y-1.5 pt-1">
+                              <div className="flex flex-wrap gap-1">
+                                {ROUTINE_DAYS.map((dayName, d) =>
+                                  d === day ? null : (
+                                    <label key={d} className="flex items-center gap-1 text-[10px]">
+                                      <input
+                                        type="checkbox"
+                                        checked={copyTargetDays.has(d)}
+                                        onChange={(e) => {
+                                          const next = new Set(copyTargetDays);
+                                          if (e.target.checked) next.add(d);
+                                          else next.delete(d);
+                                          setCopyTargetDays(next);
+                                        }}
+                                      />
+                                      {dayName.slice(0, 3)}
+                                    </label>
+                                  ),
+                                )}
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-6 text-[11px] w-full"
+                                disabled={copyTargetDays.size === 0}
+                                onClick={() => copyCellToDays(day, hour, Array.from(copyTargetDays))}
+                              >
+                                Copiar
+                              </Button>
+                            </div>
+                          )}
+                        </PopoverContent>
+                      </Popover>
+
+                      {isRangeAnchor && selection && (
+                        <Popover open onOpenChange={(o) => { if (!o) clearSelection(); }}>
+                          <PopoverTrigger asChild>
+                            <span className="absolute inset-0 pointer-events-none" />
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64 space-y-2.5" side="right" align="start">
+                            <p className="text-xs font-medium">
+                              {ROUTINE_DAYS[selection.day]} · {String(selection.from).padStart(2, "0")}:00 – {String(selection.to).padStart(2, "0")}:00 ({selection.to - selection.from + 1} h)
+                            </p>
+                            <Input
+                              placeholder="Actividad (ej. Trabajo, Estudio…)"
+                              value={rangeDraft.activity}
+                              onChange={(e) => setRangeDraft((d) => ({ ...d, activity: e.target.value }))}
+                              className="h-8 text-xs"
+                              autoFocus
+                              onKeyDown={(e) => { if (e.key === "Enter") applyRange(); }}
+                            />
+                            <div className="flex gap-1.5">
+                              {ROUTINE_CATEGORIES.map((cat) => (
+                                <button
+                                  key={cat}
+                                  type="button"
+                                  onClick={() => setRangeDraft((d) => ({ ...d, category: cat }))}
+                                  className={`flex-1 h-7 rounded-md text-[10px] border-2 transition-all ${
+                                    rangeDraft.category === cat ? "border-foreground/50" : "border-transparent"
+                                  }`}
+                                  style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }}
+                                >
+                                  {cat}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex justify-end gap-2">
+                              <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={clearSelection}>
+                                Cancelar
+                              </Button>
+                              <Button type="button" size="sm" className="h-7 text-xs" onClick={applyRange}>
+                                Aplicar a {selection.to - selection.from + 1} h
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+        {ROUTINE_CATEGORIES.map((cat) => (
+          <span key={cat} className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }} />
+            {cat}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

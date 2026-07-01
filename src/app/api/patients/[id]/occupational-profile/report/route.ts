@@ -91,9 +91,6 @@ const SECTIONS: { title: string; fields: [string, string][] }[] = [
   {
     title: "Hábitos y rutinas",
     fields: [
-      ["routineMorning", "Mañana"],
-      ["routineAfternoon", "Tarde"],
-      ["routineEvening", "Noche"],
       ["selfCare", "Autocuidado"],
       ["leisure", "Ocio"],
       ["domesticTasks", "Tareas domésticas"],
@@ -269,6 +266,70 @@ function safeParseArray<T>(raw: string | null | undefined): T[] {
   }
 }
 
+const ROUTINE_CATEGORIES = ["Autocuidado", "Productivo", "Ocio"] as const;
+const ROUTINE_CATEGORY_COLORS_HEX: Record<string, string> = {
+  Autocuidado: "FDE2C8",
+  Productivo: "BCDCF7",
+  Ocio: "C9ECCB",
+};
+
+// Summarizes the weekly occupational-balance grid as a small "hours and
+// percentage per category" table — the same calculation the dedicated
+// chart report (a separate feature) will reuse, kept here so the Word
+// document is self-contained without depending on that endpoint.
+function buildRoutineSummaryBlocks(raw: string | null | undefined, contentWidth: number): (Paragraph | Table)[] {
+  const cells = safeParseArray<{ day: number; hour: number; activity: string; category: string }>(raw);
+  const filled = cells.filter((c) => c.category);
+  if (filled.length === 0) return [];
+
+  const counts: Record<string, number> = { Autocuidado: 0, Productivo: 0, Ocio: 0 };
+  for (const c of filled) {
+    if (counts[c.category] !== undefined) counts[c.category] += 1;
+  }
+  const totalHours = filled.length; // one cell = one hour
+  if (totalHours === 0) return [];
+
+  return [
+    new Paragraph({
+      spacing: { before: 120, after: 80 },
+      children: [new TextRun({ text: "Equilibrio ocupacional (horas registradas por categoría)", bold: true, size: 19 })],
+    }),
+    new Table({
+      width: { size: contentWidth * 0.7, type: WidthType.DXA },
+      borders: {
+        top: { style: BorderStyle.SINGLE, size: 2, color: "D9D9D9" },
+        bottom: { style: BorderStyle.SINGLE, size: 2, color: "D9D9D9" },
+        left: { style: BorderStyle.NONE },
+        right: { style: BorderStyle.NONE },
+        insideHorizontal: { style: BorderStyle.SINGLE, size: 2, color: "D9D9D9" },
+        insideVertical: { style: BorderStyle.NONE },
+      },
+      rows: ROUTINE_CATEGORIES.map((cat) => {
+        const hours = counts[cat];
+        const pct = ((hours / totalHours) * 100).toFixed(1);
+        return new TableRow({
+          children: [
+            new TableCell({
+              width: { size: contentWidth * 0.7 * 0.5, type: WidthType.DXA },
+              shading: { fill: ROUTINE_CATEGORY_COLORS_HEX[cat] },
+              children: [new Paragraph({ children: [new TextRun({ text: cat, size: 19 })] })],
+            }),
+            new TableCell({
+              width: { size: contentWidth * 0.7 * 0.25, type: WidthType.DXA },
+              children: [new Paragraph({ children: [new TextRun({ text: `${hours} h`, size: 19 })] })],
+            }),
+            new TableCell({
+              width: { size: contentWidth * 0.7 * 0.25, type: WidthType.DXA },
+              children: [new Paragraph({ children: [new TextRun({ text: `${pct}%`, size: 19 })] })],
+            }),
+          ],
+        });
+      }),
+    }),
+    new Paragraph({ spacing: { after: 160 } }),
+  ];
+}
+
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id } = await params;
@@ -368,6 +429,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       );
     } else {
       bodyBlocks.push(...layoutFields(blocks));
+    }
+
+    if (section.title === "Hábitos y rutinas") {
+      bodyBlocks.push(...buildRoutineSummaryBlocks(profile?.weeklyRoutine, CONTENT_WIDTH));
     }
   }
 
