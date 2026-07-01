@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { PieChart, Pie, Cell, Tooltip } from "recharts";
 import { toast } from "@/hooks/use-toast";
 import {
   Save,
@@ -846,6 +847,100 @@ function GoalsEditor({
 // make filling 168 cells practical: copying an entire day-column to the
 // weekday columns, and copying a single cell to other days at the same
 // hour.
+// ─── Occupational balance chart ──────────────────────────────────────────────
+// Calculates hours and % per category from the weekly routine grid and
+// renders a donut chart + summary table, matching the clinical "equilibrio
+// ocupacional" analysis tool the therapist uses.
+
+const BALANCE_COLORS: Record<RoutineCategory, string> = {
+  Autocuidado: "#f6a96a",
+  Productivo: "#5a9fd4",
+  Ocio: "#6dbb74",
+};
+
+function OccupationalBalanceChart({ cells }: { cells: RoutineCell[] }) {
+  const filled = cells.filter((c) => c.category);
+  const totalHours = filled.length;
+
+  const counts = ROUTINE_CATEGORIES.reduce<Record<string, number>>((acc, cat) => {
+    acc[cat] = filled.filter((c) => c.category === cat).length;
+    return acc;
+  }, {});
+
+  if (totalHours === 0) {
+    return (
+      <p className="text-xs text-muted-foreground italic">
+        Rellena celdas de la rejilla para ver el análisis de equilibrio ocupacional.
+      </p>
+    );
+  }
+
+  const data = ROUTINE_CATEGORIES.map((cat) => ({
+    name: cat,
+    hours: counts[cat],
+    pct: totalHours > 0 ? ((counts[cat] / totalHours) * 100).toFixed(1) : "0.0",
+    fill: BALANCE_COLORS[cat],
+  }));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row items-center gap-6">
+        <PieChart width={180} height={180}>
+          <Pie
+            data={data}
+            cx={85}
+            cy={85}
+            innerRadius={50}
+            outerRadius={80}
+            dataKey="hours"
+            strokeWidth={2}
+          >
+            {data.map((entry) => (
+              <Cell key={entry.name} fill={entry.fill} />
+            ))}
+          </Pie>
+          <Tooltip
+            formatter={(value: number, name: string) => [
+              `${value} h (${data.find((d) => d.name === name)?.pct}%)`,
+              name,
+            ]}
+          />
+        </PieChart>
+
+        <table className="text-sm w-full max-w-xs">
+          <thead>
+            <tr className="text-xs text-muted-foreground border-b">
+              <th className="text-left pb-1.5 font-medium">Categoría</th>
+              <th className="text-right pb-1.5 font-medium">Horas</th>
+              <th className="text-right pb-1.5 font-medium">%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row) => (
+              <tr key={row.name} className="border-b last:border-0">
+                <td className="py-1.5 flex items-center gap-2">
+                  <span
+                    className="w-3 h-3 rounded-sm inline-block shrink-0"
+                    style={{ backgroundColor: row.fill }}
+                  />
+                  {row.name}
+                </td>
+                <td className="py-1.5 text-right tabular-nums">{row.hours}</td>
+                <td className="py-1.5 text-right tabular-nums text-muted-foreground">{row.pct}%</td>
+              </tr>
+            ))}
+            <tr className="font-medium">
+              <td className="pt-2">Total registrado</td>
+              <td className="pt-2 text-right tabular-nums">{totalHours}</td>
+              <td className="pt-2 text-right tabular-nums text-muted-foreground">100%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function WeeklyRoutineEditor({
   value,
   onChange,
@@ -1241,6 +1336,11 @@ function WeeklyRoutineEditor({
             {cat}
           </span>
         ))}
+      </div>
+
+      <div className="border-t pt-4 space-y-2">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Equilibrio ocupacional</p>
+        <OccupationalBalanceChart cells={value} />
       </div>
     </div>
   );
