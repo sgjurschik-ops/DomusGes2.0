@@ -454,6 +454,57 @@ export function useDeletePatient() {
     },
   });
 }
+
+// ─── Weekly routine records ───────────────────────────────────────────────────
+
+export interface RoutineRecordSummary {
+  id: string;
+  date: string; // yyyy-mm-dd
+  notes: string | null;
+  createdAt: string;
+}
+
+export function useRoutineRecords(patientId: string) {
+  return useQuery<RoutineRecordSummary[]>({
+    queryKey: ["routine-records", patientId],
+    queryFn: () => fetcher(`/api/patients/${patientId}/routine-records`),
+    enabled: !!patientId,
+  });
+}
+
+export function useRoutineRecord(patientId: string, recordId: string | null) {
+  return useQuery<{ id: string; date: string; cells: string; notes: string | null }>({
+    queryKey: ["routine-record", patientId, recordId],
+    queryFn: () => fetcher(`/api/patients/${patientId}/routine-records/${recordId}`),
+    enabled: !!patientId && !!recordId,
+  });
+}
+
+export function useSaveRoutineRecord(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { date: string; cells: string; notes?: string }) =>
+      fetcher(`/api/patients/${patientId}/routine-records`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["routine-records", patientId] });
+    },
+  });
+}
+
+export function useDeleteRoutineRecord(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (recordId: string) =>
+      fetcher(`/api/patients/${patientId}/routine-records/${recordId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["routine-records", patientId] });
+    },
+  });
+}
+
 // ─── Audit log (admin) ───────────────────────────────────────────────────────
 
 export function useAuditLog(limit = 100) {

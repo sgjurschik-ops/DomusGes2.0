@@ -207,7 +207,7 @@ model OccupationalProfile {
   moneyManager String?
   incomeOrganization String?
 
-  weeklyRoutine String? // JSON-encoded RoutineCell[]: { day, hour, activity, category }[]
+  weeklyRoutine String? // Legacy field — superseded by WeeklyRoutineRecord.
                         // day: 0=Lunes..6=Domingo, hour: 0-23, category: Autocuidado|Productivo|Ocio
   selfCare String?
   domesticTasks String?
@@ -230,6 +230,25 @@ model OccupationalProfile {
 
   patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
   goals   OccupationalGoal[]
+  routineRecords WeeklyRoutineRecord[]
+}
+
+// One record per date per patient. Stores a 336-slot grid (7 days × 48
+// half-hour slots) as JSON. Multiple records allow tracking occupational
+// balance evolution over time.
+model WeeklyRoutineRecord {
+  id                    String   @id @default(cuid())
+  occupationalProfileId String
+  date                  DateTime // The exact date this snapshot was taken
+  cells                 String   // JSON-encoded RoutineCell[]
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  occupationalProfile   OccupationalProfile @relation(fields: [occupationalProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([occupationalProfileId, date])
+  @@index([occupationalProfileId])
 }
 
 model OccupationalGoal {
