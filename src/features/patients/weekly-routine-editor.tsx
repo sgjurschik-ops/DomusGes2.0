@@ -456,7 +456,8 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
 
   // ─── Context menu actions ─────────────────────────────────────────────────────
   function deleteSelected() {
-    const keys = new Set(selectedCells.map((s) => `${s.day}-${s.halfHour}`));
+    if (!contextMenu) return;
+    const keys = new Set(contextMenu.selectedCells.map((s) => `${s.day}-${s.halfHour}`));
     setCells(cells.filter((c) => !keys.has(`${c.day}-${c.halfHour}`)));
     setIsDirty(true);
     clearSelection();
@@ -464,7 +465,8 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   }
 
   function changeSelectedCategory(cat: RoutineCategory) {
-    const keys = new Set(selectedCells.map((s) => `${s.day}-${s.halfHour}`));
+    if (!contextMenu) return;
+    const keys = new Set(contextMenu.selectedCells.map((s) => `${s.day}-${s.halfHour}`));
     const autoGroup = OTPF_TO_GROUP[cat] ?? "";
     setCells(cells.map((c) => keys.has(`${c.day}-${c.halfHour}`) ? { ...c, category: cat, group: autoGroup } : c));
     setIsDirty(true);
@@ -508,7 +510,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col" onClick={() => { setContextMenu(null); setChangeCatOpen(false); }}>
+    <div className="fixed inset-0 z-50 bg-background flex flex-col" onClick={(e) => { if (e.button === 0) { setContextMenu(null); setChangeCatOpen(false); } }}>
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b shrink-0">
         <div className="flex items-center gap-3">
@@ -636,21 +638,29 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                 }
                               }}
                               onMouseDown={(e) => {
-                                // Always allow range-select by mouse drag (even on filled cells)
+                                // Right-click: never reset selection
                                 if (e.button !== 0) return;
+                                // Left-click: if context menu is open, close it without resetting selection
+                                if (contextMenu) { setContextMenu(null); setChangeCatOpen(false); return; }
                                 e.preventDefault();
                                 setOpenCell(null);
-                                setContextMenu(null);
                                 setDragDay(day); setDragStart(slot); setDragEnd(slot); setIsDragging(true);
                               }}
                               onMouseEnter={() => { if (!isDragging || day !== dragDay) return; setDragEnd(slot); }}
                               onContextMenu={(e) => {
-                                // Right-click: show context menu if this cell is in a selection
                                 e.preventDefault();
-                                if (selected && selectedCells.length > 1) {
-                                  setContextMenu({ x: e.clientX, y: e.clientY, selectedCells });
+                                e.stopPropagation();
+                                // Capture current selection at the moment of right-click
+                                const currentSelection = selection
+                                  ? Array.from({ length: selection.to - selection.from + 1 }, (_, i) => ({
+                                      day: selection.day, halfHour: selection.from + i,
+                                    }))
+                                  : [];
+                                if (selected && currentSelection.length > 1) {
+                                  // Right-click within an existing multi-selection: show menu for the whole selection
+                                  setContextMenu({ x: e.clientX, y: e.clientY, selectedCells: currentSelection });
                                 } else if (hasContent) {
-                                  // Right-click on single filled cell: select it and show menu
+                                  // Right-click on single filled cell: show menu for just this cell
                                   setDragDay(day); setDragStart(slot); setDragEnd(slot);
                                   setContextMenu({ x: e.clientX, y: e.clientY, selectedCells: [{ day, halfHour: slot }] });
                                 }
