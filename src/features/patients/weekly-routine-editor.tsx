@@ -339,7 +339,6 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
 
   // ─── Context menu state ───────────────────────────────────────────────────────
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [changeCatOpen, setChangeCatOpen] = useState(false);
 
   const selection = dragDay !== null && dragStart !== null && dragEnd !== null
     ? { day: dragDay, from: Math.min(dragStart, dragEnd), to: Math.max(dragStart, dragEnd) }
@@ -366,7 +365,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   // Close context menu on click outside
   useEffect(() => {
     if (!contextMenu) return;
-    function onDown() { setContextMenu(null); setChangeCatOpen(false); }
+    function onDown() { setContextMenu(null); }
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [contextMenu]);
@@ -471,7 +470,6 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
     setCells(cells.map((c) => keys.has(`${c.day}-${c.halfHour}`) ? { ...c, category: cat, group: autoGroup } : c));
     setIsDirty(true);
     setContextMenu(null);
-    setChangeCatOpen(false);
   }
 
   function copyDayToWeekdays(sourceDay: number) {
@@ -510,7 +508,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col" onClick={(e) => { if (e.button === 0) { setContextMenu(null); setChangeCatOpen(false); } }}>
+    <div className="fixed inset-0 z-50 bg-background flex flex-col" onClick={(e) => { if (e.button === 0) { setContextMenu(null); } }}>
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b shrink-0">
         <div className="flex items-center gap-3">
@@ -641,7 +639,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                 // Right-click: never reset selection
                                 if (e.button !== 0) return;
                                 // Left-click: if context menu is open, close it without resetting selection
-                                if (contextMenu) { setContextMenu(null); setChangeCatOpen(false); return; }
+                                if (contextMenu) { setContextMenu(null); return; }
                                 e.preventDefault();
                                 setOpenCell(null);
                                 setDragDay(day); setDragStart(slot); setDragEnd(slot); setIsDragging(true);
@@ -773,44 +771,43 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
       {/* Context menu */}
       {contextMenu && (
         <div
-          className="fixed z-[60] bg-popover border rounded-md shadow-md py-1 min-w-[180px]"
+          className="fixed z-[60] bg-popover border rounded-md shadow-lg py-1 min-w-[200px] text-sm"
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
         >
-          <p className="px-3 py-1.5 text-xs text-muted-foreground border-b">
+          <p className="px-3 py-1.5 text-xs text-muted-foreground border-b mb-1">
             {contextMenu.selectedCells.length} celda{contextMenu.selectedCells.length !== 1 ? "s" : ""} seleccionada{contextMenu.selectedCells.length !== 1 ? "s" : ""}
           </p>
 
-          {/* Change category submenu */}
-          <div className="relative">
-            <button
-              type="button"
-              className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex items-center justify-between"
-              onClick={(e) => { e.stopPropagation(); setChangeCatOpen((v) => !v); }}
-            >
-              Cambiar categoría…
-              <span className="text-muted-foreground">▶</span>
-            </button>
-            {changeCatOpen && (
-              <div className="absolute left-full top-0 bg-popover border rounded-md shadow-md py-1 min-w-[220px] z-[70]"
-                onMouseDown={(e) => e.stopPropagation()}>
-                {ROUTINE_CATEGORIES.map((cat) => (
-                  <button key={cat} type="button"
-                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex items-center gap-2"
-                    onClick={() => changeSelectedCategory(cat)}>
-                    <span className="w-3 h-3 rounded-sm inline-block shrink-0" style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }} />
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* Change category: inline list, no submenu hover */}
+          <div className="px-3 py-1 text-xs font-medium text-muted-foreground">Cambiar categoría:</div>
+          <div className="max-h-64 overflow-y-auto">
+            {ROUTINE_CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2"
+                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                onClick={(e) => { e.stopPropagation(); changeSelectedCategory(cat); }}
+              >
+                <span className="w-3 h-3 rounded-sm inline-block shrink-0" style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }} />
+                {cat}
+              </button>
+            ))}
           </div>
 
-          <button type="button"
-            className="w-full text-left px-3 py-1.5 text-sm text-destructive hover:bg-accent"
-            onClick={deleteSelected}>
-            Borrar seleccionadas
-          </button>
+          <div className="border-t mt-1 pt-1">
+            <button
+              type="button"
+              className="w-full text-left px-3 py-1.5 text-destructive hover:bg-accent"
+              onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+              onClick={(e) => { e.stopPropagation(); deleteSelected(); }}
+            >
+              Borrar seleccionadas
+            </button>
+          </div>
         </div>
       )}
     </div>
