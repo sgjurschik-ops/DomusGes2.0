@@ -298,6 +298,7 @@ interface ContextMenuState {
   x: number;
   y: number;
   selectedCells: { day: number; halfHour: number }[];
+  pasteTarget?: { day: number; halfHour: number };
 }
 
 // ─── Main editor component ────────────────────────────────────────────────────
@@ -329,10 +330,16 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
     loadRecord(recordDetail.data ?? (existingRecord ? undefined : null));
   }, [recordDetail.data, existingRecord, loadRecord]);
 
-  // ─── Range-select state (works on both empty and filled cells) ───────────────
+  // ─── Range-select state ───────────────────────────────────────────────────────
+  // dragDay/dragStart/dragEnd drive the visual highlight. To avoid re-rendering
+  // all 336 cells on every mouseenter during a drag, we track the live drag
+  // position in refs and only flush to state on mouseup (which triggers one
+  // single re-render instead of one per cell the mouse passes over).
   const [dragDay, setDragDay] = useState<number | null>(null);
   const [dragStart, setDragStart] = useState<number | null>(null);
   const [dragEnd, setDragEnd] = useState<number | null>(null);
+  const dragDayRef = useRef<number | null>(null);
+  const dragEndRef = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [rangeDraft, setRangeDraft] = useState<{ activity: string; category: RoutineCategory | ""; group: BalanceGroup | "" }>({ activity: "", category: "", group: "" });
   const [openCell, setOpenCell] = useState<{ day: number; halfHour: number } | null>(null);
@@ -355,12 +362,21 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   useEffect(() => {
     if (!isDragging) return;
     function onUp() {
+      // Flush ref values to state once on mouseup instead of on every mouseenter
+      const finalEnd = dragEndRef.current;
+      const finalDay = dragDayRef.current;
       setIsDragging(false);
-      if (dragStart === dragEnd) { setDragDay(null); setDragStart(null); setDragEnd(null); }
+      if (finalDay !== null && finalEnd !== null) {
+        setDragDay(finalDay);
+        setDragEnd(finalEnd);
+      }
+      if (dragStart === dragEndRef.current) {
+        setDragDay(null); setDragStart(null); setDragEnd(null);
+      }
     }
     document.addEventListener("mouseup", onUp);
     return () => document.removeEventListener("mouseup", onUp);
-  }, [isDragging, dragStart, dragEnd]);
+  }, [isDragging, dragStart]);
 
   // Close context menu on click outside
   useEffect(() => {
@@ -470,6 +486,38 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
     setCells(cells.map((c) => keys.has(`${c.day}-${c.halfHour}`) ? { ...c, category: cat, group: autoGroup } : c));
     setIsDirty(true);
     setContextMenu(null);
+  }
+
+  // Clipboard for copy-paste between days
+  const clipboardRef = useRef<RoutineCell[]>([]);
+  const [clipboardCount, setClipboardCount] = useState(0);
+
+  function copySelected() {
+    if (!contextMenu) return;
+    const keys = new Set(contextMenu.selectedCells.map((s) => `${s.day}-${s.halfHour}`));
+    clipboardRef.current = cells.filter((c) => keys.has(`${c.day}-${c.halfHour}`));
+    setClipboardCount(clipboardRef.current.length);
+    toast({ title: `${clipboardRef.current.length} celda${clipboardRef.current.length !== 1 ? "s" : ""} copiada${clipboardRef.current.length !== 1 ? "s" : ""}. Clic derecho en la celda destino para pegar.` });
+    setContextMenu(null);
+  }
+
+  function pasteAt(targetDay: number, targetSlot: number) {
+    const copied = clipboardRef.current;
+    if (copied.length === 0) return;
+    // Find the top-left anchor of the copied block
+    const minSlot = Math.min(...copied.map((c) => c.halfHour));
+    const slotOffset = targetSlot - minSlot;
+    const dayOffset = targetDay - copied[0].day;
+    const pasted = copied.map((c) => ({
+      ...c,
+      day: c.day + dayOffset,
+      halfHour: c.halfHour + slotOffset,
+    })).filter((c) => c.day >= 0 && c.day <= 6 && c.halfHour >= 0 && c.halfHour <= 47);
+    const pastedKeys = new Set(pasted.map((c) => `${c.day}-${c.halfHour}`));
+    setCells([...cells.filter((c) => !pastedKeys.has(`${c.day}-${c.halfHour}`)), ...pasted]);
+    setIsDirty(true);
+    setContextMenu(null);
+    toast({ title: "Pegado correctamente" });
   }
 
   function copyDayToWeekdays(sourceDay: number) {
@@ -636,31 +684,34 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                 }
                               }}
                               onMouseDown={(e) => {
-                                // Right-click: never reset selection
                                 if (e.button !== 0) return;
-                                // Left-click: if context menu is open, close it without resetting selection
                                 if (contextMenu) { setContextMenu(null); return; }
                                 e.preventDefault();
                                 setOpenCell(null);
+                                dragDayRef.current = day;
+                                dragEndRef.current = slot;
                                 setDragDay(day); setDragStart(slot); setDragEnd(slot); setIsDragging(true);
                               }}
-                              onMouseEnter={() => { if (!isDragging || day !== dragDay) return; setDragEnd(slot); }}
+                              onMouseEnter={() => {
+                                // Update ref only during drag — no setState, no re-render
+                                if (!isDragging || day !== dragDayRef.current) return;
+                                dragEndRef.current = slot;
+                              }}
                               onContextMenu={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                // Capture current selection at the moment of right-click
                                 const currentSelection = selection
                                   ? Array.from({ length: selection.to - selection.from + 1 }, (_, i) => ({
                                       day: selection.day, halfHour: selection.from + i,
                                     }))
                                   : [];
                                 if (selected && currentSelection.length > 1) {
-                                  // Right-click within an existing multi-selection: show menu for the whole selection
                                   setContextMenu({ x: e.clientX, y: e.clientY, selectedCells: currentSelection });
                                 } else if (hasContent) {
-                                  // Right-click on single filled cell: show menu for just this cell
                                   setDragDay(day); setDragStart(slot); setDragEnd(slot);
                                   setContextMenu({ x: e.clientX, y: e.clientY, selectedCells: [{ day, halfHour: slot }] });
+                                } else if (clipboardCount > 0) {
+                                  setContextMenu({ x: e.clientX, y: e.clientY, selectedCells: [], pasteTarget: { day, halfHour: slot } });
                                 }
                               }}
                               className={`w-full rounded-sm border text-left px-1.5 truncate select-none text-xs font-medium ${
@@ -777,37 +828,72 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
           onClick={(e) => e.stopPropagation()}
           onContextMenu={(e) => e.preventDefault()}
         >
-          <p className="px-3 py-1.5 text-xs text-muted-foreground border-b mb-1">
-            {contextMenu.selectedCells.length} celda{contextMenu.selectedCells.length !== 1 ? "s" : ""} seleccionada{contextMenu.selectedCells.length !== 1 ? "s" : ""}
-          </p>
+          {contextMenu.selectedCells.length > 0 && (
+            <>
+              <p className="px-3 py-1.5 text-xs text-muted-foreground border-b mb-1">
+                {contextMenu.selectedCells.length} celda{contextMenu.selectedCells.length !== 1 ? "s" : ""} seleccionada{contextMenu.selectedCells.length !== 1 ? "s" : ""}
+              </p>
 
-          {/* Change category: inline list, no submenu hover */}
-          <div className="px-3 py-1 text-xs font-medium text-muted-foreground">Cambiar categoría:</div>
-          <div className="max-h-64 overflow-y-auto">
-            {ROUTINE_CATEGORIES.map((cat) => (
+              {/* Copy */}
               <button
-                key={cat}
                 type="button"
-                className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 hover:bg-accent"
                 onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-                onClick={(e) => { e.stopPropagation(); changeSelectedCategory(cat); }}
+                onClick={(e) => { e.stopPropagation(); copySelected(); }}
               >
-                <span className="w-3 h-3 rounded-sm inline-block shrink-0" style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }} />
-                {cat}
+                Copiar
               </button>
-            ))}
-          </div>
 
-          <div className="border-t mt-1 pt-1">
-            <button
-              type="button"
-              className="w-full text-left px-3 py-1.5 text-destructive hover:bg-accent"
-              onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-              onClick={(e) => { e.stopPropagation(); deleteSelected(); }}
-            >
-              Borrar seleccionadas
-            </button>
-          </div>
+              {/* Change category */}
+              <div className="px-3 pt-1.5 pb-0.5 text-xs font-medium text-muted-foreground border-t mt-1">Cambiar categoría:</div>
+              <div className="max-h-52 overflow-y-auto">
+                {ROUTINE_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    className="w-full text-left px-3 py-1.5 hover:bg-accent flex items-center gap-2"
+                    onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                    onClick={(e) => { e.stopPropagation(); changeSelectedCategory(cat); }}
+                  >
+                    <span className="w-3 h-3 rounded-sm inline-block shrink-0" style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }} />
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Delete */}
+              <div className="border-t mt-1 pt-1">
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-1.5 text-destructive hover:bg-accent"
+                  onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                  onClick={(e) => { e.stopPropagation(); deleteSelected(); }}
+                >
+                  Borrar seleccionadas
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Paste option (when right-clicking on empty cell with clipboard content) */}
+          {contextMenu.pasteTarget && clipboardCount > 0 && (
+            <>
+              <p className="px-3 py-1.5 text-xs text-muted-foreground border-b mb-1">
+                {clipboardCount} celda{clipboardCount !== 1 ? "s" : ""} en portapapeles
+              </p>
+              <button
+                type="button"
+                className="w-full text-left px-3 py-1.5 hover:bg-accent"
+                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (contextMenu.pasteTarget) pasteAt(contextMenu.pasteTarget.day, contextMenu.pasteTarget.halfHour);
+                }}
+              >
+                Pegar aquí
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
