@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
-import { X, Save, ChevronLeft, ChevronRight, Trash2, CalendarDays } from "lucide-react";
+import { X, Save, Trash2, CalendarDays, Printer } from "lucide-react";
 import {
   useRoutineRecords,
   useRoutineRecord,
@@ -14,9 +13,7 @@ import {
   useDeleteRoutineRecord,
 } from "@/hooks/api";
 
-// ─── OTEP 2020 occupational categories ───────────────────────────────────────
-// Based on the Occupational Therapy Practice Framework (OTPF-4), the
-// standard classification used in occupational therapy clinical practice.
+// ─── OTPF-4 occupational categories ──────────────────────────────────────────
 export const ROUTINE_CATEGORIES = [
   "AVD",
   "AIVD",
@@ -30,7 +27,6 @@ export const ROUTINE_CATEGORIES = [
 ] as const;
 export type RoutineCategory = typeof ROUTINE_CATEGORIES[number];
 
-// The 3 classic occupational balance groups used in clinical reports.
 export const BALANCE_GROUPS = ["Autocuidado", "Productividad", "Ocio"] as const;
 export type BalanceGroup = typeof BALANCE_GROUPS[number];
 
@@ -40,10 +36,14 @@ export const BALANCE_GROUP_COLORS: Record<BalanceGroup, string> = {
   Ocio: "#6dbb74",
 };
 
-// Default mapping from OTPF area to balance group, based on standard
-// occupational therapy classification. AIVD and Participación Social are
-// assigned "Productividad" by default but the therapist can override them
-// per cell, since both can also belong to other groups depending on context.
+// Reference percentages from clinical occupational balance literature
+// (example case: ~46% Autocuidado, ~33% Productividad, ~20% Ocio)
+export const BALANCE_GROUP_REFERENCE: Record<BalanceGroup, number> = {
+  Autocuidado: 46,
+  Productividad: 33,
+  Ocio: 20,
+};
+
 export const OTPF_TO_GROUP: Record<RoutineCategory, BalanceGroup> = {
   "AVD": "Autocuidado",
   "AIVD": "Productividad",
@@ -82,8 +82,6 @@ export const ROUTINE_CATEGORY_LABELS: Record<RoutineCategory, string> = {
 
 export const ROUTINE_DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 export const ROUTINE_DAYS_FULL = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-
-// 48 half-hour slots starting at 07:00 (slot 0 = 07:00, slot 1 = 07:30…)
 export const HALF_HOUR_SLOTS = Array.from({ length: 48 }, (_, i) => i);
 
 export function slotLabel(slot: number): string {
@@ -94,15 +92,187 @@ export function slotLabel(slot: number): string {
 }
 
 export interface RoutineCell {
-  day: number;       // 0=Lun..6=Dom
-  halfHour: number;  // 0=07:00, 1=07:30 … 47=06:30
+  day: number;
+  halfHour: number;
   activity: string;
   category: RoutineCategory | "";
-  group: BalanceGroup | "";  // auto-set from category but manually overridable
+  group: BalanceGroup | "";
+}
+
+// ─── PDF generation ───────────────────────────────────────────────────────────
+async function generatePlanningPdf(cells: RoutineCell[], date: string, patientName: string, empty = false) {
+  const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
+
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  // Landscape A4
+  const W = 841.89;
+  const H = 595.28;
+  const MARGIN = 28;
+  const COL_TIME = 36;
+  const COL_DAY = (W - MARGIN * 2 - COL_TIME) / 7;
+  const ROW_H = (H - MARGIN * 2 - 48 - 24) / 48; // 48 slots
+
+  const page = pdfDoc.addPage([W, H]);
+
+  // Title
+  page.drawText(`Planning semanal de rutinas${empty ? " (vacío)" : ""}`, {
+    x: MARGIN, y: H - MARGIN - 12,
+    size: 13, font: fontBold, color: rgb(0.1, 0.36, 0.34),
+  });
+  if (!empty && date) {
+    page.drawText(`Fecha: ${date}`, {
+      x: MARGIN, y: H - MARGIN - 26,
+      size: 9, font, color: rgb(0.4, 0.4, 0.4),
+    });
+  }
+
+  const gridTop = H - MARGIN - 48;
+
+  // Day headers
+  ROUTINE_DAYS.forEach((day, i) => {
+    const x = MARGIN + COL_TIME + i * COL_DAY;
+    page.drawRectangle({ x, y: gridTop, width: COL_DAY, height: 20, color: rgb(0.95, 0.95, 0.95) });
+    page.drawText(day, { x: x + COL_DAY / 2 - 8, y: gridTop + 6, size: 8, font: fontBold });
+  });
+
+  // Grid
+  HALF_HOUR_SLOTS.forEach((slot) => {
+    const y = gridTop - (slot + 1) * ROW_H;
+    const label = slotLabel(slot);
+    const isFullHour = slot % 2 === 0;
+
+    if (isFullHour) {
+      page.drawText(label, { x: MARGIN, y: y + ROW_H / 2 - 3, size: 6, font, color: rgb(0.4, 0.4, 0.4) });
+    }
+
+    ROUTINE_DAYS.forEach((_, day) => {
+      const x = MARGIN + COL_TIME + day * COL_DAY;
+      const cell = empty ? null : cells.find((c) => c.day === day && c.halfHour === slot);
+
+      if (cell?.category) {
+        const hex = ROUTINE_CATEGORY_COLORS[cell.category as RoutineCategory];
+        const r = parseInt(hex.slice(1, 3), 16) / 255;
+        const g = parseInt(hex.slice(3, 5), 16) / 255;
+        const b = parseInt(hex.slice(5, 7), 16) / 255;
+        page.drawRectangle({ x: x + 0.5, y: y + 0.5, width: COL_DAY - 1, height: ROW_H - 1, color: rgb(r, g, b) });
+      }
+
+      if (cell?.activity) {
+        const text = cell.activity.length > 18 ? cell.activity.slice(0, 16) + "…" : cell.activity;
+        page.drawText(text, { x: x + 2, y: y + ROW_H / 2 - 3, size: 5.5, font, color: rgb(0.1, 0.1, 0.1) });
+      }
+
+      // Cell border
+      page.drawLine({ start: { x, y }, end: { x: x + COL_DAY, y }, thickness: 0.2, color: rgb(0.8, 0.8, 0.8) });
+      page.drawLine({ start: { x, y }, end: { x, y: y + ROW_H }, thickness: isFullHour ? 0.5 : 0.2, color: rgb(0.7, 0.7, 0.7) });
+    });
+  });
+
+  // Outer border
+  page.drawRectangle({
+    x: MARGIN + COL_TIME, y: gridTop - 48 * ROW_H,
+    width: COL_DAY * 7, height: 48 * ROW_H + 20,
+    borderColor: rgb(0.6, 0.6, 0.6), borderWidth: 0.8,
+  });
+
+  // Legend
+  if (!empty) {
+    let lx = MARGIN;
+    const ly = MARGIN - 8;
+    ROUTINE_CATEGORIES.forEach((cat) => {
+      const hex = ROUTINE_CATEGORY_COLORS[cat];
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      page.drawRectangle({ x: lx, y: ly, width: 8, height: 8, color: rgb(r, g, b) });
+      page.drawText(cat, { x: lx + 10, y: ly + 1, size: 5.5, font, color: rgb(0.3, 0.3, 0.3) });
+      lx += cat.length * 3.5 + 16;
+    });
+  }
+
+  // If not empty, add a second page with balance summary
+  if (!empty && cells.length > 0) {
+    const page2 = pdfDoc.addPage([595.28, 841.89]);
+    const W2 = 595.28; const H2 = 841.89;
+
+    page2.drawText("Análisis de equilibrio ocupacional", {
+      x: MARGIN, y: H2 - MARGIN - 14, size: 14, font: fontBold, color: rgb(0.1, 0.36, 0.34),
+    });
+    if (date) {
+      page2.drawText(`Fecha: ${date}`, { x: MARGIN, y: H2 - MARGIN - 30, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
+    }
+
+    const filled = cells.filter((c) => c.category);
+    const totalSlots = filled.length;
+    const totalHours = totalSlots * 0.5;
+
+    // Group summary table
+    let ty = H2 - MARGIN - 60;
+    page2.drawText("Distribución por grupo de equilibrio (3 grupos clásicos):", { x: MARGIN, y: ty, size: 10, font: fontBold });
+    ty -= 20;
+
+    const groupCounts: Record<BalanceGroup, number> = { Autocuidado: 0, Productividad: 0, Ocio: 0 };
+    for (const c of filled) {
+      const grp = (c.group as BalanceGroup) || (c.category ? OTPF_TO_GROUP[c.category as RoutineCategory] : null);
+      if (grp && grp in groupCounts) groupCounts[grp as BalanceGroup]++;
+    }
+
+    BALANCE_GROUPS.forEach((grp) => {
+      const hours = groupCounts[grp] * 0.5;
+      const pct = totalSlots > 0 ? ((groupCounts[grp] / totalSlots) * 100).toFixed(1) : "0.0";
+      const ref = BALANCE_GROUP_REFERENCE[grp];
+      const hex = BALANCE_GROUP_COLORS[grp];
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+
+      page2.drawRectangle({ x: MARGIN, y: ty - 2, width: 12, height: 12, color: rgb(r, g, b) });
+      page2.drawText(grp, { x: MARGIN + 16, y: ty, size: 10, font: fontBold });
+      page2.drawText(`${hours.toFixed(1)} h  (${pct}%)   Referencia: ~${ref}%`, { x: MARGIN + 100, y: ty, size: 10, font });
+      ty -= 22;
+    });
+
+    ty -= 10;
+    page2.drawText(`Total registrado: ${totalHours.toFixed(1)} horas`, { x: MARGIN, y: ty, size: 10, font: fontBold });
+
+    // OTPF areas table
+    ty -= 30;
+    page2.drawText("Distribución por área OTPF:", { x: MARGIN, y: ty, size: 10, font: fontBold });
+    ty -= 18;
+
+    ROUTINE_CATEGORIES.forEach((cat) => {
+      const slots = filled.filter((c) => c.category === cat).length;
+      if (slots === 0) return;
+      const hours = slots * 0.5;
+      const pct = ((slots / totalSlots) * 100).toFixed(1);
+      const hex = ROUTINE_CATEGORY_COLORS[cat];
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+
+      page2.drawRectangle({ x: MARGIN, y: ty - 2, width: 10, height: 10, color: rgb(r, g, b) });
+      page2.drawText(ROUTINE_CATEGORY_LABELS[cat], { x: MARGIN + 14, y: ty, size: 9, font });
+      page2.drawText(`${hours.toFixed(1)} h  (${pct}%)`, { x: MARGIN + 280, y: ty, size: 9, font });
+      ty -= 16;
+    });
+  }
+
+  const bytes = await pdfDoc.save();
+  const blob = new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `planning-${empty ? "vacio" : date}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ─── Main editor component ────────────────────────────────────────────────────
-
 interface Props {
   patientId: string;
   onClose: () => void;
@@ -114,23 +284,18 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   const [cells, setCells] = useState<RoutineCell[]>([]);
   const [notes, setNotes] = useState("");
   const [isDirty, setIsDirty] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   const records = useRoutineRecords(patientId);
   const saveRecord = useSaveRoutineRecord(patientId);
   const deleteRecord = useDeleteRoutineRecord(patientId);
 
-  // Load existing record when date changes
   const existingRecord = records.data?.find((r) => r.date === date);
   const recordDetail = useRoutineRecord(patientId, existingRecord?.id ?? null);
 
   const loadRecord = useCallback((data: { cells: string; notes: string | null } | null | undefined) => {
     if (data) {
-      try {
-        const parsed = JSON.parse(data.cells);
-        setCells(parsed);
-      } catch {
-        setCells([]);
-      }
+      try { setCells(JSON.parse(data.cells)); } catch { setCells([]); }
       setNotes(data.notes ?? "");
     } else {
       setCells([]);
@@ -143,16 +308,12 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
     loadRecord(recordDetail.data ?? (existingRecord ? undefined : null));
   }, [recordDetail.data, existingRecord, loadRecord]);
 
-  // ─── Drag-to-select range state ─────────────────────────────────────────────
+  // Drag-to-select range state
   const [dragDay, setDragDay] = useState<number | null>(null);
   const [dragStart, setDragStart] = useState<number | null>(null);
   const [dragEnd, setDragEnd] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [rangeDraft, setRangeDraft] = useState<{ activity: string; category: RoutineCategory | ""; group: BalanceGroup | "" }>({
-    activity: "",
-    category: "",
-    group: "",
-  });
+  const [rangeDraft, setRangeDraft] = useState<{ activity: string; category: RoutineCategory | ""; group: BalanceGroup | "" }>({ activity: "", category: "", group: "" });
   const [openCell, setOpenCell] = useState<{ day: number; halfHour: number } | null>(null);
 
   const selection = dragDay !== null && dragStart !== null && dragEnd !== null
@@ -164,46 +325,29 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
     if (!isDragging) return;
     function onUp() {
       setIsDragging(false);
-      if (dragStart === dragEnd) {
-        setDragDay(null);
-        setDragStart(null);
-        setDragEnd(null);
-      }
+      if (dragStart === dragEnd) { setDragDay(null); setDragStart(null); setDragEnd(null); }
     }
     document.addEventListener("mouseup", onUp);
     return () => document.removeEventListener("mouseup", onUp);
   }, [isDragging, dragStart, dragEnd]);
 
-  // ─── Cell helpers ────────────────────────────────────────────────────────────
-  function cellAt(day: number, halfHour: number): RoutineCell | undefined {
+  function cellAt(day: number, halfHour: number) {
     return cells.find((c) => c.day === day && c.halfHour === halfHour);
   }
 
-  function isCellSelected(day: number, halfHour: number): boolean {
+  function isCellSelected(day: number, halfHour: number) {
     if (!selection) return false;
     return day === selection.day && halfHour >= selection.from && halfHour <= selection.to;
   }
 
   function setCell(day: number, halfHour: number, patch: Partial<RoutineCell>) {
     const existing = cellAt(day, halfHour);
-    const merged: RoutineCell = {
-      day, halfHour,
-      activity: existing?.activity ?? "",
-      category: existing?.category ?? "",
-      group: existing?.group ?? "",
-      ...patch,
-    };
-    // Auto-set group when category changes, unless the patch explicitly
-    // sets group (meaning the therapist overrode it manually).
+    const merged: RoutineCell = { day, halfHour, activity: existing?.activity ?? "", category: existing?.category ?? "", group: existing?.group ?? "", ...patch };
     if (patch.category && patch.category !== existing?.category && !("group" in patch)) {
       merged.group = OTPF_TO_GROUP[patch.category] ?? "";
     }
     const withoutThis = cells.filter((c) => !(c.day === day && c.halfHour === halfHour));
-    if (!merged.activity.trim() && !merged.category) {
-      setCells(withoutThis);
-    } else {
-      setCells([...withoutThis, merged]);
-    }
+    if (!merged.activity.trim() && !merged.category) { setCells(withoutThis); } else { setCells([...withoutThis, merged]); }
     setIsDirty(true);
   }
 
@@ -211,44 +355,25 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
     if (!selection) return;
     const slots: number[] = [];
     for (let s = selection.from; s <= selection.to; s++) slots.push(s);
-    const withoutRange = cells.filter(
-      (c) => !(c.day === selection.day && slots.includes(c.halfHour)),
-    );
+    const withoutRange = cells.filter((c) => !(c.day === selection.day && slots.includes(c.halfHour)));
     const autoGroup: BalanceGroup | "" = rangeDraft.category ? (OTPF_TO_GROUP[rangeDraft.category] ?? "") : "";
-    const filled = slots.map((s) => ({
-      day: selection.day,
-      halfHour: s,
-      activity: rangeDraft.activity.trim(),
-      category: rangeDraft.category,
-      group: autoGroup,
-    }));
+    const filled = slots.map((s) => ({ day: selection.day, halfHour: s, activity: rangeDraft.activity.trim(), category: rangeDraft.category, group: autoGroup }));
     setCells([...withoutRange, ...filled]);
     setIsDirty(true);
-    setDragDay(null);
-    setDragStart(null);
-    setDragEnd(null);
+    setDragDay(null); setDragStart(null); setDragEnd(null);
     setRangeDraft({ activity: "", category: "", group: "" });
   }
 
-  function clearSelection() {
-    setDragDay(null);
-    setDragStart(null);
-    setDragEnd(null);
-  }
+  function clearSelection() { setDragDay(null); setDragStart(null); setDragEnd(null); }
 
   function moveCell(fromDay: number, fromSlot: number, toDay: number, toSlot: number) {
     const source = cellAt(fromDay, fromSlot);
     if (!source) return;
     const dest = cellAt(toDay, toSlot);
     if (dest && (dest.activity || dest.category)) {
-      const ok = confirm(
-        `La celda de destino (${ROUTINE_DAYS_FULL[toDay]} ${slotLabel(toSlot)}) ya tiene "${dest.activity || dest.category}". ¿Sobrescribirla?`,
-      );
-      if (!ok) return;
+      if (!confirm(`La celda de destino (${ROUTINE_DAYS_FULL[toDay]} ${slotLabel(toSlot)}) ya tiene "${dest.activity || dest.category}". ¿Sobrescribirla?`)) return;
     }
-    const withoutBoth = cells.filter(
-      (c) => !(c.day === fromDay && c.halfHour === fromSlot) && !(c.day === toDay && c.halfHour === toSlot),
-    );
+    const withoutBoth = cells.filter((c) => !(c.day === fromDay && c.halfHour === fromSlot) && !(c.day === toDay && c.halfHour === toSlot));
     setCells([...withoutBoth, { ...source, day: toDay, halfHour: toSlot }]);
     setIsDirty(true);
   }
@@ -257,42 +382,40 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
     const sourceCells = cells.filter((c) => c.day === sourceDay);
     const weekdays = [1, 2, 3, 4];
     const withoutWeekdays = cells.filter((c) => !weekdays.includes(c.day));
-    const copied = weekdays.flatMap((d) => sourceCells.map((c) => ({ ...c, day: d })));
-    setCells([...withoutWeekdays, ...copied]);
+    setCells([...withoutWeekdays, ...weekdays.flatMap((d) => sourceCells.map((c) => ({ ...c, day: d })))]);
     setIsDirty(true);
     toast({ title: "Copiado a martes–viernes" });
   }
 
   async function handleSave() {
     try {
-      await saveRecord.mutateAsync({
-        date,
-        cells: JSON.stringify(cells),
-        notes: notes || undefined,
-      });
+      await saveRecord.mutateAsync({ date, cells: JSON.stringify(cells), notes: notes || undefined });
       setIsDirty(false);
-      toast({ title: "Planning guardado", description: `Registro del ${date} guardado correctamente.` });
-    } catch {
-      toast({ title: "Error al guardar", variant: "destructive" });
-    }
+      toast({ title: "Planning guardado", description: `Registro del ${date} guardado.` });
+    } catch { toast({ title: "Error al guardar", variant: "destructive" }); }
   }
 
   async function handleDelete() {
     if (!existingRecord) return;
-    const ok = confirm(`¿Eliminar el registro del ${date}? Esta acción no se puede deshacer.`);
-    if (!ok) return;
+    if (!confirm(`¿Eliminar el registro del ${date}?`)) return;
     try {
       await deleteRecord.mutateAsync(existingRecord.id);
-      setCells([]);
-      setNotes("");
-      setIsDirty(false);
+      setCells([]); setNotes(""); setIsDirty(false);
       toast({ title: "Registro eliminado" });
+    } catch { toast({ title: "Error al eliminar", variant: "destructive" }); }
+  }
+
+  async function handlePrint(empty = false) {
+    setPrinting(true);
+    try {
+      await generatePlanningPdf(cells, date, "", empty);
     } catch {
-      toast({ title: "Error al eliminar", variant: "destructive" });
+      toast({ title: "Error al generar PDF", variant: "destructive" });
+    } finally {
+      setPrinting(false);
     }
   }
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col">
       {/* Header */}
@@ -304,41 +427,37 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
           <h2 className="font-semibold text-base">Planning semanal de rutinas</h2>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Date navigation */}
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
             <CalendarDays className="w-4 h-4 text-muted-foreground" />
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="h-8 w-36 text-sm"
-            />
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-8 w-36 text-sm" />
           </div>
 
-          {/* Existing records selector */}
           {(records.data?.length ?? 0) > 0 && (
             <select
               className="h-8 rounded-md border border-input bg-background px-2 text-sm"
               value={existingRecord?.id ?? ""}
-              onChange={(e) => {
-                const rec = records.data?.find((r) => r.id === e.target.value);
-                if (rec) setDate(rec.date);
-              }}
+              onChange={(e) => { const rec = records.data?.find((r) => r.id === e.target.value); if (rec) setDate(rec.date); }}
             >
               <option value="">Registros guardados…</option>
-              {records.data?.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.date}
-                </option>
-              ))}
+              {records.data?.map((r) => <option key={r.id} value={r.id}>{r.date}</option>)}
             </select>
           )}
+
+          <Button variant="outline" size="sm" onClick={() => handlePrint(true)} disabled={printing}>
+            <Printer className="w-3.5 h-3.5 mr-1.5" />
+            PDF vacío
+          </Button>
+
+          <Button variant="outline" size="sm" onClick={() => handlePrint(false)} disabled={printing || cells.length === 0}>
+            <Printer className="w-3.5 h-3.5 mr-1.5" />
+            PDF con datos
+          </Button>
 
           {existingRecord && (
             <Button variant="outline" size="sm" onClick={handleDelete} className="text-destructive border-destructive/40">
               <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-              Borrar registro
+              Borrar
             </Button>
           )}
 
@@ -352,8 +471,8 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b bg-muted/30 shrink-0">
         {ROUTINE_CATEGORIES.map((cat) => (
-          <span key={cat} className="flex items-center gap-1 text-[11px]">
-            <span className="w-2.5 h-2.5 rounded-sm inline-block shrink-0" style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }} />
+          <span key={cat} className="flex items-center gap-1 text-xs">
+            <span className="w-3 h-3 rounded-sm inline-block shrink-0" style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }} />
             <span className="text-muted-foreground">{ROUTINE_CATEGORY_LABELS[cat]}</span>
           </span>
         ))}
@@ -361,30 +480,21 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
 
       {/* Notes */}
       <div className="px-4 pt-2 pb-1 shrink-0">
-        <Input
-          placeholder="Notas sobre este registro (opcional)…"
-          value={notes}
-          onChange={(e) => { setNotes(e.target.value); setIsDirty(true); }}
-          className="h-8 text-sm"
-        />
+        <Input placeholder="Notas sobre este registro (opcional)…" value={notes} onChange={(e) => { setNotes(e.target.value); setIsDirty(true); }} className="h-8 text-sm" />
       </div>
 
       {/* Grid */}
       <div className="flex-1 overflow-auto px-4 pb-4">
-        <table className="border-collapse text-[11px] w-full">
+        <table className="border-collapse text-xs w-full">
           <thead className="sticky top-0 z-10 bg-background">
             <tr>
-              <th className="border-b border-r p-1 w-12 text-muted-foreground font-normal"></th>
+              <th className="border-b border-r p-1 w-14 text-muted-foreground font-normal"></th>
               {ROUTINE_DAYS.map((dayName, day) => (
-                <th key={day} className="border-b p-1 min-w-[100px] font-medium">
+                <th key={day} className="border-b p-1 min-w-[110px] font-medium text-sm">
                   <div className="flex flex-col items-center gap-0.5">
                     <span>{dayName}</span>
                     {day === 0 && (
-                      <button
-                        type="button"
-                        onClick={() => copyDayToWeekdays(0)}
-                        className="text-[9px] text-muted-foreground underline decoration-dotted hover:text-foreground"
-                      >
+                      <button type="button" onClick={() => copyDayToWeekdays(0)} className="text-[10px] text-muted-foreground underline decoration-dotted hover:text-foreground">
                         copiar a Mar–Vie
                       </button>
                     )}
@@ -399,7 +509,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
               const isFullHour = slot % 2 === 0;
               return (
                 <tr key={slot} className={isFullHour ? "border-t border-t-border/60" : ""}>
-                  <td className="sticky left-0 bg-background border-r p-0.5 text-right text-muted-foreground whitespace-nowrap w-12">
+                  <td className="sticky left-0 bg-background border-r p-0.5 text-right text-muted-foreground whitespace-nowrap w-14 text-xs">
                     {isFullHour ? label : <span className="opacity-40">{label}</span>}
                   </td>
                   {ROUTINE_DAYS.map((_, day) => {
@@ -407,22 +517,16 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                     const bg = cell?.category ? ROUTINE_CATEGORY_COLORS[cell.category] : undefined;
                     const isOpen = openCell?.day === day && openCell?.halfHour === slot;
                     const selected = isCellSelected(day, slot);
-                    const isRangeAnchor = rangeReady && selection &&
-                      day === selection.day && slot === selection.to;
+                    const isRangeAnchor = rangeReady && selection && day === selection.day && slot === selection.to;
 
                     return (
                       <td key={day} className={`p-0.5 align-top relative ${isFullHour ? "" : "border-t border-t-dashed border-border/30"}`}>
-                        <Popover
-                          open={isOpen && !isDragging && !rangeReady}
-                          onOpenChange={(o) => setOpenCell(o ? { day, halfHour: slot } : null)}
-                        >
+                        <Popover open={isOpen && !isDragging && !rangeReady} onOpenChange={(o) => setOpenCell(o ? { day, halfHour: slot } : null)}>
                           <PopoverTrigger asChild>
                             <button
                               type="button"
                               draggable={!!(cell?.activity || cell?.category)}
-                              onDragStart={(e) => {
-                                e.dataTransfer.setData("text/plain", JSON.stringify({ day, halfHour: slot }));
-                              }}
+                              onDragStart={(e) => { e.dataTransfer.setData("text/plain", JSON.stringify({ day, halfHour: slot })); }}
                               onDragOver={(e) => e.preventDefault()}
                               onDrop={(e) => {
                                 e.preventDefault();
@@ -436,20 +540,12 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                 if (cell?.activity || cell?.category) return;
                                 e.preventDefault();
                                 setOpenCell(null);
-                                setDragDay(day);
-                                setDragStart(slot);
-                                setDragEnd(slot);
-                                setIsDragging(true);
+                                setDragDay(day); setDragStart(slot); setDragEnd(slot); setIsDragging(true);
                               }}
-                              onMouseEnter={() => {
-                                if (!isDragging || day !== dragDay) return;
-                                setDragEnd(slot);
-                              }}
-                              className={`w-full rounded-sm border text-left px-1 truncate select-none ${
-                                isFullHour ? "h-7" : "h-6"
-                              } ${selected
-                                ? "border-foreground ring-1 ring-foreground/40"
-                                : "border-transparent hover:border-border"
+                              onMouseEnter={() => { if (!isDragging || day !== dragDay) return; setDragEnd(slot); }}
+                              className={`w-full rounded-sm border text-left px-1.5 truncate select-none text-xs font-medium ${
+                                isFullHour ? "h-8" : "h-7"
+                              } ${selected ? "border-foreground ring-1 ring-foreground/40" : "border-transparent hover:border-border"
                               } ${cell?.activity || cell?.category ? "cursor-grab active:cursor-grabbing" : ""}`}
                               style={{ backgroundColor: bg }}
                               title={cell?.activity || undefined}
@@ -457,28 +553,25 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                               {cell?.activity || ""}
                             </button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-72 space-y-2.5" side="right" align="start">
-                            <p className="text-xs font-medium">
-                              {ROUTINE_DAYS_FULL[day]} · {label}
-                            </p>
+                          {/* Single-cell popover — larger font and wider */}
+                          <PopoverContent className="w-96 space-y-3" side="right" align="start">
+                            <p className="text-sm font-semibold">{ROUTINE_DAYS_FULL[day]} · {label}</p>
                             <Input
                               placeholder="Actividad…"
                               value={cell?.activity ?? ""}
                               onChange={(e) => setCell(day, slot, { activity: e.target.value })}
-                              className="h-8 text-xs"
+                              className="h-9 text-sm"
                               autoFocus
                             />
                             <div>
-                              <p className="text-[10px] text-muted-foreground mb-1">Área OTPF</p>
-                              <div className="grid grid-cols-3 gap-1">
+                              <p className="text-xs text-muted-foreground mb-1.5 font-medium">Área OTPF</p>
+                              <div className="grid grid-cols-3 gap-1.5">
                                 {ROUTINE_CATEGORIES.map((cat) => (
                                   <button
                                     key={cat}
                                     type="button"
                                     onClick={() => setCell(day, slot, { category: cat })}
-                                    className={`h-7 rounded-md text-[9px] border-2 transition-all px-0.5 leading-tight ${
-                                      cell?.category === cat ? "border-foreground/50" : "border-transparent"
-                                    }`}
+                                    className={`h-8 rounded-md text-[11px] border-2 transition-all px-1 leading-tight ${cell?.category === cat ? "border-foreground/50" : "border-transparent"}`}
                                     style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }}
                                   >
                                     {cat}
@@ -488,19 +581,16 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                             </div>
                             {cell?.category && (
                               <div>
-                                <p className="text-[10px] text-muted-foreground mb-1">
-                                  Grupo de equilibrio
-                                  <span className="ml-1 italic">(auto — editable)</span>
+                                <p className="text-xs text-muted-foreground mb-1.5 font-medium">
+                                  Grupo de equilibrio <span className="italic font-normal">(auto — editable)</span>
                                 </p>
-                                <div className="flex gap-1">
+                                <div className="flex gap-1.5">
                                   {BALANCE_GROUPS.map((grp) => (
                                     <button
                                       key={grp}
                                       type="button"
                                       onClick={() => setCell(day, slot, { group: grp })}
-                                      className={`flex-1 h-7 rounded-md text-[9px] border-2 transition-all ${
-                                        cell?.group === grp ? "border-foreground/50" : "border-transparent"
-                                      }`}
+                                      className={`flex-1 h-8 rounded-md text-xs border-2 transition-all font-medium ${cell?.group === grp ? "border-foreground/50" : "border-transparent"}`}
                                       style={{ backgroundColor: BALANCE_GROUP_COLORS[grp] }}
                                     >
                                       {grp}
@@ -511,11 +601,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                             )}
                             {cell && (cell.activity || cell.category) && (
                               <div className="flex items-center justify-end pt-1 border-t">
-                                <button
-                                  type="button"
-                                  onClick={() => setCell(day, slot, { activity: "", category: "", group: "" })}
-                                  className="text-[11px] text-destructive hover:underline"
-                                >
+                                <button type="button" onClick={() => setCell(day, slot, { activity: "", category: "", group: "" })} className="text-xs text-destructive hover:underline">
                                   Vaciar celda
                                 </button>
                               </div>
@@ -528,33 +614,27 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                             <PopoverTrigger asChild>
                               <span className="absolute inset-0 pointer-events-none" />
                             </PopoverTrigger>
-                            <PopoverContent className="w-72 space-y-2.5" side="right" align="start">
-                              <p className="text-xs font-medium">
+                            <PopoverContent className="w-96 space-y-3" side="right" align="start">
+                              <p className="text-sm font-semibold">
                                 {ROUTINE_DAYS_FULL[selection.day]} · {slotLabel(selection.from)} – {slotLabel(selection.to)} ({selection.to - selection.from + 1} franjas)
                               </p>
                               <Input
                                 placeholder="Actividad…"
                                 value={rangeDraft.activity}
                                 onChange={(e) => setRangeDraft((d) => ({ ...d, activity: e.target.value }))}
-                                className="h-8 text-xs"
+                                className="h-9 text-sm"
                                 autoFocus
                                 onKeyDown={(e) => { if (e.key === "Enter") applyRange(); }}
                               />
                               <div>
-                                <p className="text-[10px] text-muted-foreground mb-1">Área OTPF</p>
-                                <div className="grid grid-cols-3 gap-1">
+                                <p className="text-xs text-muted-foreground mb-1.5 font-medium">Área OTPF</p>
+                                <div className="grid grid-cols-3 gap-1.5">
                                   {ROUTINE_CATEGORIES.map((cat) => (
                                     <button
                                       key={cat}
                                       type="button"
-                                      onClick={() => setRangeDraft((d) => ({
-                                        ...d,
-                                        category: cat,
-                                        group: OTPF_TO_GROUP[cat] ?? "",
-                                      }))}
-                                      className={`h-7 rounded-md text-[9px] border-2 transition-all px-0.5 leading-tight ${
-                                        rangeDraft.category === cat ? "border-foreground/50" : "border-transparent"
-                                      }`}
+                                      onClick={() => setRangeDraft((d) => ({ ...d, category: cat, group: OTPF_TO_GROUP[cat] ?? "" }))}
+                                      className={`h-8 rounded-md text-[11px] border-2 transition-all px-1 leading-tight ${rangeDraft.category === cat ? "border-foreground/50" : "border-transparent"}`}
                                       style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }}
                                     >
                                       {cat}
@@ -564,19 +644,16 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                               </div>
                               {rangeDraft.category && (
                                 <div>
-                                  <p className="text-[10px] text-muted-foreground mb-1">
-                                    Grupo de equilibrio
-                                    <span className="ml-1 italic">(auto — editable)</span>
+                                  <p className="text-xs text-muted-foreground mb-1.5 font-medium">
+                                    Grupo de equilibrio <span className="italic font-normal">(auto — editable)</span>
                                   </p>
-                                  <div className="flex gap-1">
+                                  <div className="flex gap-1.5">
                                     {BALANCE_GROUPS.map((grp) => (
                                       <button
                                         key={grp}
                                         type="button"
                                         onClick={() => setRangeDraft((d) => ({ ...d, group: grp }))}
-                                        className={`flex-1 h-7 rounded-md text-[9px] border-2 transition-all ${
-                                          rangeDraft.group === grp ? "border-foreground/50" : "border-transparent"
-                                        }`}
+                                        className={`flex-1 h-8 rounded-md text-xs border-2 transition-all font-medium ${rangeDraft.group === grp ? "border-foreground/50" : "border-transparent"}`}
                                         style={{ backgroundColor: BALANCE_GROUP_COLORS[grp] }}
                                       >
                                         {grp}
@@ -586,12 +663,8 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                 </div>
                               )}
                               <div className="flex justify-end gap-2">
-                                <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={clearSelection}>
-                                  Cancelar
-                                </Button>
-                                <Button type="button" size="sm" className="h-7 text-xs" onClick={applyRange}>
-                                  Aplicar
-                                </Button>
+                                <Button type="button" variant="outline" size="sm" onClick={clearSelection}>Cancelar</Button>
+                                <Button type="button" size="sm" onClick={applyRange}>Aplicar</Button>
                               </div>
                             </PopoverContent>
                           </Popover>

@@ -29,6 +29,7 @@ import {
   ROUTINE_CATEGORY_LABELS,
   BALANCE_GROUPS,
   BALANCE_GROUP_COLORS,
+  BALANCE_GROUP_REFERENCE,
   OTPF_TO_GROUP,
   type RoutineCategory,
   type BalanceGroup,
@@ -951,27 +952,37 @@ function OccupationalBalanceCharts({ cells }: { cells: RoutineCell[] }) {
                 <th className="text-left pb-1 font-medium">Grupo</th>
                 <th className="text-right pb-1 font-medium">h</th>
                 <th className="text-right pb-1 font-medium">%</th>
+                <th className="text-right pb-1 font-medium text-muted-foreground/60">Ref.</th>
               </tr>
             </thead>
             <tbody>
-              {groupData.map((row) => (
-                <tr key={row.name} className="border-b last:border-0">
-                  <td className="py-0.5 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-sm inline-block shrink-0" style={{ backgroundColor: row.fill }} />
-                    {row.name}
-                  </td>
-                  <td className="py-0.5 text-right tabular-nums">{row.hours.toFixed(1)}</td>
-                  <td className="py-0.5 text-right tabular-nums text-muted-foreground">{row.pct}%</td>
-                </tr>
-              ))}
+              {BALANCE_GROUPS.map((grp) => {
+                const hours = groupCounts[grp] * 0.5;
+                const pct = totalSlots > 0 ? ((groupCounts[grp] / totalSlots) * 100).toFixed(1) : "0.0";
+                const ref = BALANCE_GROUP_REFERENCE[grp];
+                const fill = BALANCE_GROUP_COLORS[grp];
+                return (
+                  <tr key={grp} className="border-b last:border-0">
+                    <td className="py-0.5 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-sm inline-block shrink-0" style={{ backgroundColor: fill }} />
+                      {grp}
+                    </td>
+                    <td className="py-0.5 text-right tabular-nums">{hours.toFixed(1)}</td>
+                    <td className="py-0.5 text-right tabular-nums text-muted-foreground">{pct}%</td>
+                    <td className="py-0.5 text-right tabular-nums text-muted-foreground/50">~{ref}%</td>
+                  </tr>
+                );
+              })}
               <tr className="font-medium border-t">
                 <td className="pt-1">Total</td>
                 <td className="pt-1 text-right tabular-nums">{totalHours.toFixed(1)}</td>
                 <td className="pt-1 text-right text-muted-foreground">100%</td>
+                <td></td>
               </tr>
             </tbody>
           </table>
         </div>
+        <p className="text-[10px] text-muted-foreground/60 mt-1.5 italic">Ref. = porcentaje de referencia de equilibrio ocupacional (caso típico de adulto activo)</p>
       </div>
     </div>
   );
