@@ -73,6 +73,62 @@ export interface RoutineCell {
 }
 
 // ─── PDF generation ───────────────────────────────────────────────────────────
+
+// Draws a donut chart on a pdf-lib page using bezier arcs.
+// Each slice is approximated with multiple small arc segments.
+function drawDonut(
+  page: any,
+  cx: number, cy: number,
+  outerR: number, innerR: number,
+  slices: { pct: number; hex: string }[],
+  rgb: (r: number, g: number, b: number) => any,
+) {
+  const TWO_PI = Math.PI * 2;
+  let startAngle = -Math.PI / 2; // start at 12 o'clock
+
+  for (const slice of slices) {
+    if (slice.pct <= 0) continue;
+    const angle = TWO_PI * (slice.pct / 100);
+    const endAngle = startAngle + angle;
+    const r = parseInt(slice.hex.slice(1, 3), 16) / 255;
+    const g = parseInt(slice.hex.slice(3, 5), 16) / 255;
+    const b = parseInt(slice.hex.slice(5, 7), 16) / 255;
+    const color = rgb(r, g, b);
+
+    // Approximate arc with line segments
+    const steps = Math.max(8, Math.ceil((angle / TWO_PI) * 64));
+    const outerPoints: { x: number; y: number }[] = [];
+    const innerPoints: { x: number; y: number }[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const a = startAngle + (angle * i) / steps;
+      outerPoints.push({ x: cx + Math.cos(a) * outerR, y: cy + Math.sin(a) * outerR });
+      innerPoints.push({ x: cx + Math.cos(a) * innerR, y: cy + Math.sin(a) * innerR });
+    }
+
+    // Draw filled polygon: outer arc forward, inner arc backward
+    const allPoints = [...outerPoints, ...[...innerPoints].reverse()];
+    for (let i = 0; i < allPoints.length - 1; i++) {
+      page.drawLine({
+        start: allPoints[i], end: allPoints[i + 1],
+        thickness: outerR - innerR + 0.5, color,
+        opacity: 1,
+      });
+    }
+    // Solid fill using thin radial lines
+    for (let i = 0; i <= steps; i++) {
+      const a = startAngle + (angle * i) / steps;
+      page.drawLine({
+        start: { x: cx + Math.cos(a) * innerR, y: cy + Math.sin(a) * innerR },
+        end: { x: cx + Math.cos(a) * outerR, y: cy + Math.sin(a) * outerR },
+        thickness: (TWO_PI * outerR * (angle / TWO_PI)) / steps + 0.5,
+        color,
+      });
+    }
+
+    startAngle = endAngle;
+  }
+}
+
 async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = false) {
   const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
   const pdfDoc = await PDFDocument.create();
@@ -144,7 +200,8 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = f
 
   if (!empty && cells.length > 0) {
     const page2 = pdfDoc.addPage([595.28, 841.89]);
-    const W2 = 595.28; const H2 = 841.89;
+    const H2 = 841.89;
+
     page2.drawText("Análisis de equilibrio ocupacional", {
       x: MARGIN, y: H2 - MARGIN - 14, size: 14, font: fontBold, color: rgb(0.1, 0.36, 0.34),
     });
@@ -153,50 +210,74 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = f
     const filled = cells.filter((c) => c.category);
     const totalSlots = filled.length;
     const totalHours = totalSlots * 0.5;
-    let ty = H2 - MARGIN - 60;
 
-    page2.drawText("Distribución por grupo de equilibrio (3 grupos clásicos):", { x: MARGIN, y: ty, size: 10, font: fontBold });
-    ty -= 20;
-
+    // ── Calculate group data ──────────────────────────────────────────────────
     const groupCounts: Record<BalanceGroup, number> = { Autocuidado: 0, Productividad: 0, Ocio: 0 };
     for (const c of filled) {
       const grp = (c.group as BalanceGroup) || (c.category ? OTPF_TO_GROUP[c.category as RoutineCategory] : null);
       if (grp && grp in groupCounts) groupCounts[grp as BalanceGroup]++;
     }
+    const groupSlices = BALANCE_GROUPS.map((grp) => ({
+      grp, hex: BALANCE_GROUP_COLORS[grp],
+      pct: totalSlots > 0 ? (groupCounts[grp] / totalSlots) * 100 : 0,
+      hours: groupCounts[grp] * 0.5,
+    }));
 
-    BALANCE_GROUPS.forEach((grp) => {
-      const hours = groupCounts[grp] * 0.5;
-      const pct = totalSlots > 0 ? ((groupCounts[grp] / totalSlots) * 100).toFixed(1) : "0.0";
-      const ref = BALANCE_GROUP_REFERENCE[grp];
-      const hex = BALANCE_GROUP_COLORS[grp];
-      const r = parseInt(hex.slice(1, 3), 16) / 255;
-      const g = parseInt(hex.slice(3, 5), 16) / 255;
-      const b = parseInt(hex.slice(5, 7), 16) / 255;
-      page2.drawRectangle({ x: MARGIN, y: ty - 2, width: 12, height: 12, color: rgb(r, g, b) });
-      page2.drawText(grp, { x: MARGIN + 16, y: ty, size: 10, font: fontBold });
-      page2.drawText(`${hours.toFixed(1)} h  (${pct}%)   Referencia: ~${ref}%`, { x: MARGIN + 100, y: ty, size: 10, font });
-      ty -= 22;
+    // ── Calculate OTPF data ──────────────────────────────────────────────────
+    const otpfSlices = ROUTINE_CATEGORIES.map((cat) => {
+      const slots = filled.filter((c) => c.category === cat).length;
+      return { cat, hex: ROUTINE_CATEGORY_COLORS[cat], pct: totalSlots > 0 ? (slots / totalSlots) * 100 : 0, hours: slots * 0.5 };
+    }).filter((s) => s.hours > 0);
+
+    // ── Donut chart 1: 3 groups (left side) ─────────────────────────────────
+    const chart1CX = MARGIN + 75;
+    const chart1CY = H2 - MARGIN - 100;
+    drawDonut(page2, chart1CX, chart1CY, 65, 35, groupSlices.map((s) => ({ pct: s.pct, hex: s.hex })), rgb);
+
+    page2.drawText("3 Grupos de equilibrio", {
+      x: chart1CX - 55, y: chart1CY + 75, size: 9, font: fontBold, color: rgb(0.2, 0.2, 0.2),
     });
 
-    ty -= 10;
-    page2.drawText(`Total registrado: ${totalHours.toFixed(1)} horas`, { x: MARGIN, y: ty, size: 10, font: fontBold });
-    ty -= 30;
-    page2.drawText("Distribución por área OTPF:", { x: MARGIN, y: ty, size: 10, font: fontBold });
-    ty -= 18;
+    // Legend for chart 1
+    let ly1 = chart1CY - 75;
+    groupSlices.forEach((s) => {
+      const r = parseInt(s.hex.slice(1, 3), 16) / 255;
+      const g = parseInt(s.hex.slice(3, 5), 16) / 255;
+      const b = parseInt(s.hex.slice(5, 7), 16) / 255;
+      page2.drawRectangle({ x: chart1CX - 55, y: ly1, width: 10, height: 10, color: rgb(r, g, b) });
+      page2.drawText(`${s.grp}: ${s.hours.toFixed(1)}h (${s.pct.toFixed(1)}%)  Ref: ~${BALANCE_GROUP_REFERENCE[s.grp]}%`, {
+        x: chart1CX - 42, y: ly1 + 1, size: 8, font, color: rgb(0.2, 0.2, 0.2),
+      });
+      ly1 -= 16;
+    });
+    page2.drawText(`Total: ${totalHours.toFixed(1)}h`, {
+      x: chart1CX - 55, y: ly1 - 4, size: 8, font: fontBold, color: rgb(0.2, 0.2, 0.2),
+    });
 
-    ROUTINE_CATEGORIES.forEach((cat) => {
-      const slots = filled.filter((c) => c.category === cat).length;
-      if (slots === 0) return;
-      const hours = slots * 0.5;
-      const pct = ((slots / totalSlots) * 100).toFixed(1);
-      const hex = ROUTINE_CATEGORY_COLORS[cat];
-      const r = parseInt(hex.slice(1, 3), 16) / 255;
-      const g = parseInt(hex.slice(3, 5), 16) / 255;
-      const b = parseInt(hex.slice(5, 7), 16) / 255;
-      page2.drawRectangle({ x: MARGIN, y: ty - 2, width: 10, height: 10, color: rgb(r, g, b) });
-      page2.drawText(ROUTINE_CATEGORY_LABELS[cat], { x: MARGIN + 14, y: ty, size: 9, font });
-      page2.drawText(`${hours.toFixed(1)} h  (${pct}%)`, { x: MARGIN + 280, y: ty, size: 9, font });
-      ty -= 16;
+    // ── Donut chart 2: OTPF areas (right side) ─────────────────────────────
+    const chart2CX = MARGIN + 380;
+    const chart2CY = H2 - MARGIN - 100;
+    drawDonut(page2, chart2CX, chart2CY, 65, 35, otpfSlices.map((s) => ({ pct: s.pct, hex: s.hex })), rgb);
+
+    page2.drawText("Áreas OTPF", {
+      x: chart2CX - 25, y: chart2CY + 75, size: 9, font: fontBold, color: rgb(0.2, 0.2, 0.2),
+    });
+
+    // Legend for chart 2 (two columns)
+    let ly2 = chart2CY - 75;
+    const col2x = [chart2CX - 55, chart2CX + 115];
+    otpfSlices.forEach((s, i) => {
+      const colX = col2x[i % 2];
+      if (i % 2 === 0 && i > 0) ly2 -= 14;
+      if (i % 2 === 1 && i === 1) ly2 += 14; // reset to same row as previous
+      const r = parseInt(s.hex.slice(1, 3), 16) / 255;
+      const g = parseInt(s.hex.slice(3, 5), 16) / 255;
+      const b = parseInt(s.hex.slice(5, 7), 16) / 255;
+      page2.drawRectangle({ x: colX, y: ly2, width: 8, height: 8, color: rgb(r, g, b) });
+      page2.drawText(`${s.cat}: ${s.hours.toFixed(1)}h (${s.pct.toFixed(1)}%)`, {
+        x: colX + 11, y: ly2 + 1, size: 7, font, color: rgb(0.2, 0.2, 0.2),
+      });
+      if (i % 2 === 1) ly2 -= 13;
     });
   }
 
