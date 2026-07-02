@@ -15,15 +15,8 @@ import {
 
 // ─── OTPF-4 occupational categories ──────────────────────────────────────────
 export const ROUTINE_CATEGORIES = [
-  "AVD",
-  "AIVD",
-  "Gestión de la Salud",
-  "Descanso y Sueño",
-  "Educación",
-  "Trabajo",
-  "Juego",
-  "Ocio / Tiempo Libre",
-  "Participación Social",
+  "AVD", "AIVD", "Gestión de la Salud", "Descanso y Sueño",
+  "Educación", "Trabajo", "Juego", "Ocio / Tiempo Libre", "Participación Social",
 ] as const;
 export type RoutineCategory = typeof ROUTINE_CATEGORIES[number];
 
@@ -31,41 +24,23 @@ export const BALANCE_GROUPS = ["Autocuidado", "Productividad", "Ocio"] as const;
 export type BalanceGroup = typeof BALANCE_GROUPS[number];
 
 export const BALANCE_GROUP_COLORS: Record<BalanceGroup, string> = {
-  Autocuidado: "#f6a96a",
-  Productividad: "#5a9fd4",
-  Ocio: "#6dbb74",
+  Autocuidado: "#f6a96a", Productividad: "#5a9fd4", Ocio: "#6dbb74",
 };
 
-// Reference percentages from clinical occupational balance literature
-// (example case: ~46% Autocuidado, ~33% Productividad, ~20% Ocio)
 export const BALANCE_GROUP_REFERENCE: Record<BalanceGroup, number> = {
-  Autocuidado: 46,
-  Productividad: 33,
-  Ocio: 20,
+  Autocuidado: 46, Productividad: 33, Ocio: 20,
 };
 
 export const OTPF_TO_GROUP: Record<RoutineCategory, BalanceGroup> = {
-  "AVD": "Autocuidado",
-  "AIVD": "Productividad",
-  "Gestión de la Salud": "Autocuidado",
-  "Descanso y Sueño": "Autocuidado",
-  "Educación": "Productividad",
-  "Trabajo": "Productividad",
-  "Juego": "Ocio",
-  "Ocio / Tiempo Libre": "Ocio",
-  "Participación Social": "Productividad",
+  "AVD": "Autocuidado", "AIVD": "Productividad", "Gestión de la Salud": "Autocuidado",
+  "Descanso y Sueño": "Autocuidado", "Educación": "Productividad", "Trabajo": "Productividad",
+  "Juego": "Ocio", "Ocio / Tiempo Libre": "Ocio", "Participación Social": "Productividad",
 };
 
 export const ROUTINE_CATEGORY_COLORS: Record<RoutineCategory, string> = {
-  "AVD": "#f6c5a0",
-  "AIVD": "#f6e4a0",
-  "Gestión de la Salud": "#b8e0b8",
-  "Descanso y Sueño": "#b8d0f0",
-  "Educación": "#d4b8f0",
-  "Trabajo": "#f0b8b8",
-  "Juego": "#f0d4b8",
-  "Ocio / Tiempo Libre": "#b8f0e4",
-  "Participación Social": "#f0b8d4",
+  "AVD": "#f6c5a0", "AIVD": "#f6e4a0", "Gestión de la Salud": "#b8e0b8",
+  "Descanso y Sueño": "#b8d0f0", "Educación": "#d4b8f0", "Trabajo": "#f0b8b8",
+  "Juego": "#f0d4b8", "Ocio / Tiempo Libre": "#b8f0e4", "Participación Social": "#f0b8d4",
 };
 
 export const ROUTINE_CATEGORY_LABELS: Record<RoutineCategory, string> = {
@@ -73,9 +48,7 @@ export const ROUTINE_CATEGORY_LABELS: Record<RoutineCategory, string> = {
   "AIVD": "Actividades Instrumentales de la Vida Diaria",
   "Gestión de la Salud": "Gestión de la Salud",
   "Descanso y Sueño": "Descanso y Sueño",
-  "Educación": "Educación",
-  "Trabajo": "Trabajo",
-  "Juego": "Juego",
+  "Educación": "Educación", "Trabajo": "Trabajo", "Juego": "Juego",
   "Ocio / Tiempo Libre": "Ocio / Tiempo Libre",
   "Participación Social": "Participación Social",
 };
@@ -100,58 +73,40 @@ export interface RoutineCell {
 }
 
 // ─── PDF generation ───────────────────────────────────────────────────────────
-async function generatePlanningPdf(cells: RoutineCell[], date: string, patientName: string, empty = false) {
+async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = false) {
   const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
-
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  // Landscape A4
-  const W = 841.89;
-  const H = 595.28;
-  const MARGIN = 28;
-  const COL_TIME = 36;
-  const COL_DAY = (W - MARGIN * 2 - COL_TIME) / 7;
-  const ROW_H = (H - MARGIN * 2 - 48 - 24) / 48; // 48 slots
-
+  const W = 841.89; const H = 595.28; const MARGIN = 28;
+  const COL_TIME = 36; const COL_DAY = (W - MARGIN * 2 - COL_TIME) / 7;
+  const ROW_H = (H - MARGIN * 2 - 48 - 24) / 48;
   const page = pdfDoc.addPage([W, H]);
 
-  // Title
   page.drawText(`Planning semanal de rutinas${empty ? " (vacío)" : ""}`, {
-    x: MARGIN, y: H - MARGIN - 12,
-    size: 13, font: fontBold, color: rgb(0.1, 0.36, 0.34),
+    x: MARGIN, y: H - MARGIN - 12, size: 13, font: fontBold, color: rgb(0.1, 0.36, 0.34),
   });
   if (!empty && date) {
-    page.drawText(`Fecha: ${date}`, {
-      x: MARGIN, y: H - MARGIN - 26,
-      size: 9, font, color: rgb(0.4, 0.4, 0.4),
-    });
+    page.drawText(`Fecha: ${date}`, { x: MARGIN, y: H - MARGIN - 26, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
   }
 
   const gridTop = H - MARGIN - 48;
-
-  // Day headers
   ROUTINE_DAYS.forEach((day, i) => {
     const x = MARGIN + COL_TIME + i * COL_DAY;
     page.drawRectangle({ x, y: gridTop, width: COL_DAY, height: 20, color: rgb(0.95, 0.95, 0.95) });
     page.drawText(day, { x: x + COL_DAY / 2 - 8, y: gridTop + 6, size: 8, font: fontBold });
   });
 
-  // Grid
   HALF_HOUR_SLOTS.forEach((slot) => {
     const y = gridTop - (slot + 1) * ROW_H;
-    const label = slotLabel(slot);
     const isFullHour = slot % 2 === 0;
-
     if (isFullHour) {
-      page.drawText(label, { x: MARGIN, y: y + ROW_H / 2 - 3, size: 6, font, color: rgb(0.4, 0.4, 0.4) });
+      page.drawText(slotLabel(slot), { x: MARGIN, y: y + ROW_H / 2 - 3, size: 6, font, color: rgb(0.4, 0.4, 0.4) });
     }
-
     ROUTINE_DAYS.forEach((_, day) => {
       const x = MARGIN + COL_TIME + day * COL_DAY;
       const cell = empty ? null : cells.find((c) => c.day === day && c.halfHour === slot);
-
       if (cell?.category) {
         const hex = ROUTINE_CATEGORY_COLORS[cell.category as RoutineCategory];
         const r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -159,29 +114,23 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, patientNa
         const b = parseInt(hex.slice(5, 7), 16) / 255;
         page.drawRectangle({ x: x + 0.5, y: y + 0.5, width: COL_DAY - 1, height: ROW_H - 1, color: rgb(r, g, b) });
       }
-
       if (cell?.activity) {
         const text = cell.activity.length > 18 ? cell.activity.slice(0, 16) + "…" : cell.activity;
         page.drawText(text, { x: x + 2, y: y + ROW_H / 2 - 3, size: 5.5, font, color: rgb(0.1, 0.1, 0.1) });
       }
-
-      // Cell border
       page.drawLine({ start: { x, y }, end: { x: x + COL_DAY, y }, thickness: 0.2, color: rgb(0.8, 0.8, 0.8) });
       page.drawLine({ start: { x, y }, end: { x, y: y + ROW_H }, thickness: isFullHour ? 0.5 : 0.2, color: rgb(0.7, 0.7, 0.7) });
     });
   });
 
-  // Outer border
   page.drawRectangle({
     x: MARGIN + COL_TIME, y: gridTop - 48 * ROW_H,
     width: COL_DAY * 7, height: 48 * ROW_H + 20,
     borderColor: rgb(0.6, 0.6, 0.6), borderWidth: 0.8,
   });
 
-  // Legend
   if (!empty) {
-    let lx = MARGIN;
-    const ly = MARGIN - 8;
+    let lx = MARGIN; const ly = MARGIN - 8;
     ROUTINE_CATEGORIES.forEach((cat) => {
       const hex = ROUTINE_CATEGORY_COLORS[cat];
       const r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -193,24 +142,19 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, patientNa
     });
   }
 
-  // If not empty, add a second page with balance summary
   if (!empty && cells.length > 0) {
     const page2 = pdfDoc.addPage([595.28, 841.89]);
     const W2 = 595.28; const H2 = 841.89;
-
     page2.drawText("Análisis de equilibrio ocupacional", {
       x: MARGIN, y: H2 - MARGIN - 14, size: 14, font: fontBold, color: rgb(0.1, 0.36, 0.34),
     });
-    if (date) {
-      page2.drawText(`Fecha: ${date}`, { x: MARGIN, y: H2 - MARGIN - 30, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
-    }
+    if (date) page2.drawText(`Fecha: ${date}`, { x: MARGIN, y: H2 - MARGIN - 30, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
 
     const filled = cells.filter((c) => c.category);
     const totalSlots = filled.length;
     const totalHours = totalSlots * 0.5;
-
-    // Group summary table
     let ty = H2 - MARGIN - 60;
+
     page2.drawText("Distribución por grupo de equilibrio (3 grupos clásicos):", { x: MARGIN, y: ty, size: 10, font: fontBold });
     ty -= 20;
 
@@ -228,7 +172,6 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, patientNa
       const r = parseInt(hex.slice(1, 3), 16) / 255;
       const g = parseInt(hex.slice(3, 5), 16) / 255;
       const b = parseInt(hex.slice(5, 7), 16) / 255;
-
       page2.drawRectangle({ x: MARGIN, y: ty - 2, width: 12, height: 12, color: rgb(r, g, b) });
       page2.drawText(grp, { x: MARGIN + 16, y: ty, size: 10, font: fontBold });
       page2.drawText(`${hours.toFixed(1)} h  (${pct}%)   Referencia: ~${ref}%`, { x: MARGIN + 100, y: ty, size: 10, font });
@@ -237,8 +180,6 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, patientNa
 
     ty -= 10;
     page2.drawText(`Total registrado: ${totalHours.toFixed(1)} horas`, { x: MARGIN, y: ty, size: 10, font: fontBold });
-
-    // OTPF areas table
     ty -= 30;
     page2.drawText("Distribución por área OTPF:", { x: MARGIN, y: ty, size: 10, font: fontBold });
     ty -= 18;
@@ -252,7 +193,6 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, patientNa
       const r = parseInt(hex.slice(1, 3), 16) / 255;
       const g = parseInt(hex.slice(3, 5), 16) / 255;
       const b = parseInt(hex.slice(5, 7), 16) / 255;
-
       page2.drawRectangle({ x: MARGIN, y: ty - 2, width: 10, height: 10, color: rgb(r, g, b) });
       page2.drawText(ROUTINE_CATEGORY_LABELS[cat], { x: MARGIN + 14, y: ty, size: 9, font });
       page2.drawText(`${hours.toFixed(1)} h  (${pct}%)`, { x: MARGIN + 280, y: ty, size: 9, font });
@@ -272,11 +212,15 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, patientNa
   URL.revokeObjectURL(url);
 }
 
-// ─── Main editor component ────────────────────────────────────────────────────
-interface Props {
-  patientId: string;
-  onClose: () => void;
+// ─── Context menu ─────────────────────────────────────────────────────────────
+interface ContextMenuState {
+  x: number;
+  y: number;
+  selectedCells: { day: number; halfHour: number }[];
 }
+
+// ─── Main editor component ────────────────────────────────────────────────────
+interface Props { patientId: string; onClose: () => void; }
 
 export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   const today = new Date().toISOString().slice(0, 10);
@@ -289,7 +233,6 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   const records = useRoutineRecords(patientId);
   const saveRecord = useSaveRoutineRecord(patientId);
   const deleteRecord = useDeleteRoutineRecord(patientId);
-
   const existingRecord = records.data?.find((r) => r.date === date);
   const recordDetail = useRoutineRecord(patientId, existingRecord?.id ?? null);
 
@@ -297,10 +240,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
     if (data) {
       try { setCells(JSON.parse(data.cells)); } catch { setCells([]); }
       setNotes(data.notes ?? "");
-    } else {
-      setCells([]);
-      setNotes("");
-    }
+    } else { setCells([]); setNotes(""); }
     setIsDirty(false);
   }, []);
 
@@ -308,7 +248,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
     loadRecord(recordDetail.data ?? (existingRecord ? undefined : null));
   }, [recordDetail.data, existingRecord, loadRecord]);
 
-  // Drag-to-select range state
+  // ─── Range-select state (works on both empty and filled cells) ───────────────
   const [dragDay, setDragDay] = useState<number | null>(null);
   const [dragStart, setDragStart] = useState<number | null>(null);
   const [dragEnd, setDragEnd] = useState<number | null>(null);
@@ -316,10 +256,21 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   const [rangeDraft, setRangeDraft] = useState<{ activity: string; category: RoutineCategory | ""; group: BalanceGroup | "" }>({ activity: "", category: "", group: "" });
   const [openCell, setOpenCell] = useState<{ day: number; halfHour: number } | null>(null);
 
+  // ─── Context menu state ───────────────────────────────────────────────────────
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [changeCatOpen, setChangeCatOpen] = useState(false);
+
   const selection = dragDay !== null && dragStart !== null && dragEnd !== null
     ? { day: dragDay, from: Math.min(dragStart, dragEnd), to: Math.max(dragStart, dragEnd) }
     : null;
   const rangeReady = !isDragging && selection !== null && selection.from !== selection.to;
+
+  // Cells in current selection
+  const selectedCells = selection
+    ? Array.from({ length: selection.to - selection.from + 1 }, (_, i) => ({
+        day: selection.day, halfHour: selection.from + i,
+      }))
+    : [];
 
   useEffect(() => {
     if (!isDragging) return;
@@ -330,6 +281,14 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
     document.addEventListener("mouseup", onUp);
     return () => document.removeEventListener("mouseup", onUp);
   }, [isDragging, dragStart, dragEnd]);
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!contextMenu) return;
+    function onDown() { setContextMenu(null); setChangeCatOpen(false); }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [contextMenu]);
 
   function cellAt(day: number, halfHour: number) {
     return cells.find((c) => c.day === day && c.halfHour === halfHour);
@@ -347,7 +306,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
       merged.group = OTPF_TO_GROUP[patch.category] ?? "";
     }
     const withoutThis = cells.filter((c) => !(c.day === day && c.halfHour === halfHour));
-    if (!merged.activity.trim() && !merged.category) { setCells(withoutThis); } else { setCells([...withoutThis, merged]); }
+    setCells(!merged.activity.trim() && !merged.category ? withoutThis : [...withoutThis, merged]);
     setIsDirty(true);
   }
 
@@ -366,6 +325,42 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
 
   function clearSelection() { setDragDay(null); setDragStart(null); setDragEnd(null); }
 
+  // ─── Move block of selected cells ────────────────────────────────────────────
+  // When dragging a selected cell, all selected cells move together.
+  // The dragged cell is the "anchor" — destination offset is calculated
+  // relative to where the user dropped it vs. where they picked it up.
+  function moveBlock(anchorFromDay: number, anchorFromSlot: number, toDay: number, toSlot: number) {
+    if (!selection) return;
+    const slots = selectedCells;
+    const dayOffset = toDay - anchorFromDay;
+    const slotOffset = toSlot - anchorFromSlot;
+
+    // Check bounds
+    const newSlots = slots.map((s) => ({ day: s.day + dayOffset, halfHour: s.halfHour + slotOffset }));
+    const outOfBounds = newSlots.some((s) => s.day < 0 || s.day > 6 || s.halfHour < 0 || s.halfHour > 47);
+    if (outOfBounds) { toast({ title: "No cabe en esa posición", variant: "destructive" }); return; }
+
+    // Check for collisions with non-selected cells
+    const selectedKeys = new Set(slots.map((s) => `${s.day}-${s.halfHour}`));
+    const destKeys = new Set(newSlots.map((s) => `${s.day}-${s.halfHour}`));
+    const collisions = cells.filter((c) => {
+      const key = `${c.day}-${c.halfHour}`;
+      return !selectedKeys.has(key) && destKeys.has(key) && (c.activity || c.category);
+    });
+    if (collisions.length > 0) {
+      if (!confirm(`${collisions.length} celda(s) del destino ya tienen contenido. ¿Sobrescribirlas?`)) return;
+    }
+
+    // Build new cells: keep non-selected cells that aren't in destination, then add moved
+    const sourceCells = slots.map((s) => cellAt(s.day, s.halfHour)).filter(Boolean) as RoutineCell[];
+    const withoutSelected = cells.filter((c) => !selectedKeys.has(`${c.day}-${c.halfHour}`) && !destKeys.has(`${c.day}-${c.halfHour}`));
+    const movedCells = sourceCells.map((c, i) => ({ ...c, day: newSlots[i].day, halfHour: newSlots[i].halfHour }));
+    setCells([...withoutSelected, ...movedCells]);
+    setIsDirty(true);
+    clearSelection();
+  }
+
+  // ─── Single cell move (no selection) ────────────────────────────────────────
   function moveCell(fromDay: number, fromSlot: number, toDay: number, toSlot: number) {
     const source = cellAt(fromDay, fromSlot);
     if (!source) return;
@@ -376,6 +371,24 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
     const withoutBoth = cells.filter((c) => !(c.day === fromDay && c.halfHour === fromSlot) && !(c.day === toDay && c.halfHour === toSlot));
     setCells([...withoutBoth, { ...source, day: toDay, halfHour: toSlot }]);
     setIsDirty(true);
+  }
+
+  // ─── Context menu actions ─────────────────────────────────────────────────────
+  function deleteSelected() {
+    const keys = new Set(selectedCells.map((s) => `${s.day}-${s.halfHour}`));
+    setCells(cells.filter((c) => !keys.has(`${c.day}-${c.halfHour}`)));
+    setIsDirty(true);
+    clearSelection();
+    setContextMenu(null);
+  }
+
+  function changeSelectedCategory(cat: RoutineCategory) {
+    const keys = new Set(selectedCells.map((s) => `${s.day}-${s.halfHour}`));
+    const autoGroup = OTPF_TO_GROUP[cat] ?? "";
+    setCells(cells.map((c) => keys.has(`${c.day}-${c.halfHour}`) ? { ...c, category: cat, group: autoGroup } : c));
+    setIsDirty(true);
+    setContextMenu(null);
+    setChangeCatOpen(false);
   }
 
   function copyDayToWeekdays(sourceDay: number) {
@@ -407,60 +420,43 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
 
   async function handlePrint(empty = false) {
     setPrinting(true);
-    try {
-      await generatePlanningPdf(cells, date, "", empty);
-    } catch {
-      toast({ title: "Error al generar PDF", variant: "destructive" });
-    } finally {
-      setPrinting(false);
-    }
+    try { await generatePlanningPdf(cells, date, empty); }
+    catch { toast({ title: "Error al generar PDF", variant: "destructive" }); }
+    finally { setPrinting(false); }
   }
 
+  // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col" onClick={() => { setContextMenu(null); setChangeCatOpen(false); }}>
       {/* Header */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b shrink-0">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Cerrar">
-            <X className="w-4 h-4" />
-          </Button>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Cerrar"><X className="w-4 h-4" /></Button>
           <h2 className="font-semibold text-base">Planning semanal de rutinas</h2>
         </div>
-
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
             <CalendarDays className="w-4 h-4 text-muted-foreground" />
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-8 w-36 text-sm" />
           </div>
-
           {(records.data?.length ?? 0) > 0 && (
-            <select
-              className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-              value={existingRecord?.id ?? ""}
-              onChange={(e) => { const rec = records.data?.find((r) => r.id === e.target.value); if (rec) setDate(rec.date); }}
-            >
+            <select className="h-8 rounded-md border border-input bg-background px-2 text-sm" value={existingRecord?.id ?? ""}
+              onChange={(e) => { const rec = records.data?.find((r) => r.id === e.target.value); if (rec) setDate(rec.date); }}>
               <option value="">Registros guardados…</option>
               {records.data?.map((r) => <option key={r.id} value={r.id}>{r.date}</option>)}
             </select>
           )}
-
           <Button variant="outline" size="sm" onClick={() => handlePrint(true)} disabled={printing}>
-            <Printer className="w-3.5 h-3.5 mr-1.5" />
-            PDF vacío
+            <Printer className="w-3.5 h-3.5 mr-1.5" />PDF vacío
           </Button>
-
           <Button variant="outline" size="sm" onClick={() => handlePrint(false)} disabled={printing || cells.length === 0}>
-            <Printer className="w-3.5 h-3.5 mr-1.5" />
-            PDF con datos
+            <Printer className="w-3.5 h-3.5 mr-1.5" />PDF con datos
           </Button>
-
           {existingRecord && (
             <Button variant="outline" size="sm" onClick={handleDelete} className="text-destructive border-destructive/40">
-              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-              Borrar
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />Borrar
             </Button>
           )}
-
           <Button size="sm" onClick={handleSave} disabled={saveRecord.isPending}>
             <Save className="w-3.5 h-3.5 mr-1.5" />
             {saveRecord.isPending ? "Guardando…" : isDirty ? "Guardar *" : "Guardado"}
@@ -476,6 +472,11 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
             <span className="text-muted-foreground">{ROUTINE_CATEGORY_LABELS[cat]}</span>
           </span>
         ))}
+        {selection && selectedCells.length > 1 && (
+          <span className="ml-auto text-xs font-medium text-foreground">
+            {selectedCells.length} celdas seleccionadas · clic derecho para opciones
+          </span>
+        )}
       </div>
 
       {/* Notes */}
@@ -518,83 +519,98 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                     const isOpen = openCell?.day === day && openCell?.halfHour === slot;
                     const selected = isCellSelected(day, slot);
                     const isRangeAnchor = rangeReady && selection && day === selection.day && slot === selection.to;
+                    const hasContent = !!(cell?.activity || cell?.category);
 
                     return (
                       <td key={day} className={`p-0.5 align-top relative ${isFullHour ? "" : "border-t border-t-dashed border-border/30"}`}>
-                        <Popover open={isOpen && !isDragging && !rangeReady} onOpenChange={(o) => setOpenCell(o ? { day, halfHour: slot } : null)}>
+                        <Popover
+                          open={isOpen && !isDragging && !rangeReady}
+                          onOpenChange={(o) => setOpenCell(o ? { day, halfHour: slot } : null)}
+                        >
                           <PopoverTrigger asChild>
                             <button
                               type="button"
-                              draggable={!!(cell?.activity || cell?.category)}
-                              onDragStart={(e) => { e.dataTransfer.setData("text/plain", JSON.stringify({ day, halfHour: slot })); }}
+                              // HTML5 drag: if selected and part of a multi-selection, drag the block;
+                              // otherwise drag just this cell (single-cell move).
+                              draggable={hasContent}
+                              onDragStart={(e) => {
+                                if (selected && selectedCells.length > 1) {
+                                  // Store anchor info for block move
+                                  e.dataTransfer.setData("text/plain", JSON.stringify({ type: "block", anchorDay: day, anchorSlot: slot }));
+                                } else {
+                                  e.dataTransfer.setData("text/plain", JSON.stringify({ type: "single", day, halfHour: slot }));
+                                }
+                              }}
                               onDragOver={(e) => e.preventDefault()}
                               onDrop={(e) => {
                                 e.preventDefault();
                                 const raw = e.dataTransfer.getData("text/plain");
                                 if (!raw) return;
-                                const src = JSON.parse(raw) as { day: number; halfHour: number };
-                                if (src.day === day && src.halfHour === slot) return;
-                                moveCell(src.day, src.halfHour, day, slot);
+                                const data = JSON.parse(raw) as { type: string; day?: number; halfHour?: number; anchorDay?: number; anchorSlot?: number };
+                                if (data.type === "block" && data.anchorDay !== undefined && data.anchorSlot !== undefined) {
+                                  moveBlock(data.anchorDay, data.anchorSlot, day, slot);
+                                } else if (data.type === "single" && data.day !== undefined && data.halfHour !== undefined) {
+                                  if (data.day === day && data.halfHour === slot) return;
+                                  moveCell(data.day, data.halfHour, day, slot);
+                                }
                               }}
                               onMouseDown={(e) => {
-                                if (cell?.activity || cell?.category) return;
+                                // Always allow range-select by mouse drag (even on filled cells)
+                                if (e.button !== 0) return;
                                 e.preventDefault();
                                 setOpenCell(null);
+                                setContextMenu(null);
                                 setDragDay(day); setDragStart(slot); setDragEnd(slot); setIsDragging(true);
                               }}
                               onMouseEnter={() => { if (!isDragging || day !== dragDay) return; setDragEnd(slot); }}
+                              onContextMenu={(e) => {
+                                // Right-click: show context menu if this cell is in a selection
+                                e.preventDefault();
+                                if (selected && selectedCells.length > 1) {
+                                  setContextMenu({ x: e.clientX, y: e.clientY, selectedCells });
+                                } else if (hasContent) {
+                                  // Right-click on single filled cell: select it and show menu
+                                  setDragDay(day); setDragStart(slot); setDragEnd(slot);
+                                  setContextMenu({ x: e.clientX, y: e.clientY, selectedCells: [{ day, halfHour: slot }] });
+                                }
+                              }}
                               className={`w-full rounded-sm border text-left px-1.5 truncate select-none text-xs font-medium ${
                                 isFullHour ? "h-8" : "h-7"
-                              } ${selected ? "border-foreground ring-1 ring-foreground/40" : "border-transparent hover:border-border"
-                              } ${cell?.activity || cell?.category ? "cursor-grab active:cursor-grabbing" : ""}`}
+                              } ${selected
+                                ? "border-foreground ring-1 ring-foreground/40 ring-offset-0"
+                                : "border-transparent hover:border-border"
+                              } ${hasContent ? "cursor-grab active:cursor-grabbing" : ""}`}
                               style={{ backgroundColor: bg }}
                               title={cell?.activity || undefined}
                             >
                               {cell?.activity || ""}
                             </button>
                           </PopoverTrigger>
-                          {/* Single-cell popover — larger font and wider */}
+
+                          {/* Single-cell edit popover */}
                           <PopoverContent className="w-96 space-y-3" side="right" align="start">
                             <p className="text-sm font-semibold">{ROUTINE_DAYS_FULL[day]} · {label}</p>
-                            <Input
-                              placeholder="Actividad…"
-                              value={cell?.activity ?? ""}
+                            <Input placeholder="Actividad…" value={cell?.activity ?? ""}
                               onChange={(e) => setCell(day, slot, { activity: e.target.value })}
-                              className="h-9 text-sm"
-                              autoFocus
-                            />
+                              className="h-9 text-sm" autoFocus />
                             <div>
                               <p className="text-xs text-muted-foreground mb-1.5 font-medium">Área OTPF</p>
                               <div className="grid grid-cols-3 gap-1.5">
                                 {ROUTINE_CATEGORIES.map((cat) => (
-                                  <button
-                                    key={cat}
-                                    type="button"
-                                    onClick={() => setCell(day, slot, { category: cat })}
+                                  <button key={cat} type="button" onClick={() => setCell(day, slot, { category: cat })}
                                     className={`h-8 rounded-md text-[11px] border-2 transition-all px-1 leading-tight ${cell?.category === cat ? "border-foreground/50" : "border-transparent"}`}
-                                    style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }}
-                                  >
-                                    {cat}
-                                  </button>
+                                    style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }}>{cat}</button>
                                 ))}
                               </div>
                             </div>
                             {cell?.category && (
                               <div>
-                                <p className="text-xs text-muted-foreground mb-1.5 font-medium">
-                                  Grupo de equilibrio <span className="italic font-normal">(auto — editable)</span>
-                                </p>
+                                <p className="text-xs text-muted-foreground mb-1.5 font-medium">Grupo de equilibrio <span className="italic font-normal">(auto — editable)</span></p>
                                 <div className="flex gap-1.5">
                                   {BALANCE_GROUPS.map((grp) => (
-                                    <button
-                                      key={grp}
-                                      type="button"
-                                      onClick={() => setCell(day, slot, { group: grp })}
+                                    <button key={grp} type="button" onClick={() => setCell(day, slot, { group: grp })}
                                       className={`flex-1 h-8 rounded-md text-xs border-2 transition-all font-medium ${cell?.group === grp ? "border-foreground/50" : "border-transparent"}`}
-                                      style={{ backgroundColor: BALANCE_GROUP_COLORS[grp] }}
-                                    >
-                                      {grp}
-                                    </button>
+                                      style={{ backgroundColor: BALANCE_GROUP_COLORS[grp] }}>{grp}</button>
                                   ))}
                                 </div>
                               </div>
@@ -609,6 +625,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                           </PopoverContent>
                         </Popover>
 
+                        {/* Range-fill popover */}
                         {isRangeAnchor && selection && (
                           <Popover open onOpenChange={(o) => { if (!o) clearSelection(); }}>
                             <PopoverTrigger asChild>
@@ -618,46 +635,29 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                               <p className="text-sm font-semibold">
                                 {ROUTINE_DAYS_FULL[selection.day]} · {slotLabel(selection.from)} – {slotLabel(selection.to)} ({selection.to - selection.from + 1} franjas)
                               </p>
-                              <Input
-                                placeholder="Actividad…"
-                                value={rangeDraft.activity}
+                              <Input placeholder="Actividad…" value={rangeDraft.activity}
                                 onChange={(e) => setRangeDraft((d) => ({ ...d, activity: e.target.value }))}
-                                className="h-9 text-sm"
-                                autoFocus
-                                onKeyDown={(e) => { if (e.key === "Enter") applyRange(); }}
-                              />
+                                className="h-9 text-sm" autoFocus
+                                onKeyDown={(e) => { if (e.key === "Enter") applyRange(); }} />
                               <div>
                                 <p className="text-xs text-muted-foreground mb-1.5 font-medium">Área OTPF</p>
                                 <div className="grid grid-cols-3 gap-1.5">
                                   {ROUTINE_CATEGORIES.map((cat) => (
-                                    <button
-                                      key={cat}
-                                      type="button"
+                                    <button key={cat} type="button"
                                       onClick={() => setRangeDraft((d) => ({ ...d, category: cat, group: OTPF_TO_GROUP[cat] ?? "" }))}
                                       className={`h-8 rounded-md text-[11px] border-2 transition-all px-1 leading-tight ${rangeDraft.category === cat ? "border-foreground/50" : "border-transparent"}`}
-                                      style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }}
-                                    >
-                                      {cat}
-                                    </button>
+                                      style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }}>{cat}</button>
                                   ))}
                                 </div>
                               </div>
                               {rangeDraft.category && (
                                 <div>
-                                  <p className="text-xs text-muted-foreground mb-1.5 font-medium">
-                                    Grupo de equilibrio <span className="italic font-normal">(auto — editable)</span>
-                                  </p>
+                                  <p className="text-xs text-muted-foreground mb-1.5 font-medium">Grupo de equilibrio <span className="italic font-normal">(auto — editable)</span></p>
                                   <div className="flex gap-1.5">
                                     {BALANCE_GROUPS.map((grp) => (
-                                      <button
-                                        key={grp}
-                                        type="button"
-                                        onClick={() => setRangeDraft((d) => ({ ...d, group: grp }))}
+                                      <button key={grp} type="button" onClick={() => setRangeDraft((d) => ({ ...d, group: grp }))}
                                         className={`flex-1 h-8 rounded-md text-xs border-2 transition-all font-medium ${rangeDraft.group === grp ? "border-foreground/50" : "border-transparent"}`}
-                                        style={{ backgroundColor: BALANCE_GROUP_COLORS[grp] }}
-                                      >
-                                        {grp}
-                                      </button>
+                                        style={{ backgroundColor: BALANCE_GROUP_COLORS[grp] }}>{grp}</button>
                                     ))}
                                   </div>
                                 </div>
@@ -678,6 +678,50 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
           </tbody>
         </table>
       </div>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-[60] bg-popover border rounded-md shadow-md py-1 min-w-[180px]"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <p className="px-3 py-1.5 text-xs text-muted-foreground border-b">
+            {contextMenu.selectedCells.length} celda{contextMenu.selectedCells.length !== 1 ? "s" : ""} seleccionada{contextMenu.selectedCells.length !== 1 ? "s" : ""}
+          </p>
+
+          {/* Change category submenu */}
+          <div className="relative">
+            <button
+              type="button"
+              className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex items-center justify-between"
+              onClick={(e) => { e.stopPropagation(); setChangeCatOpen((v) => !v); }}
+            >
+              Cambiar categoría…
+              <span className="text-muted-foreground">▶</span>
+            </button>
+            {changeCatOpen && (
+              <div className="absolute left-full top-0 bg-popover border rounded-md shadow-md py-1 min-w-[220px] z-[70]"
+                onMouseDown={(e) => e.stopPropagation()}>
+                {ROUTINE_CATEGORIES.map((cat) => (
+                  <button key={cat} type="button"
+                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent flex items-center gap-2"
+                    onClick={() => changeSelectedCategory(cat)}>
+                    <span className="w-3 h-3 rounded-sm inline-block shrink-0" style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }} />
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button type="button"
+            className="w-full text-left px-3 py-1.5 text-sm text-destructive hover:bg-accent"
+            onClick={deleteSelected}>
+            Borrar seleccionadas
+          </button>
+        </div>
+      )}
     </div>
   );
 }
