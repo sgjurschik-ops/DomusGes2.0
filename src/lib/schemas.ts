@@ -80,19 +80,32 @@ export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export const professionalCreateSchema = z
   .object({
     name: z.string().min(2, "El nombre es obligatorio"),
-    email: z.string().email("Email no válido"),
+    email: z.string().optional().default(""),
     role: z.enum(PROFESSIONAL_ROLES, { error: "Rol no válido" }),
     numColegiado: z.string().optional().default(""),
     phone: z.string().optional().default(""),
     color: z.string().default("#1a5c58"),
     isAdmin: z.boolean().default(false),
     userRole: z.enum(["admin", "therapist", "guest"]).default("therapist"),
-    password: z.string().min(8, "Mínimo 8 caracteres"),
-    confirmPassword: z.string(),
+    password: z.string().optional().default(""),
+    confirmPassword: z.string().optional().default(""),
   })
-  .refine((d) => d.password === d.confirmPassword, {
-    message: "Las contraseñas no coinciden",
-    path: ["confirmPassword"],
+  .superRefine((d, ctx) => {
+    // Non-guest accounts require a valid email
+    if (d.userRole !== "guest") {
+      if (!d.email || !d.email.includes("@")) {
+        ctx.addIssue({ code: "custom", path: ["email"], message: "Email no válido" });
+      }
+    }
+    // Non-guest accounts require a password of at least 8 chars
+    if (d.userRole !== "guest") {
+      if (!d.password || d.password.length < 8) {
+        ctx.addIssue({ code: "custom", path: ["password"], message: "Mínimo 8 caracteres" });
+      }
+      if (d.password !== d.confirmPassword) {
+        ctx.addIssue({ code: "custom", path: ["confirmPassword"], message: "Las contraseñas no coinciden" });
+      }
+    }
   });
 export type ProfessionalCreateInput = z.infer<typeof professionalCreateSchema>;
 

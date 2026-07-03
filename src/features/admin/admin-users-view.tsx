@@ -5,7 +5,7 @@
 // but we still gate defensively here in case of stale session.
 
 import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -517,6 +517,9 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
     },
   });
 
+  const selectedUserRole = useWatch({ control, name: "userRole" });
+  const isGuest = selectedUserRole === "guest";
+
   async function onSubmit(values: ProfessionalCreateInput) {
     try {
       await create.mutateAsync(values);
@@ -546,14 +549,16 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
             <Field label="Nombre" htmlFor="name" error={errors.name?.message} required>
               <Input id="name" autoComplete="name" {...register("name")} />
             </Field>
-            <Field label="Email" htmlFor="email" error={errors.email?.message} required>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                {...register("email")}
-              />
-            </Field>
+            {!isGuest && (
+              <Field label="Email" htmlFor="email" error={errors.email?.message} required>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  {...register("email")}
+                />
+              </Field>
+            )}
             <Field label="Rol" htmlFor="role" error={errors.role?.message} required>
               <Controller
                 control={control}
@@ -626,32 +631,38 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
             )}
           />
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Field
-              label="Contraseña"
-              htmlFor="password"
-              error={errors.password?.message}
-              required
-            >
-              <PasswordInput
-                id="password"
-                autoComplete="new-password"
-                {...register("password")}
-              />
-            </Field>
-            <Field
-              label="Repetir contraseña"
-              htmlFor="confirmPassword"
-              error={errors.confirmPassword?.message}
-              required
-            >
-              <PasswordInput
-                id="confirmPassword"
-                autoComplete="new-password"
-                {...register("confirmPassword")}
-              />
-            </Field>
-          </div>
+          {isGuest ? (
+            <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+              👤 El perfil invitado no necesita email ni contraseña. Se generarán automáticamente y podrán cambiarse después desde Ajustes.
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field
+                label="Contraseña"
+                htmlFor="password"
+                error={errors.password?.message}
+                required
+              >
+                <PasswordInput
+                  id="password"
+                  autoComplete="new-password"
+                  {...register("password")}
+                />
+              </Field>
+              <Field
+                label="Repetir contraseña"
+                htmlFor="confirmPassword"
+                error={errors.confirmPassword?.message}
+                required
+              >
+                <PasswordInput
+                  id="confirmPassword"
+                  autoComplete="new-password"
+                  {...register("confirmPassword")}
+                />
+              </Field>
+            </div>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>

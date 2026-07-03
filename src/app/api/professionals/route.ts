@@ -29,18 +29,28 @@ export async function POST(req: NextRequest) {
     );
   }
   const d = parsed.data;
-  const exists = await db.professional.findUnique({ where: { email: d.email.toLowerCase() } });
+
+  // For guest accounts, generate a technical email and password if not provided
+  const email = (d.userRole === "guest" && !d.email)
+    ? `invitado-${Date.now()}@domusges.local`
+    : d.email!.toLowerCase();
+
+  const password = (d.userRole === "guest" && !d.password)
+    ? Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 6).toUpperCase()
+    : d.password!;
+
+  const exists = await db.professional.findUnique({ where: { email } });
   if (exists) {
     return NextResponse.json({ error: "EMAIL_TAKEN" }, { status: 409 });
   }
   const row = await db.professional.create({
     data: {
-      email: d.email.toLowerCase(),
+      email,
       name: d.name,
       role: d.role,
       numColegiado: d.numColegiado || null,
       phone: d.phone || null,
-      passwordHash: bcrypt.hashSync(d.password, 10),
+      passwordHash: bcrypt.hashSync(password, 10),
       isAdmin: d.userRole === "admin",
       userRole: d.userRole,
       color: d.color,
