@@ -86,6 +86,7 @@ export const professionalCreateSchema = z
     phone: z.string().optional().default(""),
     color: z.string().default("#1a5c58"),
     isAdmin: z.boolean().default(false),
+    userRole: z.enum(["admin", "therapist", "guest"]).default("therapist"),
     password: z.string().min(8, "Mínimo 8 caracteres"),
     confirmPassword: z.string(),
   })
@@ -104,6 +105,7 @@ export const professionalUpdateSchema = z.object({
   color: z.string().default("#1a5c58"),
   isActive: z.boolean().default(true),
   isAdmin: z.boolean().default(false),
+  userRole: z.enum(["admin", "therapist", "guest"]).default("therapist"),
 });
 export type ProfessionalUpdateInput = z.infer<typeof professionalUpdateSchema>;
 

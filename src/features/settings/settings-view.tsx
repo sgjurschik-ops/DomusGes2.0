@@ -175,6 +175,7 @@ function ProfileTab({ userId }: { userId: string }) {
           color: values.color,
           isActive: me.isActive,
           isAdmin: me.isAdmin,
+          userRole: (me.userRole ?? (me.isAdmin ? "admin" : "therapist")) as ProfessionalUpdateInput["userRole"],
         },
       });
       toast({ title: "Perfil actualizado" });

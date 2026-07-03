@@ -41,12 +41,13 @@ export async function POST(req: NextRequest) {
       numColegiado: d.numColegiado || null,
       phone: d.phone || null,
       passwordHash: bcrypt.hashSync(d.password, 10),
-      isAdmin: d.isAdmin,
+      isAdmin: d.userRole === "admin",
+      userRole: d.userRole,
       color: d.color,
     },
     select: {
       id: true, email: true, name: true, role: true, numColegiado: true,
-      phone: true, isActive: true, isAdmin: true, color: true, joinedAt: true,
+      phone: true, isActive: true, isAdmin: true, userRole: true, color: true, joinedAt: true,
     },
   });
   await audit(admin.id, "professional.create", "Professional", row.id, { name: row.name });

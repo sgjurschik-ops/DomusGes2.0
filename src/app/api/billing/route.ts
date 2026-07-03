@@ -1,4 +1,5 @@
 // /api/billing — aggregated billing for the current month (or any month)
+// Admin sees all therapists. Therapist/guest only sees their own billing.
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireProfessional } from "@/lib/server";
@@ -23,8 +24,12 @@ export async function GET(req: NextRequest) {
     Coordinación: 35,
   };
 
+  // Admin sees all; therapist/guest only see their own
+  const therapistFilter =
+    prof.userRole === "admin" ? {} : { therapistId: prof.id };
+
   const appointments = await db.appointment.findMany({
-    where: { start: { gte: from, lt: to }, status: { not: "cancelada" } },
+    where: { start: { gte: from, lt: to }, status: { not: "cancelada" }, ...therapistFilter },
     include: {
       patient: { select: { firstName: true, lastName: true, specialty: true } },
       therapist: { select: { name: true } },
@@ -68,5 +73,7 @@ export async function GET(req: NextRequest) {
     count: lines.length,
     byTherapist: Object.entries(byTherapist).map(([name, v]) => ({ name, ...v })),
     lines,
+    isFiltered: prof.userRole !== "admin",
+    therapistName: prof.userRole !== "admin" ? prof.name : null,
   });
 }

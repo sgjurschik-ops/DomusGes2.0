@@ -168,14 +168,16 @@ export function AdminUsersView() {
                         <div className="flex items-center gap-3 min-w-[200px]">
                           <Avatar name={prof.name} color={prof.color} size={36} />
                           <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <p className="text-sm font-medium truncate">{prof.name}</p>
-                              {prof.isAdmin && (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-[10px] gap-0.5 px-1.5 py-0"
-                                >
-                                  <ShieldCheck className="w-3 h-3" /> Admin
+                              {(prof.userRole === "admin" || prof.isAdmin) && (
+                                <Badge variant="secondary" className="text-[10px] gap-0.5 px-1.5 py-0">
+                                  🛡️ Admin
+                                </Badge>
+                              )}
+                              {prof.userRole === "guest" && (
+                                <Badge variant="outline" className="text-[10px] gap-0.5 px-1.5 py-0 text-muted-foreground">
+                                  👤 Invitado
                                 </Badge>
                               )}
                             </div>
@@ -289,6 +291,7 @@ function ActiveToggle({ prof }: { prof: ProfessionalDTO }) {
           color: prof.color,
           isActive: next,
           isAdmin: prof.isAdmin,
+          userRole: (prof.userRole ?? (prof.isAdmin ? "admin" : "therapist")) as ProfessionalUpdateInput["userRole"],
         },
       });
       toast({
@@ -508,6 +511,7 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
       phone: "",
       color: PROFESSIONAL_COLORS[0],
       isAdmin: false,
+      userRole: "therapist",
       password: "",
       confirmPassword: "",
     },
@@ -589,23 +593,36 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
 
           <Controller
             control={control}
-            name="isAdmin"
+            name="userRole"
             render={({ field }) => (
-              <label className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/40">
-                <Switch
-                  checked={!!field.value}
-                  onCheckedChange={field.onChange}
-                  aria-label="Permisos de administrador"
-                />
-                <div>
-                  <p className="text-sm font-medium flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4" /> Administrador
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Podrá gestionar usuarios y ver el registro de actividad.
-                  </p>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Nivel de acceso</p>
+                <div className="grid gap-2">
+                  {([
+                    { value: "admin", label: "Administrador", icon: "🛡️", desc: "Gestiona usuarios, datos de contacto y facturación. Sin acceso a datos clínicos." },
+                    { value: "therapist", label: "Terapeuta", icon: "🩺", desc: "Acceso clínico completo a sus pacientes. Puede ver (no editar) los de otros terapeutas." },
+                    { value: "guest", label: "Invitado", icon: "👤", desc: "Solo ve y edita sus propios pacientes. Ideal para probar la aplicación." },
+                  ] as const).map((opt) => (
+                    <label
+                      key={opt.value}
+                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        field.value === opt.value ? "border-primary bg-primary/5" : "hover:bg-muted/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        className="mt-0.5"
+                        checked={field.value === opt.value}
+                        onChange={() => field.onChange(opt.value)}
+                      />
+                      <div>
+                        <p className="text-sm font-medium">{opt.icon} {opt.label}</p>
+                        <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                      </div>
+                    </label>
+                  ))}
                 </div>
-              </label>
+              </div>
             )}
           />
 
@@ -676,6 +693,7 @@ function EditUserDialog({
       color: prof.color,
       isActive: prof.isActive,
       isAdmin: prof.isAdmin,
+      userRole: (prof.userRole ?? (prof.isAdmin ? "admin" : "therapist")) as ProfessionalUpdateInput["userRole"],
     },
   });
 
@@ -753,23 +771,36 @@ function EditUserDialog({
 
           <Controller
             control={control}
-            name="isAdmin"
+            name="userRole"
             render={({ field }) => (
-              <label className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/40">
-                <Switch
-                  checked={!!field.value}
-                  onCheckedChange={field.onChange}
-                  aria-label="Permisos de administrador"
-                />
-                <div>
-                  <p className="text-sm font-medium flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4" /> Administrador
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Podrá gestionar usuarios y ver el registro de actividad.
-                  </p>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Nivel de acceso</p>
+                <div className="grid gap-2">
+                  {([
+                    { value: "admin", label: "Administrador", icon: "🛡️", desc: "Gestiona usuarios, datos de contacto y facturación. Sin acceso a datos clínicos." },
+                    { value: "therapist", label: "Terapeuta", icon: "🩺", desc: "Acceso clínico completo a sus pacientes. Puede ver (no editar) los de otros terapeutas." },
+                    { value: "guest", label: "Invitado", icon: "👤", desc: "Solo ve y edita sus propios pacientes. Ideal para probar la aplicación." },
+                  ] as const).map((opt) => (
+                    <label
+                      key={opt.value}
+                      className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        field.value === opt.value ? "border-primary bg-primary/5" : "hover:bg-muted/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        className="mt-0.5"
+                        checked={field.value === opt.value}
+                        onChange={() => field.onChange(opt.value)}
+                      />
+                      <div>
+                        <p className="text-sm font-medium">{opt.icon} {opt.label}</p>
+                        <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                      </div>
+                    </label>
+                  ))}
                 </div>
-              </label>
+              </div>
             )}
           />
 

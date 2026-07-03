@@ -43,11 +43,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       phone: d.phone || null,
       color: d.color,
       isActive: d.isActive,
-      isAdmin: d.isAdmin,
+      isAdmin: d.userRole === "admin",
+      userRole: d.userRole,
     },
     select: {
       id: true, email: true, name: true, role: true, numColegiado: true,
-      phone: true, isActive: true, isAdmin: true, color: true, joinedAt: true,
+      phone: true, isActive: true, isAdmin: true, userRole: true, color: true, joinedAt: true,
     },
   });
   await audit(admin.id, "professional.update", "Professional", id, { name: row.name });
