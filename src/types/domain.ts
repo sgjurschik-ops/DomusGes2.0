@@ -59,6 +59,7 @@ export interface ProfessionalDTO {
   phone: string | null;
   isActive: boolean;
   isAdmin: boolean;
+  userRole: "admin" | "therapist" | "guest";
   color: string;
   joinedAt: string; // ISO
 }

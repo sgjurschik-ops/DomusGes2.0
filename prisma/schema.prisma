@@ -20,7 +20,8 @@ model Professional {
   phone        String?
   passwordHash String
   isActive     Boolean  @default(true)
-  isAdmin      Boolean  @default(false)
+  isAdmin      Boolean  @default(false) // legacy — use userRole instead
+  userRole     String   @default("therapist") // admin | therapist | guest
   color        String   @default("#1a5c58")
   joinedAt     DateTime @default(now())
   createdAt    DateTime @default(now())

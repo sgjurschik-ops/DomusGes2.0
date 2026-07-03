@@ -7,6 +7,8 @@ import { db } from "@/lib/db";
 import type { ProfessionalDTO, AreaSummaryData } from "@/types/domain";
 import type { Prisma } from "@prisma/client";
 
+export type UserRole = "admin" | "therapist" | "guest";
+
 export async function getCurrentProfessional(): Promise<ProfessionalDTO | null> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return null;
@@ -14,6 +16,7 @@ export async function getCurrentProfessional(): Promise<ProfessionalDTO | null> 
     where: { id: session.user.id },
   });
   if (!prof || !prof.isActive) return null;
+  const userRole: UserRole = (prof.userRole as UserRole) ?? (prof.isAdmin ? "admin" : "therapist");
   return {
     id: prof.id,
     email: prof.email,
@@ -23,6 +26,7 @@ export async function getCurrentProfessional(): Promise<ProfessionalDTO | null> 
     phone: prof.phone,
     isActive: prof.isActive,
     isAdmin: prof.isAdmin,
+    userRole,
     color: prof.color,
     joinedAt: prof.joinedAt.toISOString(),
   };
@@ -80,11 +84,60 @@ export async function requireProfessional(): Promise<ProfessionalDTO> {
 
 export async function requireAdmin(): Promise<ProfessionalDTO> {
   const prof = await requireProfessional();
-  if (!prof.isAdmin) throw new Error("FORBIDDEN");
+  if (prof.userRole !== "admin") throw new Error("FORBIDDEN");
   return prof;
 }
 
-// ─── Audit log ───────────────────────────────────────────────────────────────
+export async function requireTherapistOrAdmin(): Promise<ProfessionalDTO> {
+  const prof = await requireProfessional();
+  if (prof.userRole === "guest") throw new Error("FORBIDDEN");
+  return prof;
+}
+
+// Can edit a patient's contact/admin data?
+// admin: always. therapist/guest: only if assigned.
+export async function canEditPatient(prof: ProfessionalDTO, patientId: string): Promise<boolean> {
+  if (prof.userRole === "admin") return true;
+  const link = await db.patient.findFirst({
+    where: { id: patientId, therapists: { some: { id: prof.id } } },
+    select: { id: true },
+  });
+  return !!link;
+}
+
+// Can edit clinical data (visits, assessments, profile)?
+// Only assigned therapists/guests. Admin cannot touch clinical data.
+export async function canEditClinical(prof: ProfessionalDTO, patientId: string): Promise<boolean> {
+  if (prof.userRole === "admin") return false;
+  const link = await db.patient.findFirst({
+    where: { id: patientId, therapists: { some: { id: prof.id } } },
+    select: { id: true },
+  });
+  return !!link;
+}
+
+// Can view (read) clinical data?
+// therapist: all patients. guest: only assigned. admin: never.
+export async function canViewClinical(prof: ProfessionalDTO, patientId: string): Promise<boolean> {
+  if (prof.userRole === "admin") return false;
+  if (prof.userRole === "therapist") return true;
+  const link = await db.patient.findFirst({
+    where: { id: patientId, therapists: { some: { id: prof.id } } },
+    select: { id: true },
+  });
+  return !!link;
+}
+
+// Can see a patient at all (list, contact)?
+// admin: all. therapist: all. guest: only assigned.
+export async function canViewPatient(prof: ProfessionalDTO, patientId: string): Promise<boolean> {
+  if (prof.userRole !== "guest") return true;
+  const link = await db.patient.findFirst({
+    where: { id: patientId, therapists: { some: { id: prof.id } } },
+    select: { id: true },
+  });
+  return !!link;
+}
 
 export async function audit(
   professionalId: string | null,

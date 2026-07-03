@@ -7,7 +7,14 @@ import { patientCreateSchema } from "@/lib/schemas";
 
 export async function GET() {
   const prof = await requireProfessional();
+
+  // Guests only see patients assigned to them
+  const where = prof.userRole === "guest"
+    ? { therapists: { some: { id: prof.id } } }
+    : {};
+
   const rows = await db.patient.findMany({
+    where,
     include: {
       therapists: { select: { id: true, name: true } },
       _count: { select: { visits: true } },

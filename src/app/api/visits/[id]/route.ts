@@ -1,7 +1,7 @@
 // /api/visits/[id] — get, update & delete a single visit
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapVisit, buildMadridDateTime } from "@/lib/server";
+import { requireProfessional, canViewClinical, canEditClinical, audit, mapVisit, buildMadridDateTime } from "@/lib/server";
 import { visitUpdateSchema } from "@/lib/schemas";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -17,6 +17,9 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     },
   });
   if (!row) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  if (!(await canViewClinical(prof, row.patientId))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
   await audit(prof.id, "visit.view", "Visit", row.id, { patientId: row.patientId });
   return NextResponse.json(mapVisit(row));
 }
@@ -24,6 +27,12 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id } = await params;
+
+  const existing = await db.visit.findUnique({ where: { id }, select: { patientId: true } });
+  if (!existing) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  if (!(await canEditClinical(prof, existing.patientId))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
 
   let body: any;
   try {
@@ -68,6 +77,9 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
 
   const existing = await db.visit.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  if (!(await canEditClinical(prof, existing.patientId))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
 
   await db.visit.delete({ where: { id } });
   await audit(prof.id, "visit.delete", "Visit", id, { patientId: existing.patientId });
