@@ -50,6 +50,15 @@ export function useCurrentSession() {
   };
 }
 
+// Current professional profile (includes userRole for permission checks)
+export function useMe() {
+  return useQuery<ProfessionalDTO>({
+    queryKey: ["me"],
+    queryFn: () => fetcher("/api/me"),
+    staleTime: 5 * 60_000, // refresh every 5 min at most
+  });
+}
+
 export function useChangePassword() {
   return useMutation({
     mutationFn: (data: ChangePasswordInput) =>

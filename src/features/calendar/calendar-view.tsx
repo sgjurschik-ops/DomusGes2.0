@@ -39,6 +39,7 @@ import {
   useDeleteReservation,
   usePatients,
   useProfessionals,
+  useMe,
 } from "@/hooks/api";
 import { useNav } from "@/store/nav";
 import { toast } from "@/hooks/use-toast";
@@ -349,6 +350,8 @@ export function CalendarView() {
     time: "10:00",
   });
 
+  const { data: me } = useMe();
+  const isAdmin = me?.userRole === "admin";
   const { data: professionals } = useProfessionals();
   const moveAppt = useMoveAppointment();
   const moveReservation = useMoveReservation();
@@ -580,19 +583,21 @@ export function CalendarView() {
               </TabsList>
             </Tabs>
 
-            <Select value={filterTherapistId} onValueChange={setFilterTherapistId}>
-              <SelectTrigger aria-label="Filtrar por terapeuta" className="w-[200px] h-8 text-muted-foreground">
-                <SelectValue placeholder="Todos los terapeutas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los terapeutas</SelectItem>
-                {(professionals ?? []).filter((p) => p.isActive).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isAdmin && (
+              <Select value={filterTherapistId} onValueChange={setFilterTherapistId}>
+                <SelectTrigger aria-label="Filtrar por terapeuta" className="w-[200px] h-8 text-muted-foreground">
+                  <SelectValue placeholder="Todos los terapeutas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los terapeutas</SelectItem>
+                  {(professionals ?? []).filter((p) => p.isActive).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
       </div>
