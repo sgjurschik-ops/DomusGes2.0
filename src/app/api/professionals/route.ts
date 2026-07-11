@@ -7,12 +7,20 @@ import { professionalCreateSchema } from "@/lib/schemas";
 
 export async function GET() {
   const prof = await requireProfessional();
+
+  // All roles need the list (for calendar filters, patient assignment, etc.)
+  // but guests get a minimal view (id, name, color, role — no email/phone).
+  const select =
+    prof.userRole === "guest"
+      ? { id: true, name: true, role: true, isActive: true, color: true, joinedAt: true }
+      : {
+          id: true, email: true, name: true, role: true, numColegiado: true,
+          phone: true, isActive: true, isAdmin: true, userRole: true, color: true, joinedAt: true,
+        };
+
   const rows = await db.professional.findMany({
     orderBy: { name: "asc" },
-    select: {
-      id: true, email: true, name: true, role: true, numColegiado: true,
-      phone: true, isActive: true, isAdmin: true, color: true, joinedAt: true,
-    },
+    select,
   });
   await audit(prof.id, "professional.list", "Professional", null);
   return NextResponse.json(rows);

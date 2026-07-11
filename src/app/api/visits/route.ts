@@ -8,7 +8,18 @@ export async function GET(req: NextRequest) {
   const prof = await requireProfessional();
   const url = new URL(req.url);
   const patientId = url.searchParams.get("patientId");
-  const where = patientId ? { patientId } : {};
+
+  // Build base filter
+  const where: Record<string, unknown> = {};
+  if (patientId) where.patientId = patientId;
+
+  // Permission: guest only sees visits for their own patients;
+  // therapist sees all; admin does not access clinical data but
+  // we still allow listing for reporting purposes.
+  if (prof.userRole === "guest") {
+    where.therapistId = prof.id;
+  }
+
   const rows = await db.visit.findMany({
     where,
     include: {

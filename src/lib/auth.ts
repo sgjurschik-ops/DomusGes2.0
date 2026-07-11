@@ -47,23 +47,19 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        // `user` here is always the object returned by `authorize()` above,
-        // which always includes `role` — but NextAuth types it as
-        // `User | AdapterUser` (a union where AdapterUser lacks `role`),
-        // so a direct cast is rejected. Going through `unknown` is correct
-        // here because we know the real shape from our own authorize().
         token.role = (user as unknown as { role: string }).role;
       }
-      // Always refresh isActive/isAdmin from DB so disabled admins are kicked
+      // Always refresh isActive/isAdmin/userRole from DB so changes take
+      // effect without forcing the user to log out and back in.
       const prof = await db.professional.findUnique({
         where: { id: token.id as string },
-        select: { isActive: true, isAdmin: true },
+        select: { isActive: true, isAdmin: true, userRole: true },
       });
       if (!prof || !prof.isActive) {
-        // Force sign-out by returning an empty token
         return { ...token, expired: true } as typeof token;
       }
       token.isAdmin = prof.isAdmin;
+      token.userRole = prof.userRole ?? (prof.isAdmin ? "admin" : "therapist");
       return token;
     },
     async session({ session, token }) {
@@ -71,13 +67,14 @@ export const authOptions: NextAuthOptions = {
         (session.user as { id?: string }).id = token.id as string;
         (session.user as { role?: string }).role = token.role as string;
         (session.user as { isAdmin?: boolean }).isAdmin = token.isAdmin as boolean;
+        (session.user as { userRole?: string }).userRole = token.userRole as string;
       }
       return session;
     },
   },
 };
 
-// Extend the type locally so consumers can read id/role/isAdmin off session.user.
+// Extend the type locally so consumers can read id/role/isAdmin/userRole off session.user.
 declare module "next-auth" {
   interface Session {
     user: {
@@ -86,6 +83,7 @@ declare module "next-auth" {
       email: string;
       role: string;
       isAdmin: boolean;
+      userRole: "admin" | "therapist" | "guest";
     };
   }
 }
@@ -94,6 +92,7 @@ declare module "next-auth/jwt" {
     id?: string;
     role?: string;
     isAdmin?: boolean;
+    userRole?: string;
     expired?: boolean;
   }
 }

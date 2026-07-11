@@ -26,6 +26,16 @@ const TodayView = dynamic(
   { ssr: false, loading: () => <div className="text-sm text-muted-foreground p-8">Cargando mapa…</div> },
 );
 
+type UserRole = "admin" | "therapist" | "guest";
+
+/** Views restricted by role. Omitted views are available to all roles. */
+const VIEW_ROLES: Partial<Record<string, UserRole[]>> = {
+  "admin-users": ["admin"],
+  facturacion: ["admin"],
+  reports: ["admin", "therapist"],
+  today: ["admin", "therapist"],
+};
+
 export default function Home() {
   const { status, user, isLoading } = useCurrentSession();
   const { view } = useNav();
@@ -42,27 +52,32 @@ export default function Home() {
     return <LoginView />;
   }
 
+  const userRole: UserRole = (user as { userRole?: UserRole } | undefined)?.userRole ?? (user?.isAdmin ? "admin" : "therapist");
+  const allowed = VIEW_ROLES[view];
+  const hasAccess = !allowed || allowed.includes(userRole);
+
   // Authenticated — render the shell + current view
   return (
     <AppShell>
-      {view === "dashboard" && <DashboardView />}
-      {view === "today" && <TodayView />}
-      {view === "patients" && <PatientsListView />}
-      {view === "patient-detail" && <PatientDetailView />}
-      {view === "new-patient" && <NewPatientForm />}
-      {view === "edit-patient" && <NewPatientForm mode="edit" />}
-      {view === "new-visit" && <NewVisitForm />}
-      {view === "calendar" && <CalendarView />}
-      {view === "equipo" && <TeamView />}
-      {view === "facturacion" && <BillingView />}
-      {view === "reports" && <ReportsView />}
-      {view === "settings" && <SettingsView />}
-      {view === "admin-users" &&
-        (user?.isAdmin ? (
-          <AdminUsersView />
-        ) : (
-          <AccessDenied />
-        ))}
+      {!hasAccess ? (
+        <AccessDenied />
+      ) : (
+        <>
+          {view === "dashboard" && <DashboardView />}
+          {view === "today" && <TodayView />}
+          {view === "patients" && <PatientsListView />}
+          {view === "patient-detail" && <PatientDetailView />}
+          {view === "new-patient" && <NewPatientForm />}
+          {view === "edit-patient" && <NewPatientForm mode="edit" />}
+          {view === "new-visit" && <NewVisitForm />}
+          {view === "calendar" && <CalendarView />}
+          {view === "equipo" && <TeamView />}
+          {view === "facturacion" && <BillingView />}
+          {view === "reports" && <ReportsView />}
+          {view === "settings" && <SettingsView />}
+          {view === "admin-users" && <AdminUsersView />}
+        </>
+      )}
     </AppShell>
   );
 }

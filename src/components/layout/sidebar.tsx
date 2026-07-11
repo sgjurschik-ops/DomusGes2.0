@@ -14,28 +14,33 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import type { View } from "@/types/domain";
 import { useEffect } from "react";
 
+type UserRole = "admin" | "therapist" | "guest";
+
 interface NavItem {
   view: View;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  adminOnly?: boolean;
+  /** Which roles can see this item. Omit = everyone. */
+  roles?: UserRole[];
 }
 
 const NAV_ITEMS: NavItem[] = [
   { view: "dashboard", label: "Inicio", icon: LayoutDashboard },
-  { view: "today", label: "Ruta de hoy", icon: MapPin },
+  { view: "today", label: "Ruta de hoy", icon: MapPin, roles: ["admin", "therapist"] },
   { view: "patients", label: "Pacientes", icon: Users },
   { view: "calendar", label: "Agenda", icon: CalendarDays },
-  { view: "reports", label: "Informes", icon: FileText },
+  { view: "reports", label: "Informes", icon: FileText, roles: ["admin", "therapist"] },
   { view: "equipo", label: "Equipo", icon: ClipboardList },
-  { view: "facturacion", label: "Facturación", icon: Receipt },
-  { view: "admin-users", label: "Gestión usuarios", icon: UserCog, adminOnly: true },
+  { view: "facturacion", label: "Facturación", icon: Receipt, roles: ["admin"] },
+  { view: "admin-users", label: "Gestión usuarios", icon: UserCog, roles: ["admin"] },
   { view: "settings", label: "Ajustes", icon: Settings },
 ];
 
 export function Sidebar() {
   const { view, navigate, sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useNav();
   const { user } = useCurrentSession();
+
+  const userRole: UserRole = (user as { userRole?: UserRole } | undefined)?.userRole ?? (user?.isAdmin ? "admin" : "therapist");
 
   // Close on Escape
   useEffect(() => {
@@ -47,7 +52,7 @@ export function Sidebar() {
     return () => window.removeEventListener("keydown", onKey);
   }, [sidebarOpen, setSidebarOpen]);
 
-  const items = NAV_ITEMS.filter((it) => !it.adminOnly || user?.isAdmin);
+  const items = NAV_ITEMS.filter((it) => !it.roles || it.roles.includes(userRole));
 
   return (
     <>
@@ -86,9 +91,6 @@ export function Sidebar() {
               <p className="text-[10px] text-sidebar-foreground/60 uppercase tracking-wider whitespace-nowrap">Seguimiento</p>
             </div>
 
-            {/* Desktop collapse/expand toggle — directly under the logo
-                when collapsed, so it never overlaps the icon regardless of
-                the sidebar's narrow width. */}
             {sidebarCollapsed && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -114,8 +116,6 @@ export function Sidebar() {
             <X className="w-5 h-5" />
           </button>
 
-          {/* Desktop collapse toggle when expanded — same row as the logo,
-              right-aligned, since there's room here. */}
           {!sidebarCollapsed && (
             <button
               className="hidden lg:flex w-7 h-7 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"

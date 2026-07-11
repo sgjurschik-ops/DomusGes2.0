@@ -17,6 +17,16 @@ export async function GET() {
   endOfWeek.setDate(startOfWeek.getDate() + 6);
   endOfWeek.setHours(23, 59, 59, 999);
 
+  // Scope filters: admin sees everything, others only their own data
+  const isAdmin = prof.userRole === "admin";
+  const apptFilter = isAdmin ? {} : { therapistId: prof.id };
+  const visitFilter = isAdmin ? {} : { therapistId: prof.id };
+  const patientFilter = isAdmin
+    ? {}
+    : prof.userRole === "therapist"
+      ? {} // therapists see all patients in the list anyway
+      : { therapists: { some: { id: prof.id } } }; // guests: only assigned
+
   const [
     totalPatients,
     activePatients,
@@ -26,17 +36,19 @@ export async function GET() {
     bySpecialty,
     byStatus,
   ] = await Promise.all([
-    db.patient.count(),
-    db.patient.count({ where: { status: "Activo" } }),
+    db.patient.count({ where: patientFilter }),
+    db.patient.count({ where: { ...patientFilter, status: "Activo" } }),
     db.appointment.count({
-      where: { start: { gte: startOfDay, lte: endOfDay }, status: "programada" },
+      where: { start: { gte: startOfDay, lte: endOfDay }, status: "programada", ...apptFilter },
     }),
     db.appointment.count({
-      where: { start: { gte: startOfWeek, lte: endOfWeek }, status: "programada" },
+      where: { start: { gte: startOfWeek, lte: endOfWeek }, status: "programada", ...apptFilter },
     }),
-    db.visit.count({ where: { date: { gte: new Date(Date.now() - 30 * 86400000) } } }),
-    db.patient.groupBy({ by: ["specialty"], _count: true }),
-    db.patient.groupBy({ by: ["status"], _count: true }),
+    db.visit.count({
+      where: { date: { gte: new Date(Date.now() - 30 * 86400000) }, ...visitFilter },
+    }),
+    db.patient.groupBy({ by: ["specialty"], where: patientFilter, _count: true }),
+    db.patient.groupBy({ by: ["status"], where: patientFilter, _count: true }),
   ]);
 
   return NextResponse.json({

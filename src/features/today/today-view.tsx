@@ -22,6 +22,8 @@ const SAMPLE_COORDS: [number, number][] = [
   [42.8180, -1.6612], [42.8085, -1.6489], [42.8217, -1.6558],
 ];
 
+type UserRole = "admin" | "therapist" | "guest";
+
 export function TodayView() {
   const { data: appts, isLoading } = useAppointments({
     from: startOfDayISO(),
@@ -36,7 +38,13 @@ export function TodayView() {
   const mapInstance = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
 
-  const filtered = (appts ?? []).filter((a) => filterProfId === "all" || a.therapistId === filterProfId);
+  const userRole: UserRole = (user as { userRole?: UserRole } | undefined)?.userRole ?? "therapist";
+  const isAdmin = userRole === "admin";
+
+  // Non-admin: backend already filters, so client filter is irrelevant
+  const filtered = isAdmin
+    ? (appts ?? []).filter((a) => filterProfId === "all" || a.therapistId === filterProfId)
+    : (appts ?? []);
 
   // Assign demo coords to patients on first load
   useEffect(() => {
@@ -58,8 +66,7 @@ export function TodayView() {
       scrollWheelZoom: true,
     });
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap",
     }).addTo(map);
     mapInstance.current = map;
     return () => {
@@ -74,19 +81,17 @@ export function TodayView() {
     if (!map) return;
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
-
     if (filtered.length === 0) return;
 
-    const bounds: [number, number][] = [];
-    filtered.forEach((a, idx) => {
-      const coords = PATIENT_COORDS[a.patientId] ?? SAMPLE_COORDS[idx % SAMPLE_COORDS.length];
-      bounds.push(coords);
-      // Use DOM APIs (not template literal HTML) to avoid XSS risk.
-      const icon = L.divIcon({
-        className: "domus-marker",
-        html: (() => {
-          const wrap = document.createElement("div");
-          wrap.style.cssText = `
+    filtered
+      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+      .forEach((a, idx) => {
+        const coords = PATIENT_COORDS[a.patientId] ?? PAMPLONA;
+        const icon = L.divIcon({
+          className: "",
+          html: (() => {
+            const wrap = document.createElement("div");
+            wrap.style.cssText = `
             background: ${a.patientColor};
             color: white;
             border-radius: 50% 50% 50% 0;
@@ -97,51 +102,51 @@ export function TodayView() {
             border: 2px solid white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
           `;
-          const span = document.createElement("span");
-          span.style.transform = "rotate(45deg)";
-          span.textContent = String(idx + 1);
-          wrap.appendChild(span);
-          return wrap.outerHTML;
-        })(),
-        iconSize: [28, 28],
-        iconAnchor: [14, 28],
+            const span = document.createElement("span");
+            span.style.transform = "rotate(45deg)";
+            span.textContent = String(idx + 1);
+            wrap.appendChild(span);
+            return wrap.outerHTML;
+          })(),
+          iconSize: [28, 28],
+          iconAnchor: [14, 28],
+        });
+
+        const marker = L.marker(coords, { icon }).addTo(map);
+
+        // Build popup with safe DOM APIs
+        const popup = L.popup();
+        const popupEl = document.createElement("div");
+        popupEl.style.cssText = "font-family: inherit; padding: 4px; min-width: 200px;";
+        const time = document.createElement("p");
+        time.style.cssText = "font-size: 11px; color: #6b7280; margin-bottom: 4px;";
+        time.textContent = `${new Date(a.start).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })} · ${a.type}`;
+        const name = document.createElement("p");
+        name.style.cssText = "font-weight: 600; font-size: 14px; margin-bottom: 2px;";
+        name.textContent = a.patientName;
+        const addr = document.createElement("p");
+        addr.style.cssText = "font-size: 12px; color: #6b7280;";
+        addr.textContent = a.patientAddress ?? "Sin dirección";
+        const btn = document.createElement("button");
+        btn.textContent = "Ver paciente";
+        btn.style.cssText = `
+          margin-top: 8px; padding: 4px 10px; font-size: 12px;
+          background: #1a5c58; color: white; border: none; border-radius: 6px;
+          cursor: pointer;
+        `;
+        btn.onclick = () => {
+          selectPatient(a.patientId);
+          navigate("patient-detail");
+        };
+        popupEl.append(time, name, addr, btn);
+        popup.setContent(popupEl);
+        marker.bindPopup(popup);
+
+        markersRef.current.push(marker);
       });
 
-      const marker = L.marker(coords, { icon }).addTo(map);
-
-      // Build popup with safe DOM APIs
-      const popup = L.popup();
-      const popupEl = document.createElement("div");
-      popupEl.style.cssText = "font-family: inherit; padding: 4px; min-width: 200px;";
-      const time = document.createElement("p");
-      time.style.cssText = "font-size: 11px; color: #6b7280; margin-bottom: 4px;";
-      time.textContent = `${new Date(a.start).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })} · ${a.type}`;
-      const name = document.createElement("p");
-      name.style.cssText = "font-weight: 600; font-size: 14px; margin-bottom: 2px;";
-      name.textContent = a.patientName;
-      const addr = document.createElement("p");
-      addr.style.cssText = "font-size: 12px; color: #6b7280;";
-      addr.textContent = a.patientAddress ?? "Sin dirección";
-      const btn = document.createElement("button");
-      btn.textContent = "Ver paciente";
-      btn.style.cssText = `
-        margin-top: 8px; padding: 4px 10px; font-size: 12px;
-        background: #1a5c58; color: white; border: none; border-radius: 6px;
-        cursor: pointer;
-      `;
-      btn.onclick = () => {
-        selectPatient(a.patientId);
-        navigate("patient-detail");
-      };
-      popupEl.append(time, name, addr, btn);
-      popup.setContent(popupEl);
-      marker.bindPopup(popup);
-      markersRef.current.push(marker);
-    });
-
-    if (bounds.length > 0) {
-      map.fitBounds(bounds, { padding: [50, 50] });
-    }
+    const coords = filtered.map((a) => PATIENT_COORDS[a.patientId] ?? PAMPLONA);
+    if (coords.length > 0) map.fitBounds(coords as [number, number][], { padding: [40, 40] });
   }, [filtered, selectPatient, navigate]);
 
   return (
@@ -151,19 +156,21 @@ export function TodayView() {
       </Card>
 
       <div className="space-y-3">
-        <div>
-          <Select value={filterProfId} onValueChange={setFilterProfId}>
-            <SelectTrigger aria-label="Filtrar por terapeuta">
-              <SelectValue placeholder="Todos los terapeutas" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los terapeutas</SelectItem>
-              {(professionals ?? []).map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {isAdmin && (
+          <div>
+            <Select value={filterProfId} onValueChange={setFilterProfId}>
+              <SelectTrigger aria-label="Filtrar por terapeuta">
+                <SelectValue placeholder="Todos los terapeutas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los terapeutas</SelectItem>
+                {(professionals ?? []).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="space-y-2">
