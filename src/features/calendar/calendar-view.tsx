@@ -1562,6 +1562,8 @@ function AppointmentDetailDialogInner({
   }
 
   async function handleDelete() {
+    const ok = confirm("¿Seguro que quieres eliminar esta cita? Esta acción no se puede deshacer.");
+    if (!ok) return;
     try {
       await del.mutateAsync(appt.id);
       toast({ title: "Cita eliminada" });
@@ -1716,6 +1718,8 @@ function ReservationDetailDialogInner({
   const [isEditing, setIsEditing] = useState(false);
 
   async function handleDelete() {
+    const ok = confirm("¿Seguro que quieres eliminar esta reserva? Esta acción no se puede deshacer.");
+    if (!ok) return;
     try {
       await del.mutateAsync(reservation.id);
       toast({ title: "Reserva eliminada" });
@@ -1808,6 +1812,8 @@ function AppointmentFormDialog({
   const create = useCreateAppointment();
   const update = useUpdateAppointment();
   const { data: patients } = usePatients();
+  const { data: me } = useMe();
+  const isAdmin = me?.userRole === "admin";
   const { data: professionals } = useProfessionals();
 
   const schema = mode === "edit" ? appointmentUpdateSchema : appointmentCreateSchema;
@@ -2051,6 +2057,8 @@ function ReservationFormDialog({
 }) {
   const create = useCreateReservation();
   const update = useUpdateReservation();
+  const { data: me } = useMe();
+  const isAdmin = me?.userRole === "admin";
   const { data: professionals } = useProfessionals();
   const { data: categories } = useReservationCategories();
 
