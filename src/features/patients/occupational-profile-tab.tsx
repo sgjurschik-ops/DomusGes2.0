@@ -544,8 +544,8 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
           "activitiesDesiredLeisure",
         ]}
       >
-        <div className="space-y-4">
-          <div>
+        <div className="grid sm:grid-cols-2 gap-6">
+          <div className="space-y-3">
             <p className="text-sm font-semibold mb-2">Actividades que realizaba</p>
             <div className="space-y-3">
               <div className="rounded-lg border-l-4 border-l-teal-500 pl-3 space-y-1.5">
@@ -566,8 +566,8 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
             </div>
           </div>
 
-          <div>
-            <p className="text-sm font-semibold mb-2">Actividades que le gustaría retomar o realizar actualmente</p>
+          <div className="space-y-3">
+            <p className="text-sm font-semibold mb-2">Actividades que le gustaría retomar o realizar</p>
             <div className="space-y-3">
               <div className="rounded-lg border-l-4 border-l-teal-500 pl-3 space-y-1.5">
                 <p className="text-xs font-medium text-teal-700">Cuidado de sí mismo</p>
