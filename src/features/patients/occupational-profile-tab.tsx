@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,13 +57,16 @@ function countFilled(profile: Profile, fields: string[]) {
 // so "which area does this objective belong to" always matches a real
 // section the person can see, rather than a free-floating list.
 const GOAL_AREAS = [
-  "Datos generales",
-  "Social-familiar",
-  "Laboral y económica",
-  "Hábitos y rutinas",
-  "Intereses y motivaciones",
+  "Cuidado de sí mismo",
+  "Productividad",
+  "Ocio",
 ] as const;
 type GoalArea = typeof GOAL_AREAS[number];
+const GOAL_AREA_COLORS: Record<GoalArea, string> = {
+  "Cuidado de sí mismo": "#14b8a6",
+  "Productividad": "#f59e0b",
+  "Ocio": "#8b5cf6",
+};
 const GOAL_STATUSES = ["En curso", "Conseguido", "Abandonado"] as const;
 type GoalStatus = typeof GOAL_STATUSES[number];
 
@@ -72,7 +75,9 @@ interface Goal {
   text: string;
   area: GoalArea;
   status: GoalStatus;
-  targetDate: string | null; // yyyy-mm-dd or null
+  startDate: string | null;
+  targetDate: string | null;
+  evaluation: string;
 }
 
 interface FamilyMember {
@@ -125,19 +130,16 @@ const emptyProfile: Profile = {
   moneyManager: "",
   incomeOrganization: "",
   weeklyRoutine: [] as RoutineCell[],
-  selfCare: "",
-  domesticTasks: "",
-  responsibilities: "",
-  leisure: "",
-  physicalActivity: "",
-  socialParticipation: "",
-  leisureActivitiesCurrent: "",
-  leisureActivitiesPast: "",
-  sportsCurrent: "",
-  sportsPast: "",
-  trainingCurrent: "",
-  trainingPast: "",
+  dailyRoutine: "",
+  activitiesPastSelfcare: "",
+  activitiesPastProductivity: "",
+  activitiesPastLeisure: "",
+  activitiesDesiredSelfcare: "",
+  activitiesDesiredProductivity: "",
+  activitiesDesiredLeisure: "",
   desiredImprovements: "",
+  problemsUser: "",
+  problemsProfessional: "",
   goals: [],
 };
 
@@ -482,10 +484,10 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
 
       <Section
         title="Hábitos y rutinas"
-        description="Rutina diaria y participación ocupacional."
+        description="Rutina diaria y planning semanal."
         icon={CalendarClock}
         profile={profile}
-        fields={["selfCare", "leisure", "domesticTasks", "physicalActivity", "responsibilities", "socialParticipation"]}
+        fields={["dailyRoutine"]}
       >
         {/* Planning semanal — opens the full-screen editor */}
         <div className="rounded-md border p-3 space-y-3">
@@ -510,26 +512,14 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
           )}
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Autocuidado">
-            <Textarea value={profile.selfCare ?? ""} onChange={(e) => update("selfCare", e.target.value)} className={!profile.selfCare ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Ocio">
-            <Textarea value={profile.leisure ?? ""} onChange={(e) => update("leisure", e.target.value)} className={!profile.leisure ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Tareas domésticas">
-            <Textarea value={profile.domesticTasks ?? ""} onChange={(e) => update("domesticTasks", e.target.value)} className={!profile.domesticTasks ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Actividad física">
-            <Textarea value={profile.physicalActivity ?? ""} onChange={(e) => update("physicalActivity", e.target.value)} className={!profile.physicalActivity ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Responsabilidades">
-            <Textarea value={profile.responsibilities ?? ""} onChange={(e) => update("responsibilities", e.target.value)} className={!profile.responsibilities ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Participación social">
-            <Textarea value={profile.socialParticipation ?? ""} onChange={(e) => update("socialParticipation", e.target.value)} className={!profile.socialParticipation ? "bg-muted/60" : ""} />
-          </Field>
-        </div>
+        <Field label="Rutina de un día">
+          <RichTextarea
+            rows={6}
+            placeholder="Describa la rutina habitual de un día típico del/la paciente..."
+            value={profile.dailyRoutine ?? ""}
+            onChange={(v) => update("dailyRoutine", v)}
+          />
+        </Field>
       </Section>
 
       {/* Full-screen weekly planning editor */}
@@ -541,50 +531,88 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       )}
 
       <Section
-        title="Intereses y motivaciones"
-        description="Actividades actuales, abandonadas y posibles intereses a recuperar."
+        title="Actividades realizadas y deseadas"
+        description="Actividades que realizaba y las que le gustaría retomar o realizar actualmente."
         icon={Heart}
         profile={profile}
         fields={[
-          "leisureActivitiesCurrent",
-          "leisureActivitiesPast",
-          "sportsCurrent",
-          "sportsPast",
-          "trainingCurrent",
-          "trainingPast",
+          "activitiesPastSelfcare",
+          "activitiesPastProductivity",
+          "activitiesPastLeisure",
+          "activitiesDesiredSelfcare",
+          "activitiesDesiredProductivity",
+          "activitiesDesiredLeisure",
         ]}
       >
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Actividades de ocio que realiza actualmente">
-            <Textarea value={profile.leisureActivitiesCurrent ?? ""} onChange={(e) => update("leisureActivitiesCurrent", e.target.value)} className={!profile.leisureActivitiesCurrent ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Actividades de ocio que ya no realiza">
-            <Textarea value={profile.leisureActivitiesPast ?? ""} onChange={(e) => update("leisureActivitiesPast", e.target.value)} className={!profile.leisureActivitiesPast ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Deportes actuales">
-            <Textarea value={profile.sportsCurrent ?? ""} onChange={(e) => update("sportsCurrent", e.target.value)} className={!profile.sportsCurrent ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Deportes que ya no realiza">
-            <Textarea value={profile.sportsPast ?? ""} onChange={(e) => update("sportsPast", e.target.value)} className={!profile.sportsPast ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Cursos o formación actual">
-            <Textarea value={profile.trainingCurrent ?? ""} onChange={(e) => update("trainingCurrent", e.target.value)} className={!profile.trainingCurrent ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Cursos o formación que ya no realiza">
-            <Textarea value={profile.trainingPast ?? ""} onChange={(e) => update("trainingPast", e.target.value)} className={!profile.trainingPast ? "bg-muted/60" : ""} />
-          </Field>
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-semibold mb-2">Actividades que realizaba</p>
+            <div className="space-y-3">
+              <div className="rounded-lg border-l-4 border-l-teal-500 pl-3 space-y-1.5">
+                <p className="text-xs font-medium text-teal-700">Cuidado de sí mismo</p>
+                <p className="text-[11px] text-muted-foreground">Cuidado personal, movilidad, gestión comunitaria</p>
+                <RichTextarea value={profile.activitiesPastSelfcare ?? ""} onChange={(v) => update("activitiesPastSelfcare", v)} rows={2} />
+              </div>
+              <div className="rounded-lg border-l-4 border-l-amber-500 pl-3 space-y-1.5">
+                <p className="text-xs font-medium text-amber-700">Productividad</p>
+                <p className="text-[11px] text-muted-foreground">Trabajo o voluntariado, manejo del hogar, estudios</p>
+                <RichTextarea value={profile.activitiesPastProductivity ?? ""} onChange={(v) => update("activitiesPastProductivity", v)} rows={2} />
+              </div>
+              <div className="rounded-lg border-l-4 border-l-violet-500 pl-3 space-y-1.5">
+                <p className="text-xs font-medium text-violet-700">Ocio</p>
+                <p className="text-[11px] text-muted-foreground">Recreación tranquila, activa y socialización (adjuntar listado de intereses)</p>
+                <RichTextarea value={profile.activitiesPastLeisure ?? ""} onChange={(v) => update("activitiesPastLeisure", v)} rows={2} />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold mb-2">Actividades que le gustaría retomar o realizar actualmente</p>
+            <div className="space-y-3">
+              <div className="rounded-lg border-l-4 border-l-teal-500 pl-3 space-y-1.5">
+                <p className="text-xs font-medium text-teal-700">Cuidado de sí mismo</p>
+                <p className="text-[11px] text-muted-foreground">Cuidado personal, movilidad, gestión comunitaria</p>
+                <RichTextarea value={profile.activitiesDesiredSelfcare ?? ""} onChange={(v) => update("activitiesDesiredSelfcare", v)} rows={2} />
+              </div>
+              <div className="rounded-lg border-l-4 border-l-amber-500 pl-3 space-y-1.5">
+                <p className="text-xs font-medium text-amber-700">Productividad</p>
+                <p className="text-[11px] text-muted-foreground">Trabajo o voluntariado, manejo del hogar, estudios</p>
+                <RichTextarea value={profile.activitiesDesiredProductivity ?? ""} onChange={(v) => update("activitiesDesiredProductivity", v)} rows={2} />
+              </div>
+              <div className="rounded-lg border-l-4 border-l-violet-500 pl-3 space-y-1.5">
+                <p className="text-xs font-medium text-violet-700">Ocio</p>
+                <p className="text-[11px] text-muted-foreground">Recreación tranquila, activa y socialización (adjuntar listado de intereses)</p>
+                <RichTextarea value={profile.activitiesDesiredLeisure ?? ""} onChange={(v) => update("activitiesDesiredLeisure", v)} rows={2} />
+              </div>
+            </div>
+          </div>
         </div>
       </Section>
 
       <Section
+        title="Problemas detectados"
+        description="Problemas identificados por el/la usuario/a y por el/la profesional."
+        icon={ClipboardList}
+        profile={profile}
+        fields={["problemsUser", "problemsProfessional"]}
+      >
+        <Field label="Problemas detectados por el/la usuario/a">
+          <RichTextarea rows={4} value={profile.problemsUser ?? ""} onChange={(v) => update("problemsUser", v)} placeholder="Problemas que el/la paciente identifica como principales..." />
+        </Field>
+        <Field label="Problemas detectados por el/la profesional">
+          <RichTextarea rows={4} value={profile.problemsProfessional ?? ""} onChange={(v) => update("problemsProfessional", v)} placeholder="Problemas identificados por el/la terapeuta durante la evaluación..." />
+        </Field>
+      </Section>
+
+      <Section
         title="Objetivos y planificación"
-        description="Objetivos ocupacionales y planificación inicial."
+        description="Objetivos ocupacionales con seguimiento temporal."
         icon={Target}
         profile={profile}
         fields={["desiredImprovements"]}
       >
         <Field label="Qué le gustaría conseguir o mejorar">
-          <Textarea rows={3} value={profile.desiredImprovements ?? ""} onChange={(e) => update("desiredImprovements", e.target.value)} className={!profile.desiredImprovements ? "bg-muted/60" : ""} />
+          <RichTextarea rows={3} value={profile.desiredImprovements ?? ""} onChange={(v) => update("desiredImprovements", v)} />
         </Field>
 
         <GoalsEditor
@@ -787,66 +815,153 @@ function GoalsEditor({
   onChange: (goals: Goal[]) => void;
 }) {
   function addRow() {
-    onChange([...value, { text: "", area: "Datos generales", status: "En curso", targetDate: null }]);
+    onChange([...value, { text: "", area: "Cuidado de sí mismo", status: "En curso", startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "" }]);
   }
   function updateRow(i: number, patch: Partial<Goal>) {
     onChange(value.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
   }
   function removeRow(i: number) {
+    const ok = confirm("¿Seguro que quieres eliminar este objetivo?");
+    if (!ok) return;
     onChange(value.filter((_, idx) => idx !== i));
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <Label className="text-xs">Objetivos</Label>
       {value.length === 0 && (
         <p className="text-xs text-muted-foreground italic">Sin objetivos añadidos.</p>
       )}
-      <div className="space-y-2">
-        {value.map((goal, i) => (
-          <div key={i} className="rounded-md border bg-muted/30 p-3 space-y-2">
-            <div className="flex items-start gap-2">
-              <Textarea
-                rows={2}
-                placeholder="Describe el objetivo…"
-                value={goal.text}
-                onChange={(e) => updateRow(i, { text: e.target.value })}
-                className="flex-1"
-              />
-              <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive shrink-0" onClick={() => removeRow(i)} aria-label="Quitar objetivo">
-                <Trash2 className="w-4 h-4" />
-              </Button>
+      <div className="space-y-3">
+        {value.map((goal, i) => {
+          const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
+          return (
+            <div key={i} className="rounded-lg border overflow-hidden" style={{ borderLeftWidth: "4px", borderLeftColor: areaColor }}>
+              <div className="p-3 space-y-3">
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 space-y-2">
+                    <Textarea
+                      rows={2}
+                      placeholder="Describe el objetivo…"
+                      value={goal.text}
+                      onChange={(e) => updateRow(i, { text: e.target.value })}
+                    />
+                  </div>
+                  <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive shrink-0" onClick={() => removeRow(i)} aria-label="Quitar objetivo">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                <div className="grid sm:grid-cols-4 gap-2">
+                  <Select value={goal.area} onValueChange={(v) => updateRow(i, { area: v as GoalArea })}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: areaColor }} />
+                        <SelectValue />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GOAL_AREAS.map((a) => (
+                        <SelectItem key={a} value={a}>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: GOAL_AREA_COLORS[a] }} />
+                            {a}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={goal.status} onValueChange={(v) => updateRow(i, { status: v as GoalStatus })}>
+                    <SelectTrigger className={`h-8 text-xs ${GOAL_STATUS_STYLES[goal.status]}`}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {GOAL_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-muted-foreground">Inicio</p>
+                    <Input type="date" className="h-8 text-xs" value={goal.startDate ?? ""} onChange={(e) => updateRow(i, { startDate: e.target.value || null })} />
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] text-muted-foreground">Fecha objetivo</p>
+                    <Input type="date" className="h-8 text-xs" value={goal.targetDate ?? ""} onChange={(e) => updateRow(i, { targetDate: e.target.value || null })} />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Evaluación de la consecución</Label>
+                  <Textarea
+                    rows={2}
+                    placeholder="Valoración del progreso hacia este objetivo..."
+                    value={goal.evaluation ?? ""}
+                    onChange={(e) => updateRow(i, { evaluation: e.target.value })}
+                    className={!goal.evaluation ? "bg-muted/60" : ""}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid sm:grid-cols-3 gap-2">
-              <Select value={goal.area} onValueChange={(v) => updateRow(i, { area: v as GoalArea })}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {GOAL_AREAS.map((a) => (
-                    <SelectItem key={a} value={a}>{a}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={goal.status} onValueChange={(v) => updateRow(i, { status: v as GoalStatus })}>
-                <SelectTrigger className={`h-8 text-xs ${GOAL_STATUS_STYLES[goal.status]}`}><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {GOAL_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                type="date"
-                className="h-8 text-xs"
-                value={goal.targetDate ?? ""}
-                onChange={(e) => updateRow(i, { targetDate: e.target.value || null })}
-              />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <Button type="button" variant="outline" size="sm" onClick={addRow}>
         <Plus className="w-3.5 h-3.5 mr-1.5" /> Añadir objetivo
       </Button>
+    </div>
+  );
+}
+
+
+
+// ─── Rich text area with bold/italic/underline ────────────────────────────────
+// Uses contentEditable for inline formatting. Stores HTML.
+function RichTextarea({
+  value,
+  onChange,
+  rows = 3,
+  placeholder,
+}: {
+  value: string;
+  onChange: (html: string) => void;
+  rows?: number;
+  placeholder?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [focused, setFocused] = useState(false);
+
+  // Sync external value on mount or when value changes and div is not focused
+  useEffect(() => {
+    if (ref.current && !focused) {
+      if (ref.current.innerHTML !== value) {
+        ref.current.innerHTML = value || "";
+      }
+    }
+  }, [value, focused]);
+
+  function handleFormat(cmd: "bold" | "italic" | "underline") {
+    document.execCommand(cmd, false);
+    ref.current?.focus();
+    if (ref.current) onChange(ref.current.innerHTML);
+  }
+
+  return (
+    <div className={`rounded-md border ${focused ? "ring-2 ring-ring" : ""} ${!value ? "bg-muted/60" : ""}`}>
+      <div className="flex items-center gap-0.5 px-2 py-1 border-b bg-muted/30">
+        <button type="button" className="px-1.5 py-0.5 rounded text-xs font-bold hover:bg-muted" onClick={() => handleFormat("bold")} title="Negrita"><b>N</b></button>
+        <button type="button" className="px-1.5 py-0.5 rounded text-xs italic hover:bg-muted" onClick={() => handleFormat("italic")} title="Cursiva"><i>K</i></button>
+        <button type="button" className="px-1.5 py-0.5 rounded text-xs underline hover:bg-muted" onClick={() => handleFormat("underline")} title="Subrayado"><u>S</u></button>
+      </div>
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        className="px-3 py-2 text-sm outline-none min-h-[2.5rem] [&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-muted-foreground"
+        style={{ minHeight: `${rows * 1.5}rem` }}
+        data-placeholder={placeholder ?? ""}
+        onFocus={() => setFocused(true)}
+        onBlur={() => { setFocused(false); if (ref.current) onChange(ref.current.innerHTML); }}
+        onInput={() => { if (ref.current) onChange(ref.current.innerHTML); }}
+      />
     </div>
   );
 }

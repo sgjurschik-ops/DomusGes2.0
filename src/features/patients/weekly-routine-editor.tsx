@@ -58,7 +58,7 @@ export const ROUTINE_DAYS_FULL = ["Lunes", "Martes", "Miércoles", "Jueves", "Vi
 export const HALF_HOUR_SLOTS = Array.from({ length: 48 }, (_, i) => i);
 
 export function slotLabel(slot: number): string {
-  const totalMins = 7 * 60 + slot * 30;
+  const totalMins = 6 * 60 + slot * 30;
   const h = Math.floor(totalMins / 60) % 24;
   const m = totalMins % 60;
   return `${String(h).padStart(2, "0")}:${m === 0 ? "00" : "30"}`;
@@ -644,7 +644,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                   </td>
                   {ROUTINE_DAYS.map((_, day) => {
                     const cell = cellAt(day, slot);
-                    const bg = cell?.category ? ROUTINE_CATEGORY_COLORS[cell.category] : undefined;
+                    const bg = cell?.category ? (BALANCE_GROUP_COLORS[(cell.group as BalanceGroup) || OTPF_TO_GROUP[cell.category]] ?? ROUTINE_CATEGORY_COLORS[cell.category]) : undefined;
                     const isOpen = openCell?.day === day && openCell?.halfHour === slot;
                     const selected = isCellSelected(day, slot);
                     const isRangeAnchor = rangeReady && selection && day === selection.day && slot === selection.to;
