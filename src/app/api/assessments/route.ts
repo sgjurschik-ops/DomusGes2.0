@@ -34,7 +34,13 @@ export async function POST(req: NextRequest) {
     );
   }
   const d = parsed.data;
-  const areaSummaryData = d.itemScores ? generateAreaSummaryData(d.scale, d.itemScores) : null;
+  // COPM sends its own areaSummary (problem names); other structured scales
+  // compute it from item scores (strengths/areas-to-work-on).
+  const areaSummaryData = d.areaSummary
+    ? d.areaSummary
+    : d.itemScores
+      ? generateAreaSummaryData(d.scale, d.itemScores)
+      : null;
   const row = await db.assessment.create({
     data: {
       patientId: d.patientId,

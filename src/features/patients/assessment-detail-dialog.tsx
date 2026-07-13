@@ -16,6 +16,7 @@ import {
 } from "@/lib/schemas";
 import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
+import { CopmFields, formatCopmScore } from "./copm-fields";
 import { AreaSummaryView } from "./area-summary-view";
 import {
   Dialog,
@@ -32,7 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Pencil } from "lucide-react";
+import { Trash2, Pencil, BarChart3 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { formatDate } from "@/components/domain";
 
@@ -42,12 +43,6 @@ type Props = {
   onClose: () => void;
 };
 
-// Lets the professional open a previously saved assessment from the
-// history list. Opens in a compact, read-only summary (scale, date, every
-// item's score, total, interpretation, notes) — editing the full item form
-// inside the narrow dialog caused long option labels to overlap across the
-// 2-column grid, so editing is a deliberate second step via "Editar",
-// which switches to the same form used to create an assessment.
 export function AssessmentDetailDialog({ assessmentId, patientId, onClose }: Props) {
   const { data: assessment, isLoading } = useAssessment(assessmentId);
   const [isEditing, setIsEditing] = useState(false);
@@ -87,6 +82,93 @@ export function AssessmentDetailDialog({ assessmentId, patientId, onClose }: Pro
   );
 }
 
+// ─── COPM read-only summary ──────────────────────────────────────────────────
+
+const AREA_META: Record<string, { title: string; color: string }> = {
+  selfcare: { title: "Cuidado de sí mismo", color: "bg-teal-500" },
+  productivity: { title: "Productividad", color: "bg-amber-500" },
+  leisure: { title: "Ocio", color: "bg-violet-500" },
+};
+
+function CopmSummary({
+  assessment,
+}: {
+  assessment: { score: string; itemScores?: Record<string, number> | null; areaSummary?: unknown };
+}) {
+  // areaSummary holds the full COPM data structure
+  const data = assessment.areaSummary as {
+    problems?: { uid: string; areaId: string; subcatId: string; description: string; importance?: number }[];
+    selected?: { uid: string; performance?: number; satisfaction?: number; performance2?: number; satisfaction2?: number }[];
+  } | null;
+
+  if (!data?.problems || data.problems.length === 0) {
+    return (
+      <div className="rounded-lg border bg-muted/40 px-4 py-3">
+        <p className="text-sm font-semibold">{assessment.score}</p>
+      </div>
+    );
+  }
+
+  const selectedUids = new Set((data.selected ?? []).map((s) => s.uid));
+  const selectedMap = new Map((data.selected ?? []).map((s) => [s.uid, s]));
+
+  // Group by area
+  const byArea: Record<string, typeof data.problems> = {};
+  for (const p of data.problems) {
+    if (!p.description?.trim()) continue;
+    (byArea[p.areaId] ??= []).push(p);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border bg-muted/40 px-4 py-3">
+        <p className="text-sm font-semibold">{assessment.score}</p>
+      </div>
+
+      {/* Visual problem map */}
+      <div className="rounded-lg border p-3 space-y-2">
+        <div className="flex items-center gap-2 mb-1">
+          <BarChart3 className="w-4 h-4 text-muted-foreground" />
+          <p className="text-xs font-semibold">Problemas identificados</p>
+        </div>
+        {Object.entries(byArea).map(([areaId, probs]) => {
+          const meta = AREA_META[areaId] ?? { title: areaId, color: "bg-gray-400" };
+          return (
+            <div key={areaId} className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-sm ${meta.color}`} />
+                <span className="text-xs font-medium">{meta.title}</span>
+              </div>
+              {probs.map((prob) => {
+                const isSelected = selectedUids.has(prob.uid);
+                const sel = selectedMap.get(prob.uid);
+                return (
+                  <div key={prob.uid} className="pl-5 flex items-center gap-2 text-xs">
+                    <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? meta.color : "bg-muted-foreground/30"}`} />
+                    <span className={isSelected ? "font-medium" : "text-muted-foreground"}>
+                      {prob.description}
+                    </span>
+                    <span className="text-muted-foreground">Imp: {prob.importance ?? "—"}</span>
+                    {isSelected && sel && (
+                      <span className="text-muted-foreground">
+                        · Des: {sel.performance ?? "—"} · Sat: {sel.satisfaction ?? "—"}
+                        {sel.performance2 !== undefined && (
+                          <> · Des₂: {sel.performance2} · Sat₂: {sel.satisfaction2 ?? "—"}</>
+                        )}
+                      </span>
+                    )}
+                    {isSelected && <span className="text-amber-500 font-bold">★</span>}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Read-only summary ───────────────────────────────────────────────────────
 
 function AssessmentSummary({
@@ -102,6 +184,7 @@ function AssessmentSummary({
 }) {
   const remove = useDeleteAssessment();
   const def = STRUCTURED_SCALE_DEFINITIONS[assessment.scale];
+  const isCopm = assessment.scale === "COPM";
 
   async function handleDelete() {
     const ok = confirm("¿Seguro que quieres eliminar esta evaluación? Esta acción no se puede deshacer.");
@@ -126,7 +209,9 @@ function AssessmentSummary({
         <span className="text-muted-foreground">{formatDate(assessment.date)} · {assessment.therapistName}</span>
       </div>
 
-      {def && assessment.itemScores ? (
+      {isCopm ? (
+        <CopmSummary assessment={assessment} />
+      ) : def && assessment.itemScores ? (
         <>
           <div className="rounded-lg border bg-muted/40 px-4 py-3">
             <p className="text-sm font-semibold">{assessment.score}</p>
@@ -135,10 +220,6 @@ function AssessmentSummary({
             {def.items.map((item) => {
               const score = assessment.itemScores?.[item.id];
               const opt = item.options.find((o) => o.value === score);
-              // Each item's own max (not the scale's max) — Barthel items
-              // have different ranges per item (e.g. "Baño" 0-5 vs.
-              // "Alimentación" 0-10), so this must come from that item's
-              // own options, not a shared constant.
               const itemMax = Math.max(...item.options.map((o) => o.value));
               return (
                 <li key={item.id} className="px-3 py-2 text-sm">
@@ -164,7 +245,7 @@ function AssessmentSummary({
         </div>
       )}
 
-      {assessment.areaSummary && <AreaSummaryView data={assessment.areaSummary} />}
+      {!isCopm && assessment.areaSummary && <AreaSummaryView data={assessment.areaSummary} />}
 
       {assessment.notes && (
         <div>
@@ -209,6 +290,8 @@ function AssessmentEditForm({
 }) {
   const update = useUpdateAssessment();
   const [itemScores, setItemScores] = useState<Record<string, number>>(assessment.itemScores ?? {});
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [copmData, setCopmData] = useState<any>(assessment.areaSummary ?? null);
 
   const {
     register,
@@ -227,17 +310,24 @@ function AssessmentEditForm({
   });
 
   const scale = watch("scale");
+  const isCopm = scale === "COPM";
   const isStructured = (STRUCTURED_SCALES as readonly string[]).includes(scale);
 
   useEffect(() => {
-    if (isStructured) {
+    if (isCopm) {
+      setValue("score", formatCopmScore(itemScores), { shouldValidate: false });
+    } else if (isStructured) {
       setValue("score", formatScaleScore(scale, itemScores), { shouldValidate: false });
     }
-  }, [isStructured, scale, itemScores, setValue]);
+  }, [isStructured, isCopm, scale, itemScores, setValue]);
 
   async function onSubmit(values: AssessmentUpdateInput) {
     try {
-      const payload = isStructured ? { ...values, itemScores } : values;
+      const payload = isCopm
+        ? { ...values, itemScores, areaSummary: copmData }
+        : isStructured
+          ? { ...values, itemScores }
+          : values;
       await update.mutateAsync({ id: assessmentId, data: payload });
       toast({ title: "Evaluación actualizada" });
       onSaved();
@@ -286,9 +376,16 @@ function AssessmentEditForm({
         {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
       </div>
 
-      {isStructured && (
+      {isCopm ? (
+        <CopmFields
+          itemScores={itemScores}
+          onChange={setItemScores}
+          onProblemsChange={setCopmData}
+          showReeval
+        />
+      ) : isStructured ? (
         <StructuredScaleFields scale={scale} itemScores={itemScores} onChange={setItemScores} />
-      )}
+      ) : null}
 
       <div className="space-y-1.5 sm:col-span-2">
         <Label htmlFor="notes" className="text-xs">Notas (opcional)</Label>

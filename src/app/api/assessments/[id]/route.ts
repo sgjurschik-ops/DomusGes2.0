@@ -41,7 +41,11 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     );
   }
   const d = parsed.data;
-  const areaSummaryData = d.itemScores ? generateAreaSummaryData(d.scale, d.itemScores) : null;
+  const areaSummaryData = d.areaSummary
+    ? d.areaSummary
+    : d.itemScores
+      ? generateAreaSummaryData(d.scale, d.itemScores)
+      : null;
 
   const row = await db.assessment.update({
     where: { id },

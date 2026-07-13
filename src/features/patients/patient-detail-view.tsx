@@ -35,6 +35,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { assessmentCreateSchema, type AssessmentCreateInput, ASSESSMENT_SCALES, STRUCTURED_SCALES } from "@/lib/schemas";
 import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
+import { CopmFields, formatCopmScore } from "./copm-fields";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { VisitDetailDialog } from "./visit-detail-dialog";
 import { PatientReportDialog } from "./patient-report-dialog";
@@ -426,6 +427,8 @@ function InfoRow({
 function AssessmentForm({ patientId, therapistId }: { patientId: string; therapistId: string }) {
   const create = useCreateAssessment();
   const [itemScores, setItemScores] = useState<Record<string, number>>({});
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [copmData, setCopmData] = useState<any>(null);
   const {
     register,
     handleSubmit,
@@ -446,29 +449,36 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
   });
 
   const scale = watch("scale");
+  const isCopm = scale === "COPM";
   const isStructured = (STRUCTURED_SCALES as readonly string[]).includes(scale);
   const structuredItemCount = isStructured
     ? Object.keys(itemScores).length
     : 0;
 
   // Keep the (hidden, but still registered) `score` field in sync with the
-  // computed total as items are answered. This matters because
-  // react-hook-form/Zod validate `score` on submit regardless of whether
-  // the input is visually shown — hiding the field without updating its
-  // value left `score` empty, so validation silently failed and the
-  // submit handler never ran (no value -> no API call -> nothing visible).
+  // computed total as items are answered.
   useEffect(() => {
-    if (isStructured) {
+    if (isCopm) {
+      setValue("score", formatCopmScore(itemScores), { shouldValidate: false });
+    } else if (isStructured) {
       setValue("score", formatScaleScore(scale, itemScores), { shouldValidate: false });
     }
-  }, [isStructured, scale, itemScores, setValue]);
+  }, [isStructured, isCopm, scale, itemScores, setValue]);
 
   async function onSubmit(values: AssessmentCreateInput) {
-    const payload = isStructured ? { ...values, itemScores } : values;
+    const payload = isStructured
+      ? {
+          ...values,
+          itemScores,
+          // For COPM, store the full problem data in areaSummary
+          ...(isCopm && copmData ? { areaSummary: copmData } : {}),
+        }
+      : values;
     try {
       await create.mutateAsync(payload);
       toast({ title: "Evaluación registrada" });
       setItemScores({});
+      setCopmData(null);
       reset({ ...values, score: "", notes: "" });
     } catch {
       toast({
@@ -482,6 +492,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
   function handleScaleChange(value: AssessmentCreateInput["scale"]) {
     setValue("scale", value);
     setItemScores({});
+    setCopmData(null);
   }
 
   return (
@@ -522,9 +533,15 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
             {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
           </div>
 
-          {isStructured && (
+          {isCopm ? (
+            <CopmFields
+              itemScores={itemScores}
+              onChange={setItemScores}
+              onProblemsChange={setCopmData}
+            />
+          ) : isStructured ? (
             <StructuredScaleFields scale={scale} itemScores={itemScores} onChange={setItemScores} />
-          )}
+          ) : null}
 
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="notes" className="text-xs">Notas (opcional)</Label>
@@ -536,7 +553,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
               size="sm"
               disabled={
                 create.isPending ||
-                (isStructured && structuredItemCount < (STRUCTURED_SCALES as readonly string[]).length)
+                (isStructured && !isCopm && structuredItemCount < (STRUCTURED_SCALES as readonly string[]).length)
               }
             >
               {create.isPending ? "Guardando…" : "Añadir evaluación"}

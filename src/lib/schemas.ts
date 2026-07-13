@@ -31,6 +31,7 @@ export const ASSESSMENT_SCALES = [
   "VAVDI",
   "Barthel",
   "Lawton-Brody",
+  "COPM",
   "EVN",
   "PHQ-9",
   "GAD-7",
@@ -41,7 +42,7 @@ export const ASSESSMENT_SCALES = [
 // Scales with a structured, item-by-item form (score is computed, not
 // typed in by hand). Any scale not in this list keeps the free-text score
 // field as before.
-export const STRUCTURED_SCALES = ["Barthel", "Lawton-Brody", "VAVDI"] as const;
+export const STRUCTURED_SCALES = ["Barthel", "Lawton-Brody", "VAVDI", "COPM"] as const;
 export type StructuredScale = (typeof STRUCTURED_SCALES)[number];
 
 export const PROFESSIONAL_COLORS = [
@@ -174,10 +175,12 @@ export const assessmentCreateSchema = z.object({
   therapistId: z.string().min(1, "Terapeuta obligatorio"),
   scale: z.enum(ASSESSMENT_SCALES),
   score: z.string().min(1, "La puntuación es obligatoria"),
-  // Only present for structured scales (Barthel, Lawton-Brody, VAVDI): a
-  // map of item id -> score for that item, used to recompute the total
+  // Only present for structured scales (Barthel, Lawton-Brody, VAVDI, COPM):
+  // a map of item id -> score for that item, used to recompute the total
   // and let the report show the per-item breakdown later if needed.
   itemScores: z.record(z.string(), z.number()).optional(),
+  // For COPM: stores problem descriptions; for Barthel/VAVDI: strengths/areas.
+  areaSummary: z.any().optional(),
   notes: z.string().optional().default(""),
   date: z.string().min(1, "La fecha es obligatoria"),
 });
@@ -189,6 +192,7 @@ export const assessmentUpdateSchema = z.object({
   scale: z.enum(ASSESSMENT_SCALES),
   score: z.string().min(1, "La puntuación es obligatoria"),
   itemScores: z.record(z.string(), z.number()).optional(),
+  areaSummary: z.any().optional(),
   notes: z.string().optional().default(""),
   date: z.string().min(1, "La fecha es obligatoria"),
 });

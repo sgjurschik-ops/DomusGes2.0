@@ -29,6 +29,7 @@ export type AssessmentScale =
   | "PHQ-9" // Depresión
   | "GAD-7" // Ansiedad
   | "Mini-Mental" // Estado cognitivo
+  | "COPM"  // Medida Canadiense del Desempeño Ocupacional
   | "FIM"; // Independencia funcional
 
 // View identifiers for client-side navigation.
