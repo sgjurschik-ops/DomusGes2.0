@@ -90,7 +90,7 @@ type SelectedProblem = {
   satisfaction2: number | undefined;  // re-evaluation
 };
 
-type CopmData = {
+export type CopmData = {
   problems: Problem[];
   selected: SelectedProblem[];
 };
@@ -103,6 +103,8 @@ type Props = {
   onProblemsChange?: (data: CopmData) => void;
   /** When true, show the re-evaluation columns (Step 4). */
   showReeval?: boolean;
+  /** Saved COPM data (from areaSummary) to restore on edit. */
+  initialData?: CopmData | null;
 };
 
 // ─── Encoding helpers ──────────────────────────────────────────────────────────
@@ -133,10 +135,27 @@ function nextUid() {
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-export function CopmFields({ itemScores, onChange, onProblemsChange, showReeval = false }: Props) {
+export function CopmFields({ itemScores, onChange, onProblemsChange, showReeval = false, initialData }: Props) {
   const [step, setStep] = useState<1 | 3>(1);
-  const [problems, setProblems] = useState<Problem[]>([]);
-  const [selected, setSelected] = useState<SelectedProblem[]>([]);
+  const [problems, setProblems] = useState<Problem[]>(() => {
+    if (initialData?.problems && initialData.problems.length > 0) {
+      // Restore from saved data, assigning new uids if missing
+      return initialData.problems.map((p) => ({
+        ...p,
+        uid: p.uid || nextUid(),
+      }));
+    }
+    return [];
+  });
+  const [selected, setSelected] = useState<SelectedProblem[]>(() => {
+    if (initialData?.selected && initialData.selected.length > 0) {
+      return initialData.selected.map((s) => ({
+        ...s,
+        uid: s.uid || nextUid(),
+      }));
+    }
+    return [];
+  });
 
   // Sync out
   const syncOut = useCallback(() => {
@@ -330,8 +349,8 @@ function StepOneTwo({
 
       {AREAS.map((area) => (
         <div key={area.id} className="rounded-lg border overflow-hidden">
-          <div className={`${area.color} px-3 py-2`}>
-            <p className="text-xs font-semibold text-white">{area.title}</p>
+          <div className={`${area.color} px-4 py-2.5`}>
+            <p className="text-sm font-bold text-white">{area.title}</p>
           </div>
           <div className="p-3 space-y-3">
             {area.subcategories.map((subcat) => {
@@ -342,8 +361,8 @@ function StepOneTwo({
                 <div key={subcat.id} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-medium">{subcat.label}</p>
-                      <p className="text-[10px] text-muted-foreground">{subcat.examples}</p>
+                      <p className="text-sm font-semibold">{subcat.label}</p>
+                      <p className="text-xs text-muted-foreground">{subcat.examples}</p>
                     </div>
                     {subcatProblems.length < 2 && (
                       <Button
@@ -358,13 +377,13 @@ function StepOneTwo({
                     )}
                   </div>
                   {subcatProblems.map((prob) => (
-                    <div key={prob.uid} className="flex items-center gap-2">
+                    <div key={prob.uid} className="flex items-center gap-2 pl-2">
                       <Input
                         placeholder="Descripción del problema"
                         value={prob.description}
                         onChange={(e) => updateProblem(prob.uid, { description: e.target.value })}
-                        className="flex-1 text-sm h-8"
-                        style={{ fontSize: "16px" }}
+                        className="flex-1 h-8"
+                        style={{ fontSize: "14px" }}
                       />
                       <Select
                         value={prob.importance !== undefined ? String(prob.importance) : ""}
@@ -479,24 +498,24 @@ function StepThree({
                 {isSelected && sel && (
                   <div className={`flex items-center gap-2 shrink-0 ${showReeval ? "" : ""}`}>
                     <ScoreSelect
-                      label="Desempeño"
+                      label="Des."
                       value={sel.performance}
                       onChange={(v) => updateSelected(prob.uid, { performance: v })}
                     />
                     <ScoreSelect
-                      label="Satisfacción"
+                      label="Sat."
                       value={sel.satisfaction}
                       onChange={(v) => updateSelected(prob.uid, { satisfaction: v })}
                     />
                     {showReeval && (
                       <>
                         <ScoreSelect
-                          label="Desempeño 2"
+                          label="Des. 2"
                           value={sel.performance2}
                           onChange={(v) => updateSelected(prob.uid, { performance2: v })}
                         />
                         <ScoreSelect
-                          label="Satisfacción 2"
+                          label="Sat. 2"
                           value={sel.satisfaction2}
                           onChange={(v) => updateSelected(prob.uid, { satisfaction2: v })}
                         />

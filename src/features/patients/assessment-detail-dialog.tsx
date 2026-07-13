@@ -16,7 +16,7 @@ import {
 } from "@/lib/schemas";
 import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
-import { CopmFields, formatCopmScore } from "./copm-fields";
+import { CopmFields, formatCopmScore, type CopmData } from "./copm-fields";
 import { AreaSummaryView } from "./area-summary-view";
 import {
   Dialog,
@@ -382,6 +382,7 @@ function AssessmentEditForm({
           onChange={setItemScores}
           onProblemsChange={setCopmData}
           showReeval
+          initialData={assessment.areaSummary as CopmData | null}
         />
       ) : isStructured ? (
         <StructuredScaleFields scale={scale} itemScores={itemScores} onChange={setItemScores} />
