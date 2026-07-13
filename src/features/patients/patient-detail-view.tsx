@@ -192,7 +192,7 @@ export function PatientDetailView() {
           <TabsTrigger value="overview">Resumen</TabsTrigger>
           <TabsTrigger value="visits">Seguimientos ({visits?.length ?? 0})</TabsTrigger>
           <TabsTrigger value="occupational-profile">Perfil ocupacional</TabsTrigger>
-          <TabsTrigger value="assessments">Escalas</TabsTrigger>
+          <TabsTrigger value="assessments">Valoración</TabsTrigger>
           <TabsTrigger value="progress">Evolución</TabsTrigger>
         </TabsList>
 

@@ -479,24 +479,24 @@ function StepThree({
                 {isSelected && sel && (
                   <div className={`flex items-center gap-2 shrink-0 ${showReeval ? "" : ""}`}>
                     <ScoreSelect
-                      label="Des."
+                      label="Desempeño"
                       value={sel.performance}
                       onChange={(v) => updateSelected(prob.uid, { performance: v })}
                     />
                     <ScoreSelect
-                      label="Sat."
+                      label="Satisfacción"
                       value={sel.satisfaction}
                       onChange={(v) => updateSelected(prob.uid, { satisfaction: v })}
                     />
                     {showReeval && (
                       <>
                         <ScoreSelect
-                          label="Des. 2"
+                          label="Desempeño 2"
                           value={sel.performance2}
                           onChange={(v) => updateSelected(prob.uid, { performance2: v })}
                         />
                         <ScoreSelect
-                          label="Sat. 2"
+                          label="Satisfacción 2"
                           value={sel.satisfaction2}
                           onChange={(v) => updateSelected(prob.uid, { satisfaction2: v })}
                         />
