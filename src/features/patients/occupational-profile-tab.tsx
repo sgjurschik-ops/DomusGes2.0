@@ -273,31 +273,15 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
           : [],
       });
 
-      const res = await fetch(`/api/patients/${patientId}/occupational-profile/report`);
-      if (!res.ok) throw new Error("REPORT_ERROR");
-
-      const blob = await res.blob();
-      const disposition = res.headers.get("Content-Disposition") ?? "";
-      const match = disposition.match(/filename="([^"]+)"/);
-      const fileName = match?.[1] ?? "Perfil_ocupacional.pdf";
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-
+      window.open(`/api/patients/${patientId}/occupational-profile/report`, "_blank");
       toast({
         title: "Informe generado",
-        description: "El documento Word se ha descargado correctamente.",
+        description: "Se ha abierto en una nueva pestana. Usa Cmd+P para guardar como PDF.",
       });
     } catch {
       toast({
         title: "Error",
-        description: "No se ha podido generar el informe PDF.",
+        description: "No se ha podido generar el informe Word.",
         variant: "destructive",
       });
     } finally {

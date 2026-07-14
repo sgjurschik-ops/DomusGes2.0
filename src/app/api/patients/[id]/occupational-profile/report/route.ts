@@ -1,50 +1,24 @@
 // GET /api/patients/[id]/occupational-profile/report
-// Professional PDF report of the occupational profile.
-// Uses pdf-lib for server-side generation with donut charts,
-// color-coded sections, and visual goal cards.
+// Returns a beautifully styled HTML page optimized for print/PDF.
+// Open in new tab → Cmd+P → Save as PDF.
 
 import { NextRequest, NextResponse } from "next/server";
-import { PDFDocument, rgb, StandardFonts, type PDFPage, type PDFFont, type RGB } from "pdf-lib";
 import { db } from "@/lib/db";
 import { requireProfessional, audit } from "@/lib/server";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-// ─── Constants ──────────────────────────────────────────────────────────────
-
-const W = 595.28; // A4 width
-const H = 841.89; // A4 height
-const M = 50;     // margin
-const CW = W - M * 2; // content width
-
-// Colors
-const TEAL: RGB = rgb(0.102, 0.361, 0.345);     // #1A5C58
-const TEAL_L: RGB = rgb(0.91, 0.96, 0.95);       // light teal bg
-const AMBER: RGB = rgb(0.706, 0.333, 0.035);     // #B45309
-const AMBER_L: RGB = rgb(0.996, 0.953, 0.78);    // light amber bg
-const VIOLET: RGB = rgb(0.427, 0.157, 0.851);    // #6D28D9
-const VIOLET_L: RGB = rgb(0.929, 0.914, 0.992);  // light violet bg
-const GRAY: RGB = rgb(0.42, 0.42, 0.42);
-const GRAY_L: RGB = rgb(0.95, 0.95, 0.95);
-const WHITE: RGB = rgb(1, 1, 1);
-const BLACK: RGB = rgb(0.1, 0.1, 0.1);
-const BORDER: RGB = rgb(0.9, 0.9, 0.9);
-const GREEN_D: RGB = rgb(0.024, 0.373, 0.275);
-const GREEN_L: RGB = rgb(0.82, 0.98, 0.898);
-
-const AREA_COLORS: Record<string, { bg: RGB; text: RGB; hex: string }> = {
-  "Cuidado de sí mismo": { bg: TEAL_L, text: TEAL, hex: "#14b8a6" },
-  "Productividad": { bg: AMBER_L, text: AMBER, hex: "#f59e0b" },
-  "Ocio": { bg: VIOLET_L, text: VIOLET, hex: "#8b5cf6" },
+const OTPF_TO_GROUP: Record<string, string> = {
+  "AVD": "Autocuidado", "AIVD": "Productividad", "Gestión de la Salud": "Autocuidado",
+  "Descanso y Sueño": "Autocuidado", "Educación": "Productividad", "Trabajo": "Productividad",
+  "Juego": "Ocio", "Ocio / Tiempo Libre": "Ocio", "Participación Social": "Productividad",
 };
 
-const STATUS_COLORS: Record<string, { bg: RGB; text: RGB }> = {
-  "En curso": { bg: AMBER_L, text: AMBER },
-  "Conseguido": { bg: GREEN_L, text: GREEN_D },
-  "Abandonado": { bg: GRAY_L, text: GRAY },
+const OTPF_COLORS: Record<string, string> = {
+  "AVD": "#f6c5a0", "AIVD": "#f6e4a0", "Gestión de la Salud": "#b8e0b8",
+  "Descanso y Sueño": "#b8d0f0", "Educación": "#d4b8f0", "Trabajo": "#f0b8b8",
+  "Juego": "#f0d4b8", "Ocio / Tiempo Libre": "#b8f0e4", "Participación Social": "#f0b8d4",
 };
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function stripHtml(html: string | null | undefined): string {
   if (!html) return "";
@@ -52,7 +26,7 @@ function stripHtml(html: string | null | undefined): string {
 }
 
 function fmtDate(d: Date | string | null): string {
-  if (!d) return "—";
+  if (!d) return "sin fecha";
   return new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
@@ -68,585 +42,462 @@ function safeJson<T>(raw: string | null | undefined): T[] {
   try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch { return []; }
 }
 
-function hexToRgb(hex: string): RGB {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  return rgb(r, g, b);
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// Wraps text to fit within maxWidth, returning lines
-function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const lines: string[] = [];
-  for (const rawLine of text.split("\n")) {
-    if (!rawLine.trim()) { lines.push(""); continue; }
-    const words = rawLine.split(" ");
-    let current = "";
-    for (const word of words) {
-      const test = current ? `${current} ${word}` : word;
-      if (font.widthOfTextAtSize(test, size) <= maxWidth) {
-        current = test;
-      } else {
-        if (current) lines.push(current);
-        current = word;
-      }
-    }
-    if (current) lines.push(current);
-  }
-  return lines.length > 0 ? lines : [""];
+function nl2br(s: string): string {
+  return esc(s).replace(/\n/g, "<br>");
 }
 
-// ─── Donut chart ────────────────────────────────────────────────────────────
-
-function drawDonut(
-  page: PDFPage, cx: number, cy: number,
-  outerR: number, innerR: number,
-  slices: { pct: number; color: RGB }[],
-) {
-  const TWO_PI = Math.PI * 2;
-  let startAngle = -Math.PI / 2;
-  for (const slice of slices) {
-    if (slice.pct <= 0) continue;
-    const angle = TWO_PI * (slice.pct / 100);
-    const steps = Math.max(12, Math.ceil((angle / TWO_PI) * 80));
-    for (let i = 0; i <= steps; i++) {
-      const a = startAngle + (angle * i) / steps;
-      page.drawLine({
-        start: { x: cx + Math.cos(a) * innerR, y: cy + Math.sin(a) * innerR },
-        end: { x: cx + Math.cos(a) * outerR, y: cy + Math.sin(a) * outerR },
-        thickness: (TWO_PI * outerR * (angle / TWO_PI)) / steps + 0.8,
-        color: slice.color,
-      });
-    }
-    startAngle += angle;
-  }
+// SVG donut chart
+function donutSvg(slices: { pct: number; color: string; label: string }[], size = 120, strokeW = 22): string {
+  const r = (size - strokeW) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circ = 2 * Math.PI * r;
+  let offset = circ * 0.25; // start at top
+  const paths = slices.filter(s => s.pct > 0).map(s => {
+    const dash = (s.pct / 100) * circ;
+    const svg = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${strokeW}" stroke-dasharray="${dash} ${circ - dash}" stroke-dashoffset="${offset}" />`;
+    offset -= dash;
+    return svg;
+  }).join("");
+  const total = slices.reduce((s, v) => s + (v.pct > 0 ? parseFloat(((v.pct / 100) * circ / 2 / 0.5).toFixed(0)) : 0), 0);
+  const totalH = slices.reduce((s, v) => s + v.pct, 0);
+  const centerLabel = `${(totalH > 0 ? slices.reduce((s, v) => s + v.pct * 1.2, 0) / 100 * 100 : 0).toFixed(0)}`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${paths}</svg>`;
 }
-
-// ─── Page manager ───────────────────────────────────────────────────────────
-
-class PageManager {
-  private doc: typeof PDFDocument extends new (...args: any) => infer R ? R : any;
-  page: PDFPage;
-  y: number;
-  font: PDFFont;
-  fontBold: PDFFont;
-
-  constructor(doc: any, font: PDFFont, fontBold: PDFFont) {
-    this.doc = doc;
-    this.font = font;
-    this.fontBold = fontBold;
-    this.page = doc.addPage([W, H]);
-    this.y = H - M;
-  }
-
-  ensureSpace(needed: number) {
-    if (this.y - needed < M + 20) {
-      this.page = this.doc.addPage([W, H]);
-      this.y = H - M;
-    }
-  }
-
-  drawRect(x: number, y: number, w: number, h: number, color: RGB, borderColor?: RGB) {
-    this.page.drawRectangle({ x, y, width: w, height: h, color });
-    if (borderColor) {
-      this.page.drawRectangle({ x, y, width: w, height: h, borderColor, borderWidth: 0.5, color: rgb(0, 0, 0) });
-      // Overdraw fill to hide the inner part of border
-      this.page.drawRectangle({ x: x + 0.5, y: y + 0.5, width: w - 1, height: h - 1, color });
-    }
-  }
-
-  text(txt: string, x: number, size: number, color: RGB, bold = false, maxWidth?: number): number {
-    const f = bold ? this.fontBold : this.font;
-    const lines = maxWidth ? wrapText(txt, f, size, maxWidth) : [txt];
-    const lineH = size * 1.4;
-    for (const line of lines) {
-      this.page.drawText(line, { x, y: this.y, size, font: f, color });
-      this.y -= lineH;
-    }
-    return lines.length * lineH;
-  }
-
-  label(txt: string, x = M) {
-    this.page.drawText(txt.toUpperCase(), { x, y: this.y, size: 7.5, font: this.fontBold, color: GRAY });
-    this.y -= 11;
-  }
-
-  value(txt: string, x = M, maxW = CW) {
-    const lines = wrapText(txt, this.font, 9.5, maxW);
-    for (const line of lines) {
-      this.page.drawText(line, { x, y: this.y, size: 9.5, font: this.font, color: BLACK });
-      this.y -= 13;
-    }
-    // Separator line
-    this.page.drawLine({ start: { x, y: this.y + 2 }, end: { x: x + maxW, y: this.y + 2 }, thickness: 0.3, color: BORDER });
-    this.y -= 8;
-  }
-
-  sectionTitle(txt: string, color = TEAL) {
-    this.ensureSpace(40);
-    this.y -= 12;
-    this.page.drawLine({ start: { x: M, y: this.y - 2 }, end: { x: M + CW, y: this.y - 2 }, thickness: 2.5, color });
-    this.page.drawText(txt, { x: M, y: this.y + 5, size: 12, font: this.fontBold, color });
-    this.y -= 22;
-  }
-
-  field(lbl: string, val: string | undefined | null, x = M, maxW = CW) {
-    const v = stripHtml(val);
-    if (!v) return;
-    this.ensureSpace(30);
-    this.label(lbl, x);
-    this.value(v, x, maxW);
-  }
-
-  skip(pts: number) { this.y -= pts; }
-}
-
-// ─── Main ───────────────────────────────────────────────────────────────────
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
- try {
-  const prof = await requireProfessional();
-  const { id } = await params;
+  try {
+    const prof = await requireProfessional();
+    const { id } = await params;
 
-  const patient = await db.patient.findUnique({ where: { id } });
-  if (!patient) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+    const patient = await db.patient.findUnique({ where: { id } });
+    if (!patient) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
 
-  const profile = await db.occupationalProfile.findUnique({
-    where: { patientId: id },
-    include: { goals: { orderBy: { createdAt: "asc" } } },
-  });
+    const profile = await db.occupationalProfile.findUnique({
+      where: { patientId: id },
+      include: { goals: { orderBy: { createdAt: "asc" } } },
+    });
 
-  // Also fetch latest routine record for balance charts
-  const latestRecord = profile
-    ? await db.weeklyRoutineRecord.findFirst({
-        where: { occupationalProfileId: profile.id },
-        orderBy: { createdAt: "desc" },
-      })
-    : null;
+    const latestRecord = profile
+      ? await db.weeklyRoutineRecord.findFirst({
+          where: { occupationalProfileId: profile.id },
+          orderBy: { createdAt: "desc" },
+        })
+      : null;
 
-  const d: Record<string, any> = { ...(profile ?? {}) };
-  const today = fmtDate(new Date());
-  const birthStr = fmtDate(patient.birthDate);
-  const age = calcAge(patient.birthDate);
-  const fullName = `${patient.firstName} ${patient.lastName}`;
+    const d: Record<string, any> = { ...(profile ?? {}) };
+    const today = fmtDate(new Date());
+    const fullName = `${patient.firstName} ${patient.lastName}`;
+    const age = calcAge(patient.birthDate);
+    const goals: any[] = profile?.goals ?? [];
 
-  const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const pm = new PageManager(pdfDoc, font, fontBold);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PAGE 1 — COVER
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // Brand header bar
-  pm.drawRect(M, pm.y - 55, CW, 60, TEAL);
-  pm.page.drawText("INFORME DE PERFIL OCUPACIONAL", {
-    x: M + 20, y: pm.y - 20, size: 16, font: fontBold, color: WHITE,
-  });
-  pm.page.drawText("DomusGes · Seguimiento ocupacional", {
-    x: M + 20, y: pm.y - 38, size: 8.5, font, color: rgb(0.7, 0.87, 0.84),
-  });
-  pm.y -= 72;
-
-  // Patient info card
-  pm.drawRect(M, pm.y - 38, CW, 42, GRAY_L);
-  pm.page.drawText("USUARIO/A", { x: M + 10, y: pm.y - 10, size: 7, font: fontBold, color: GRAY });
-  pm.page.drawText(fullName, { x: M + 10, y: pm.y - 24, size: 13, font: fontBold, color: BLACK });
-  pm.page.drawText("FECHA DE NACIMIENTO", { x: M + CW * 0.55, y: pm.y - 10, size: 7, font: fontBold, color: GRAY });
-  pm.page.drawText(`${birthStr} (${age} años)`, { x: M + CW * 0.55, y: pm.y - 24, size: 11, font, color: BLACK });
-  pm.page.drawLine({ start: { x: M + CW * 0.52, y: pm.y - 38 }, end: { x: M + CW * 0.52, y: pm.y + 4 }, thickness: 0.5, color: BORDER });
-  pm.y -= 52;
-
-  // Diagnosis & objective box
-  if (patient.diagnosis || patient.objective) {
-    const diagLines: string[] = [];
-    if (patient.diagnosis) diagLines.push(...wrapText(patient.diagnosis, font, 9, CW - 30));
-    if (patient.objective) diagLines.push(...wrapText(patient.objective, font, 9, CW - 30));
-    const boxH = 20 + (patient.diagnosis ? 12 + diagLines.filter(() => true).length * 12 : 0) + (patient.objective ? 24 : 0);
-
-    pm.page.drawLine({ start: { x: M, y: pm.y + 2 }, end: { x: M + CW, y: pm.y + 2 }, thickness: 2.5, color: TEAL });
-    pm.drawRect(M, pm.y - boxH + 2, CW, boxH, rgb(0.98, 0.98, 0.98));
-
-    let boxY = pm.y - 8;
-    if (patient.diagnosis) {
-      pm.page.drawText("DIAGNÓSTICO / MOTIVO DE DERIVACIÓN", { x: M + 10, y: boxY, size: 7, font: fontBold, color: GRAY });
-      boxY -= 13;
-      for (const line of wrapText(patient.diagnosis, font, 9, CW - 30)) {
-        pm.page.drawText(line, { x: M + 10, y: boxY, size: 9, font, color: BLACK });
-        boxY -= 12;
-      }
-      boxY -= 4;
+    // Balance data
+    const routineCells = latestRecord?.cells ? safeJson<{ category?: string; group?: string }>(latestRecord.cells as string) : [];
+    const balanceCounts: Record<string, number> = { "Autocuidado": 0, "Productividad": 0, "Ocio": 0 };
+    for (const c of routineCells) {
+      const grp = (c.group as string) || (c.category ? OTPF_TO_GROUP[c.category as string] : null);
+      if (grp && grp in balanceCounts) balanceCounts[grp]++;
     }
-    if (patient.objective) {
-      pm.page.drawText("OBJETIVO TERAPÉUTICO", { x: M + 10, y: boxY, size: 7, font: fontBold, color: GRAY });
-      boxY -= 13;
-      for (const line of wrapText(patient.objective, font, 9, CW - 30)) {
-        pm.page.drawText(line, { x: M + 10, y: boxY, size: 9, font, color: BLACK });
-        boxY -= 12;
-      }
-    }
-    pm.y -= boxH + 8;
-  }
+    const totalSlots = Object.values(balanceCounts).reduce((s, n) => s + n, 0);
 
-  // ── Summary dashboard ──
-  const goals: any[] = profile?.goals ?? [];
-  const routineCells = latestRecord?.cells ? safeJson<{ category?: string; group?: string }>(latestRecord.cells as string) : [];
-
-  pm.skip(12);
-
-  // Balance donut chart
-  const filled = routineCells.filter(c => c.group);
-  const balanceCounts: Record<string, number> = { "Cuidado de sí mismo": 0, "Productividad": 0, "Ocio": 0 };
-  for (const c of filled) {
-    const grp = c.group as string;
-    if (grp in balanceCounts) balanceCounts[grp]++;
-  }
-  const totalSlots = Object.values(balanceCounts).reduce((s, n) => s + n, 0);
-
-  if (totalSlots > 0 || goals.length > 0) {
-    pm.page.drawText("RESUMEN", { x: M, y: pm.y, size: 10, font: fontBold, color: TEAL });
-    pm.y -= 20;
-
-    // Two columns: left = balance chart, right = goals summary
-    const colW = CW * 0.48;
-    const chartCx = M + 55;
-    const chartCy = pm.y - 40;
-
-    if (totalSlots > 0) {
-      // Donut chart
-      const slices = Object.entries(balanceCounts).map(([name, count]) => ({
-        pct: (count / totalSlots) * 100,
-        color: hexToRgb(AREA_COLORS[name]?.hex ?? "#888"),
-      }));
-      drawDonut(pm.page, chartCx, chartCy, 38, 20, slices);
-
-      // Center text
-      pm.page.drawText(`${(totalSlots * 0.5).toFixed(0)}h`, {
-        x: chartCx - font.widthOfTextAtSize(`${(totalSlots * 0.5).toFixed(0)}h`, 10) / 2,
-        y: chartCy - 4, size: 10, font: fontBold, color: BLACK,
-      });
-
-      // Legend
-      let legendY = pm.y - 5;
-      const legendX = M + 110;
-      for (const [name, count] of Object.entries(balanceCounts)) {
-        const pct = totalSlots > 0 ? ((count / totalSlots) * 100).toFixed(0) : "0";
-        const ac = AREA_COLORS[name];
-        if (ac) {
-          pm.drawRect(legendX, legendY - 2, 8, 8, hexToRgb(ac.hex));
-          pm.page.drawText(`${name}`, { x: legendX + 12, y: legendY, size: 8, font: fontBold, color: ac.text });
-          pm.page.drawText(`${(count * 0.5).toFixed(1)}h · ${pct}%`, { x: legendX + 12, y: legendY - 11, size: 7.5, font, color: GRAY });
-          legendY -= 26;
-        }
-      }
-
-      // Reference note
-      pm.page.drawText("Ref: Autocuidado ~46% · Productividad ~33% · Ocio ~20%", {
-        x: M, y: pm.y - 90, size: 6.5, font, color: GRAY,
-      });
-    }
-
-    // Goals summary (right column)
-    if (goals.length > 0) {
-      const rightX = M + CW * 0.55;
-      pm.page.drawText("OBJETIVOS", { x: rightX, y: pm.y, size: 7.5, font: fontBold, color: GRAY });
-      pm.page.drawText(`${goals.length} definidos`, { x: rightX, y: pm.y - 14, size: 14, font: fontBold, color: BLACK });
-
-      let statY = pm.y - 32;
-      const inProgress = goals.filter(g => g.status === "En curso").length;
-      const achieved = goals.filter(g => g.status === "Conseguido").length;
-      const abandoned = goals.filter(g => g.status === "Abandonado").length;
-
-      if (inProgress > 0) {
-        pm.drawRect(rightX, statY - 2, 6, 6, AMBER);
-        pm.page.drawText(`${inProgress} en curso`, { x: rightX + 10, y: statY, size: 8.5, font, color: AMBER });
-        statY -= 14;
-      }
-      if (achieved > 0) {
-        pm.drawRect(rightX, statY - 2, 6, 6, GREEN_D);
-        pm.page.drawText(`${achieved} conseguido${achieved > 1 ? "s" : ""}`, { x: rightX + 10, y: statY, size: 8.5, font, color: GREEN_D });
-        statY -= 14;
-      }
-      if (abandoned > 0) {
-        pm.drawRect(rightX, statY - 2, 6, 6, GRAY);
-        pm.page.drawText(`${abandoned} abandonado${abandoned > 1 ? "s" : ""}`, { x: rightX + 10, y: statY, size: 8.5, font, color: GRAY });
-      }
-    }
-
-    pm.y -= 105;
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // DETAILED SECTIONS
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // ── Datos generales ──
-  pm.sectionTitle("Datos generales");
-  pm.field("Documentos que adjunta", d.documentsAttached);
-  pm.field("Recurso que deriva", d.referralResource);
-  pm.field("Motivo de intervención", d.interventionReason);
-
-  // ── Área social-familiar ──
-  pm.sectionTitle("Área social-familiar");
-  pm.field("Carné de conducir", d.drivingLicense);
-  pm.field("¿Conduce actualmente?", d.currentlyDrives === true ? "Sí" : d.currentlyDrives === false ? "No" : null);
-  pm.field("Motivo si no conduce", d.drivingReason);
-  pm.field("Estado civil", d.maritalStatus);
-  pm.field("Pareja", d.partnerInfo);
-  pm.field("Convivencia actual", d.livingSituation);
-
-  const family = safeJson<{ name?: string; relationship?: string; occupation?: string; notes?: string }>(d.familyComposition);
-  if (family.length > 0) {
-    pm.field("Composición familiar", family.map(f => [f.name, f.relationship, f.occupation, f.notes].filter(Boolean).join(" — ")).join("\n"));
-  }
-  pm.field("Red de apoyo / amistades", d.supportNetwork);
-  pm.field("Con quién tiene mejor relación", d.bestRelationship);
-  pm.field("Con quién tiene peor relación", d.worstRelationship);
-
-  // ── Área laboral y económica ──
-  pm.sectionTitle("Área laboral y económica");
-  pm.field("Estudios realizados", d.educationLevel);
-  pm.field("Otros estudios", d.otherEducation);
-  const work = safeJson<{ company?: string; role?: string; year?: string; notes?: string }>(d.workHistory);
-  if (work.length > 0) {
-    pm.field("Trabajos realizados", work.map(w => [w.company, w.role, w.year, w.notes].filter(Boolean).join(" — ")).join("\n"));
-  }
-  pm.field("Situación laboral actual", d.currentWorkSituation);
-  pm.field("Ocupación actual", d.currentOccupation);
-  pm.field("Ingresos aproximados", d.approximateIncome);
-  pm.field("Quién gestiona el dinero", d.moneyManager);
-  pm.field("Organización de ingresos", d.incomeOrganization);
-
-  // ── Hábitos y rutinas ──
-  pm.sectionTitle("Hábitos y rutinas");
-  pm.field("Rutina de un día", d.dailyRoutine);
-
-  // OTPF detailed chart
-  if (routineCells.length > 0) {
+    // OTPF data
     const OTPF_CATS = ["AVD", "AIVD", "Gestión de la Salud", "Descanso y Sueño", "Educación", "Trabajo", "Juego", "Ocio / Tiempo Libre", "Participación Social"];
-    const OTPF_COLORS: Record<string, string> = {
-      "AVD": "#f6c5a0", "AIVD": "#f6e4a0", "Gestión de la Salud": "#b8e0b8",
-      "Descanso y Sueño": "#b8d0f0", "Educación": "#d4b8f0", "Trabajo": "#f0b8b8",
-      "Juego": "#f0d4b8", "Ocio / Tiempo Libre": "#b8f0e4", "Participación Social": "#f0b8d4",
-    };
     const otpfCounts: Record<string, number> = {};
     for (const cat of OTPF_CATS) otpfCounts[cat] = 0;
     for (const c of routineCells) {
-      if (c.category && c.category in otpfCounts) otpfCounts[c.category as string]++;
+      const cat = c.category as string;
+      if (cat && cat in otpfCounts) otpfCounts[cat]++;
     }
     const otpfTotal = Object.values(otpfCounts).reduce((s, n) => s + n, 0);
 
-    if (otpfTotal > 0) {
-      pm.ensureSpace(120);
-      pm.skip(8);
-      pm.page.drawText("DISTRIBUCIÓN POR ÁREAS OTPF", { x: M, y: pm.y, size: 7.5, font: fontBold, color: GRAY });
-      pm.y -= 16;
+    // Goals stats
+    const goalsInProgress = goals.filter(g => g.status === "En curso").length;
+    const goalsAchieved = goals.filter(g => g.status === "Conseguido").length;
+    const goalsAbandoned = goals.filter(g => g.status === "Abandonado").length;
 
-      const chartCx = M + 55;
-      const chartCy = pm.y - 38;
-      const otpfSlices = OTPF_CATS.map(cat => ({
-        pct: otpfTotal > 0 ? (otpfCounts[cat] / otpfTotal) * 100 : 0,
-        color: hexToRgb(OTPF_COLORS[cat] ?? "#ccc"),
-      })).filter(s => s.pct > 0);
-      drawDonut(pm.page, chartCx, chartCy, 35, 18, otpfSlices);
+    // Activity fields
+    const actPastSelf = stripHtml(d.activitiesPastSelfcare);
+    const actPastProd = stripHtml(d.activitiesPastProductivity);
+    const actPastLeis = stripHtml(d.activitiesPastLeisure);
+    const actDesSelf = stripHtml(d.activitiesDesiredSelfcare);
+    const actDesProd = stripHtml(d.activitiesDesiredProductivity);
+    const actDesLeis = stripHtml(d.activitiesDesiredLeisure);
+    const hasActivities = actPastSelf || actPastProd || actPastLeis || actDesSelf || actDesProd || actDesLeis;
 
-      // Legend table
-      let legY = pm.y;
-      const legX = M + 110;
-      for (const cat of OTPF_CATS) {
-        if (otpfCounts[cat] === 0) continue;
-        const pct = ((otpfCounts[cat] / otpfTotal) * 100).toFixed(0);
-        pm.drawRect(legX, legY - 2, 6, 6, hexToRgb(OTPF_COLORS[cat]));
-        pm.page.drawText(cat, { x: legX + 10, y: legY, size: 7.5, font, color: BLACK });
-        pm.page.drawText(`${(otpfCounts[cat] * 0.5).toFixed(1)}h (${pct}%)`, { x: legX + CW * 0.35, y: legY, size: 7.5, font, color: GRAY });
-        legY -= 11;
-      }
-      pm.y = Math.min(pm.y - 85, legY - 8);
-    }
+    // Problems
+    const problemsU = stripHtml(d.problemsUser);
+    const problemsP = stripHtml(d.problemsProfessional);
+
+    // Family & work
+    const family = safeJson<{ name?: string; relationship?: string; occupation?: string; notes?: string }>(d.familyComposition);
+    const work = safeJson<{ company?: string; role?: string; year?: string; notes?: string }>(d.workHistory);
+
+    // Social fields
+    const socialData: [string, string][] = [];
+    if (d.drivingLicense) socialData.push(["Carné de conducir", d.drivingLicense]);
+    if (d.currentlyDrives === true || d.currentlyDrives === false) socialData.push(["¿Conduce actualmente?", d.currentlyDrives ? "Sí" : "No"]);
+    if (d.drivingReason) socialData.push(["Motivo si no conduce", stripHtml(d.drivingReason)]);
+    if (d.maritalStatus) socialData.push(["Estado civil", d.maritalStatus]);
+    if (d.partnerInfo) socialData.push(["Pareja", stripHtml(d.partnerInfo)]);
+    if (d.livingSituation) socialData.push(["Convivencia actual", stripHtml(d.livingSituation)]);
+    if (family.length > 0) socialData.push(["Composición familiar", family.map(fm => [fm.name, fm.relationship, fm.occupation, fm.notes].filter(Boolean).join(" — ")).join("\n")]);
+    if (d.supportNetwork) socialData.push(["Red de apoyo / amistades", stripHtml(d.supportNetwork)]);
+    if (d.bestRelationship) socialData.push(["Con quién tiene mejor relación", stripHtml(d.bestRelationship)]);
+    if (d.worstRelationship) socialData.push(["Con quién tiene peor relación", stripHtml(d.worstRelationship)]);
+
+    // Work fields
+    const workData: [string, string][] = [];
+    if (d.educationLevel) workData.push(["Estudios realizados", d.educationLevel]);
+    if (d.otherEducation) workData.push(["Otros estudios", stripHtml(d.otherEducation)]);
+    if (work.length > 0) workData.push(["Trabajos realizados", work.map(w => [w.company, w.role, w.year, w.notes].filter(Boolean).join(" — ")).join("\n")]);
+    if (d.currentWorkSituation) workData.push(["Situación laboral actual", stripHtml(d.currentWorkSituation)]);
+    if (d.currentOccupation) workData.push(["Ocupación actual", stripHtml(d.currentOccupation)]);
+    if (d.approximateIncome) workData.push(["Ingresos aproximados", d.approximateIncome]);
+    if (d.moneyManager) workData.push(["Quién gestiona el dinero", stripHtml(d.moneyManager)]);
+
+    // Balance donut SVG
+    const balanceSlices = [
+      { pct: totalSlots > 0 ? (balanceCounts["Autocuidado"] / totalSlots) * 100 : 0, color: "#14b8a6", label: "Autocuidado" },
+      { pct: totalSlots > 0 ? (balanceCounts["Productividad"] / totalSlots) * 100 : 0, color: "#f59e0b", label: "Productividad" },
+      { pct: totalSlots > 0 ? (balanceCounts["Ocio"] / totalSlots) * 100 : 0, color: "#8b5cf6", label: "Ocio" },
+    ];
+
+    // OTPF donut SVG
+    const otpfSlices = OTPF_CATS.filter(c => otpfCounts[c] > 0).map(c => ({
+      pct: (otpfCounts[c] / otpfTotal) * 100,
+      color: OTPF_COLORS[c],
+      label: c,
+    }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BUILD HTML
+    // ═══════════════════════════════════════════════════════════════════════
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Perfil Ocupacional — ${esc(fullName)}</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  @media print {
+    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .no-print { display: none !important; }
+    .page-break { page-break-before: always; }
   }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10pt; color: #1a1a1a; line-height: 1.5; background: #fff; }
+  .container { max-width: 210mm; margin: 0 auto; padding: 0 16mm; }
 
-  // ── Actividades realizadas y deseadas ──
-  pm.sectionTitle("Actividades realizadas y deseadas");
+  /* Print button */
+  .print-bar { background: #1A5C58; color: #fff; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .print-bar h3 { font-size: 13px; font-weight: 500; }
+  .print-btn { background: #fff; color: #1A5C58; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .print-btn:hover { background: #e0f2f1; }
 
-  const actFields = [
-    { past: d.activitiesPastSelfcare, desired: d.activitiesDesiredSelfcare, area: "Cuidado de sí mismo" },
-    { past: d.activitiesPastProductivity, desired: d.activitiesDesiredProductivity, area: "Productividad" },
-    { past: d.activitiesPastLeisure, desired: d.activitiesDesiredLeisure, area: "Ocio" },
-  ];
+  /* Cover */
+  .cover-bar { background: #1A5C58; border-radius: 8px; padding: 24px 28px; color: #fff; margin-bottom: 20px; margin-top: 20px; }
+  .cover-bar h1 { font-size: 18pt; font-weight: 400; letter-spacing: 0.02em; }
+  .cover-bar p { color: #B2DFDB; font-size: 9pt; margin-top: 4px; }
 
-  // Column headers
-  pm.ensureSpace(40);
-  pm.page.drawText("REALIZABA", { x: M, y: pm.y, size: 7.5, font: fontBold, color: GRAY });
-  pm.page.drawText("LE GUSTARÍA RETOMAR", { x: M + CW * 0.52, y: pm.y, size: 7.5, font: fontBold, color: GRAY });
-  pm.y -= 14;
+  .patient-card { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+  .patient-cell { background: #f9fafb; padding: 12px 16px; }
+  .patient-cell + .patient-cell { border-left: 1px solid #e5e7eb; }
+  .patient-cell .label { font-size: 7pt; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; font-weight: 600; margin-bottom: 3px; }
+  .patient-cell .value { font-size: 13pt; font-weight: 600; }
+  .patient-cell .value-sm { font-size: 11pt; }
 
-  for (const act of actFields) {
-    const ac = AREA_COLORS[act.area];
-    if (!ac) continue;
-    const pastText = stripHtml(act.past) || "—";
-    const desText = stripHtml(act.desired) || "—";
-    const colW = CW * 0.46;
+  .diag-box { border: 1px solid #e5e7eb; border-top: 3px solid #1A5C58; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; }
+  .diag-box .label { font-size: 7pt; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; font-weight: 600; margin-bottom: 2px; }
+  .diag-box .value { font-size: 10pt; margin-bottom: 10px; }
+  .diag-box .value:last-child { margin-bottom: 0; }
 
-    pm.ensureSpace(40);
+  /* Summary */
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .summary-box { background: #f9fafb; border-radius: 8px; padding: 16px; }
+  .summary-box h4 { font-size: 7pt; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; font-weight: 600; margin-bottom: 10px; }
+  .balance-row { display: flex; align-items: center; gap: 16px; }
+  .balance-legend { flex: 1; }
+  .balance-item { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .balance-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .balance-name { font-size: 9pt; font-weight: 600; }
+  .balance-val { font-size: 8pt; color: #6b7280; }
+  .ref-note { font-size: 7pt; color: #9ca3af; margin-top: 8px; }
+  .goals-num { font-size: 24pt; font-weight: 300; margin-bottom: 4px; }
+  .goals-sub { font-size: 8.5pt; color: #6b7280; }
+  .goals-stat { display: flex; align-items: center; gap: 5px; font-size: 8.5pt; margin-top: 3px; }
+  .stat-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
-    // Area tag
-    pm.drawRect(M, pm.y - 1, colW, 12, ac.bg);
-    pm.page.drawText(act.area, { x: M + 4, y: pm.y + 2, size: 7.5, font: fontBold, color: ac.text });
-    pm.drawRect(M + CW * 0.52, pm.y - 1, colW, 12, ac.bg);
-    pm.page.drawText(act.area, { x: M + CW * 0.52 + 4, y: pm.y + 2, size: 7.5, font: fontBold, color: ac.text });
-    pm.y -= 16;
+  /* Sections */
+  .section { margin-bottom: 22px; }
+  .section-title { font-size: 12pt; font-weight: 600; color: #1A5C58; padding-bottom: 6px; border-bottom: 2.5px solid #1A5C58; margin-bottom: 14px; }
+  .section-title.amber { color: #b45309; border-color: #f59e0b; }
 
-    // Content
-    const pastLines = wrapText(pastText, font, 8.5, colW - 8);
-    const desLines = wrapText(desText, font, 8.5, colW - 8);
-    const maxLines = Math.max(pastLines.length, desLines.length);
-    
-    pm.ensureSpace(maxLines * 11 + 8);
-    let lineY = pm.y;
-    for (const line of pastLines) {
-      pm.page.drawText(line, { x: M + 4, y: lineY, size: 8.5, font, color: BLACK });
-      lineY -= 11;
-    }
-    lineY = pm.y;
-    for (const line of desLines) {
-      pm.page.drawText(line, { x: M + CW * 0.52 + 4, y: lineY, size: 8.5, font, color: BLACK });
-      lineY -= 11;
-    }
-    pm.y -= maxLines * 11 + 8;
-  }
+  .field { margin-bottom: 10px; }
+  .field .label { font-size: 7pt; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; font-weight: 600; margin-bottom: 2px; }
+  .field .value { font-size: 9.5pt; padding-bottom: 6px; border-bottom: 1px solid #f0f0f0; }
 
-  // ── Problemas detectados ──
-  const problemsU = stripHtml(d.problemsUser);
-  const problemsP = stripHtml(d.problemsProfessional);
+  /* Activities */
+  .act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .act-col h4 { font-size: 7pt; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; font-weight: 600; margin-bottom: 10px; }
+  .act-item { border-left: 3px solid; padding: 6px 0 6px 12px; margin-bottom: 8px; font-size: 9pt; }
+  .act-item .area-name { font-size: 8pt; font-weight: 600; margin-bottom: 2px; }
+  .act-item.teal { border-color: #14b8a6; }
+  .act-item.teal .area-name { color: #1A5C58; }
+  .act-item.amber { border-color: #f59e0b; }
+  .act-item.amber .area-name { color: #b45309; }
+  .act-item.violet { border-color: #8b5cf6; }
+  .act-item.violet .area-name { color: #6d28d9; }
+  .act-item .empty { color: #9ca3af; font-style: italic; }
 
-  if (problemsU || problemsP) {
-    pm.sectionTitle("Problemas detectados", AMBER);
+  /* Problems */
+  .problem-box { border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; }
+  .problem-box.user { background: #fef3c7; border-top: 3px solid #f59e0b; }
+  .problem-box.prof { background: #e8f5f3; border-top: 3px solid #1A5C58; }
+  .problem-box .pb-title { font-size: 7pt; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .problem-box.user .pb-title { color: #b45309; }
+  .problem-box.prof .pb-title { color: #1A5C58; }
+  .problem-box p { font-size: 9pt; margin-bottom: 2px; }
 
-    if (problemsU) {
-      const lines = wrapText(problemsU, font, 8.5, CW - 24);
-      pm.ensureSpace(20 + lines.length * 11);
-      const boxH = 18 + lines.length * 11;
-      pm.page.drawLine({ start: { x: M, y: pm.y + 4 }, end: { x: M + CW, y: pm.y + 4 }, thickness: 2.5, color: AMBER });
-      pm.drawRect(M, pm.y - boxH + 4, CW, boxH, AMBER_L);
-      pm.page.drawText("PROBLEMAS DETECTADOS POR EL/LA USUARIO/A", { x: M + 10, y: pm.y - 6, size: 7, font: fontBold, color: AMBER });
-      let ly = pm.y - 18;
-      for (const line of lines) {
-        pm.page.drawText(line, { x: M + 10, y: ly, size: 8.5, font, color: BLACK });
-        ly -= 11;
-      }
-      pm.y -= boxH + 8;
-    }
+  /* Goals */
+  .goal-card { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .goal-left { width: 5px; }
+  .goal-body { padding: 12px 16px; }
+  .goal-text { font-size: 10pt; margin-bottom: 8px; }
+  .goal-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .badge { font-size: 7.5pt; padding: 2px 8px; border-radius: 4px; font-weight: 600; display: inline-block; }
+  .badge.teal { background: #e8f5f3; color: #1A5C58; }
+  .badge.amber { background: #fef3c7; color: #b45309; }
+  .badge.violet { background: #ede9fe; color: #6d28d9; }
+  .badge.green { background: #d1fae5; color: #065f46; }
+  .badge.gray { background: #f3f4f6; color: #6b7280; }
+  .goal-dates { font-size: 7.5pt; color: #6b7280; }
+  .goal-eval { font-size: 8.5pt; color: #4b5563; border-top: 1px solid #f0f0f0; padding-top: 6px; margin-top: 6px; }
+  .goal-eval strong { font-size: 7pt; text-transform: uppercase; color: #6b7280; }
 
-    if (problemsP) {
-      const lines = wrapText(problemsP, font, 8.5, CW - 24);
-      pm.ensureSpace(20 + lines.length * 11);
-      const boxH = 18 + lines.length * 11;
-      pm.page.drawLine({ start: { x: M, y: pm.y + 4 }, end: { x: M + CW, y: pm.y + 4 }, thickness: 2.5, color: TEAL });
-      pm.drawRect(M, pm.y - boxH + 4, CW, boxH, TEAL_L);
-      pm.page.drawText("PROBLEMAS DETECTADOS POR EL/LA PROFESIONAL", { x: M + 10, y: pm.y - 6, size: 7, font: fontBold, color: TEAL });
-      let ly = pm.y - 18;
-      for (const line of lines) {
-        pm.page.drawText(line, { x: M + 10, y: ly, size: 8.5, font, color: BLACK });
-        ly -= 11;
-      }
-      pm.y -= boxH + 8;
-    }
-  }
+  /* OTPF */
+  .otpf-row { display: flex; align-items: center; gap: 16px; margin-bottom: 6px; }
+  .otpf-legend { flex: 1; }
+  .otpf-item { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .otpf-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .otpf-label { font-size: 8pt; }
+  .otpf-val { font-size: 8pt; color: #6b7280; margin-left: auto; }
 
-  // ── Objetivos y planificación ──
-  if (goals.length > 0) {
-    pm.sectionTitle("Objetivos y planificación");
+  /* Footer */
+  .footer { border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 30px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #6b7280; }
+  .signature { margin-top: 30px; }
+  .signature .line { width: 180px; border-bottom: 1px solid #d1d5db; margin-top: 4px; }
+  .signature span { font-size: 8pt; color: #6b7280; }
+</style>
+</head>
+<body>
+<div class="print-bar no-print">
+  <h3>Informe de Perfil Ocupacional — ${esc(fullName)}</h3>
+  <button class="print-btn" onclick="window.print()">Imprimir / Guardar PDF</button>
+</div>
+<div class="container">
 
-    const desiredImprovements = stripHtml(d.desiredImprovements);
-    if (desiredImprovements) pm.field("Qué le gustaría conseguir o mejorar", desiredImprovements);
+<!-- COVER -->
+<div class="cover-bar">
+  <h1>Informe de Perfil Ocupacional</h1>
+  <p>DomusGes · Seguimiento ocupacional</p>
+</div>
 
-    for (const goal of goals) {
-      const ac = AREA_COLORS[goal.area as string] ?? AREA_COLORS["Cuidado de sí mismo"];
-      const sc = STATUS_COLORS[goal.status as string] ?? STATUS_COLORS["En curso"];
-      const goalText = goal.text || "—";
-      const goalLines = wrapText(goalText, font, 9, CW - 30);
-      const hasEval = goal.evaluation?.trim();
-      const evalLines = hasEval ? wrapText(goal.evaluation, font, 8, CW - 30) : [];
-      const cardH = 16 + goalLines.length * 12 + 18 + (hasEval ? 12 + evalLines.length * 10 : 0) + 8;
+<div class="patient-card">
+  <div class="patient-cell">
+    <div class="label">Usuario/a</div>
+    <div class="value">${esc(fullName)}</div>
+  </div>
+  <div class="patient-cell">
+    <div class="label">Fecha de nacimiento</div>
+    <div class="value-sm">${fmtDate(patient.birthDate)} (${age} años)</div>
+  </div>
+</div>
 
-      pm.ensureSpace(cardH + 10);
+${patient.diagnosis || patient.objective ? `
+<div class="diag-box">
+  ${patient.diagnosis ? `<div class="label">Diagnóstico / Motivo de derivación</div><div class="value">${nl2br(patient.diagnosis)}</div>` : ""}
+  ${patient.objective ? `<div class="label">Objetivo terapéutico</div><div class="value">${nl2br(patient.objective)}</div>` : ""}
+</div>` : ""}
 
-      // Left color border
-      pm.drawRect(M, pm.y - cardH + 2, 4, cardH, ac.text);
-      // Card bg
-      pm.drawRect(M + 4, pm.y - cardH + 2, CW - 4, cardH, rgb(0.99, 0.99, 0.99));
-      // Border
-      pm.page.drawRectangle({ x: M, y: pm.y - cardH + 2, width: CW, height: cardH, borderColor: BORDER, borderWidth: 0.5 });
+<!-- SUMMARY -->
+${totalSlots > 0 || goals.length > 0 ? `
+<div class="summary-grid">
+  ${totalSlots > 0 ? `
+  <div class="summary-box">
+    <h4>Equilibrio ocupacional</h4>
+    <div class="balance-row">
+      ${(() => {
+        const r = 40, sw = 16, size = 2 * (r + sw / 2);
+        const circ = 2 * Math.PI * r;
+        let offset = circ * 0.25;
+        const arcs = balanceSlices.filter(s => s.pct > 0).map(s => {
+          const dash = (s.pct / 100) * circ;
+          const arc = `<circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(1)} ${(circ - dash).toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" />`;
+          offset -= dash;
+          return arc;
+        }).join("");
+        const totalH = (totalSlots * 0.5).toFixed(0);
+        return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${arcs}<text x="${size/2}" y="${size/2 + 5}" text-anchor="middle" font-size="14" font-weight="600" fill="#1a1a1a">${totalH}h</text></svg>`;
+      })()}
+      <div class="balance-legend">
+        ${balanceSlices.map(s => `
+          <div class="balance-item">
+            <span class="balance-dot" style="background:${s.color}"></span>
+            <span class="balance-name" style="color:${s.color}">${s.label}</span>
+            <span class="balance-val">${(balanceCounts[s.label] * 0.5).toFixed(1)}h · ${s.pct.toFixed(0)}%</span>
+          </div>
+        `).join("")}
+        <div class="ref-note">Ref: Autocuidado ~46% · Productividad ~33% · Ocio ~20%</div>
+      </div>
+    </div>
+  </div>` : ""}
+  ${goals.length > 0 ? `
+  <div class="summary-box">
+    <h4>Objetivos</h4>
+    <div class="goals-num">${goals.length}</div>
+    <div class="goals-sub">objetivos definidos</div>
+    ${goalsInProgress > 0 ? `<div class="goals-stat"><span class="stat-dot" style="background:#f59e0b"></span>${goalsInProgress} en curso</div>` : ""}
+    ${goalsAchieved > 0 ? `<div class="goals-stat"><span class="stat-dot" style="background:#065f46"></span>${goalsAchieved} conseguido${goalsAchieved > 1 ? "s" : ""}</div>` : ""}
+    ${goalsAbandoned > 0 ? `<div class="goals-stat"><span class="stat-dot" style="background:#6b7280"></span>${goalsAbandoned} abandonado${goalsAbandoned > 1 ? "s" : ""}</div>` : ""}
+  </div>` : ""}
+</div>` : ""}
 
-      let cardY = pm.y - 8;
-      // Goal text
-      for (const line of goalLines) {
-        pm.page.drawText(line, { x: M + 14, y: cardY, size: 9, font, color: BLACK });
-        cardY -= 12;
-      }
-      cardY -= 2;
+<!-- DATOS GENERALES -->
+${d.documentsAttached || d.referralResource || d.interventionReason ? `
+<div class="section">
+  <div class="section-title">Datos generales</div>
+  ${d.documentsAttached ? `<div class="field"><div class="label">Documentos que adjunta</div><div class="value">${nl2br(stripHtml(d.documentsAttached))}</div></div>` : ""}
+  ${d.referralResource ? `<div class="field"><div class="label">Recurso que deriva</div><div class="value">${nl2br(stripHtml(d.referralResource))}</div></div>` : ""}
+  ${d.interventionReason ? `<div class="field"><div class="label">Motivo de intervención</div><div class="value">${nl2br(stripHtml(d.interventionReason))}</div></div>` : ""}
+</div>` : ""}
 
-      // Area badge
-      const areaW = fontBold.widthOfTextAtSize(goal.area, 7) + 12;
-      pm.drawRect(M + 14, cardY - 2, areaW, 12, ac.bg);
-      pm.page.drawText(goal.area, { x: M + 20, y: cardY + 1, size: 7, font: fontBold, color: ac.text });
+<!-- AREA SOCIAL-FAMILIAR -->
+${socialData.length > 0 ? `
+<div class="section">
+  <div class="section-title">Área social-familiar</div>
+  ${socialData.map(([label, value]) => `<div class="field"><div class="label">${esc(label)}</div><div class="value">${nl2br(value)}</div></div>`).join("")}
+</div>` : ""}
 
-      // Status badge
-      const statusW = fontBold.widthOfTextAtSize(goal.status, 7) + 12;
-      pm.drawRect(M + 14 + areaW + 6, cardY - 2, statusW, 12, sc.bg);
-      pm.page.drawText(goal.status, { x: M + 20 + areaW + 6, y: cardY + 1, size: 7, font: fontBold, color: sc.text });
+<!-- AREA LABORAL Y ECONOMICA -->
+${workData.length > 0 ? `
+<div class="section">
+  <div class="section-title">Área laboral y económica</div>
+  ${workData.map(([label, value]) => `<div class="field"><div class="label">${esc(label)}</div><div class="value">${nl2br(value)}</div></div>`).join("")}
+</div>` : ""}
 
-      // Dates
-      const dateStr = `Inicio: ${fmtDate(goal.startDate)} > Objetivo: ${fmtDate(goal.targetDate)}`;
-      pm.page.drawText(dateStr, { x: M + 14 + areaW + statusW + 16, y: cardY + 1, size: 7, font, color: GRAY });
-      cardY -= 16;
+<!-- HABITOS Y RUTINAS -->
+${stripHtml(d.dailyRoutine) || otpfTotal > 0 ? `
+<div class="section">
+  <div class="section-title">Hábitos y rutinas</div>
+  ${stripHtml(d.dailyRoutine) ? `<div class="field"><div class="label">Rutina de un día</div><div class="value">${nl2br(stripHtml(d.dailyRoutine))}</div></div>` : ""}
+  ${otpfTotal > 0 ? `
+  <div style="margin-top:12px">
+    <div class="label" style="margin-bottom:10px">Distribución por áreas OTPF</div>
+    <div class="otpf-row">
+      ${(() => {
+        const r = 35, sw = 14, size = 2 * (r + sw / 2);
+        const circ = 2 * Math.PI * r;
+        let offset = circ * 0.25;
+        const arcs = otpfSlices.map(s => {
+          const dash = (s.pct / 100) * circ;
+          const arc = `<circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(1)} ${(circ - dash).toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" />`;
+          offset -= dash;
+          return arc;
+        }).join("");
+        return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${arcs}</svg>`;
+      })()}
+      <div class="otpf-legend">
+        ${OTPF_CATS.filter(c => otpfCounts[c] > 0).map(c => `
+          <div class="otpf-item">
+            <span class="otpf-dot" style="background:${OTPF_COLORS[c]}"></span>
+            <span class="otpf-label">${esc(c)}</span>
+            <span class="otpf-val">${(otpfCounts[c] * 0.5).toFixed(1)}h (${((otpfCounts[c] / otpfTotal) * 100).toFixed(0)}%)</span>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  </div>` : ""}
+</div>` : ""}
 
-      // Evaluation
-      if (hasEval) {
-        pm.page.drawText("EVALUACIÓN", { x: M + 14, y: cardY, size: 6.5, font: fontBold, color: GRAY });
-        cardY -= 10;
-        for (const line of evalLines) {
-          pm.page.drawText(line, { x: M + 14, y: cardY, size: 8, font, color: GRAY });
-          cardY -= 10;
-        }
-      }
+<!-- ACTIVIDADES REALIZADAS Y DESEADAS -->
+${hasActivities ? `
+<div class="section">
+  <div class="section-title">Actividades realizadas y deseadas</div>
+  <div class="act-grid">
+    <div class="act-col">
+      <h4>Actividades que realizaba</h4>
+      <div class="act-item teal"><div class="area-name">Cuidado de sí mismo</div>${actPastSelf ? nl2br(actPastSelf) : '<span class="empty">Sin información</span>'}</div>
+      <div class="act-item amber"><div class="area-name">Productividad</div>${actPastProd ? nl2br(actPastProd) : '<span class="empty">Sin información</span>'}</div>
+      <div class="act-item violet"><div class="area-name">Ocio</div>${actPastLeis ? nl2br(actPastLeis) : '<span class="empty">Sin información</span>'}</div>
+    </div>
+    <div class="act-col">
+      <h4>Actividades que le gustaría retomar</h4>
+      <div class="act-item teal"><div class="area-name">Cuidado de sí mismo</div>${actDesSelf ? nl2br(actDesSelf) : '<span class="empty">Sin información</span>'}</div>
+      <div class="act-item amber"><div class="area-name">Productividad</div>${actDesProd ? nl2br(actDesProd) : '<span class="empty">Sin información</span>'}</div>
+      <div class="act-item violet"><div class="area-name">Ocio</div>${actDesLeis ? nl2br(actDesLeis) : '<span class="empty">Sin información</span>'}</div>
+    </div>
+  </div>
+</div>` : ""}
 
-      pm.y -= cardH + 6;
-    }
-  }
+<!-- PROBLEMAS DETECTADOS -->
+${problemsU || problemsP ? `
+<div class="section">
+  <div class="section-title amber">Problemas detectados</div>
+  ${problemsU ? `<div class="problem-box user"><div class="pb-title">Problemas detectados por el/la usuario/a</div>${nl2br(problemsU).split("<br>").map(l => `<p>${l}</p>`).join("")}</div>` : ""}
+  ${problemsP ? `<div class="problem-box prof"><div class="pb-title">Problemas detectados por el/la profesional</div>${nl2br(problemsP).split("<br>").map(l => `<p>${l}</p>`).join("")}</div>` : ""}
+</div>` : ""}
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // FOOTER
-  // ═══════════════════════════════════════════════════════════════════════════
+<!-- OBJETIVOS -->
+${goals.length > 0 ? `
+<div class="section">
+  <div class="section-title">Objetivos y planificación</div>
+  ${stripHtml(d.desiredImprovements) ? `<div class="field"><div class="label">Qué le gustaría conseguir o mejorar</div><div class="value">${nl2br(stripHtml(d.desiredImprovements))}</div></div>` : ""}
+  ${goals.map(goal => {
+    const area = goal.area as string;
+    const areaCls = area.includes("Cuidado") || area.includes("Autocuidado") ? "teal" : area === "Productividad" ? "amber" : "violet";
+    const statusCls = goal.status === "Conseguido" ? "green" : goal.status === "Abandonado" ? "gray" : "amber";
+    return `
+    <div class="goal-card" style="border-left: 5px solid ${areaCls === "teal" ? "#14b8a6" : areaCls === "amber" ? "#f59e0b" : "#8b5cf6"}">
+      <div class="goal-body">
+        <div class="goal-text">${nl2br(goal.text || "Sin descripción")}</div>
+        <div class="goal-meta">
+          <span class="badge ${areaCls}">${esc(area)}</span>
+          <span class="badge ${statusCls}">${esc(goal.status)}</span>
+          <span class="goal-dates">Inicio: ${fmtDate(goal.startDate)} · Objetivo: ${fmtDate(goal.targetDate)}</span>
+        </div>
+        ${goal.evaluation?.trim() ? `<div class="goal-eval"><strong>Evaluación:</strong> ${nl2br(goal.evaluation)}</div>` : ""}
+      </div>
+    </div>`;
+  }).join("")}
+</div>` : ""}
 
-  pm.ensureSpace(80);
-  pm.skip(30);
-  pm.page.drawLine({ start: { x: M, y: pm.y + 6 }, end: { x: M + CW, y: pm.y + 6 }, thickness: 0.5, color: BORDER });
-  pm.page.drawText(`Profesional: ${prof.name} (${prof.role})`, { x: M, y: pm.y - 6, size: 8, font, color: GRAY });
-  pm.page.drawText(`Fecha: ${today}`, { x: M + CW - font.widthOfTextAtSize(`Fecha: ${today}`, 8), y: pm.y - 6, size: 8, font, color: GRAY });
-  pm.skip(40);
-  pm.page.drawText("Firma:", { x: M, y: pm.y, size: 8, font, color: GRAY });
-  pm.skip(30);
-  pm.page.drawLine({ start: { x: M, y: pm.y }, end: { x: M + 180, y: pm.y }, thickness: 0.5, color: BORDER });
+<!-- FOOTER -->
+<div class="footer">
+  <span>Profesional: ${esc(prof.name)} (${esc(prof.role)})</span>
+  <span>Fecha: ${today}</span>
+</div>
+<div class="signature">
+  <span>Firma:</span>
+  <div class="line"></div>
+</div>
 
-  // ═══════════════════════════════════════════════════════════════════════════
+</div>
+</body>
+</html>`;
 
-  const pdfBytes = await pdfDoc.save();
-  await audit(prof.id, "occupational_profile.report", "OccupationalProfile", id);
+    await audit(prof.id, "occupational_profile.report", "OccupationalProfile", id);
 
-  const fileName = `Perfil_ocupacional_${patient.firstName}_${patient.lastName}`
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9_]+/g, "_");
-
-  return new NextResponse(new Uint8Array(pdfBytes), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${fileName}.pdf"`,
-    },
-  });
- } catch (err: any) {
-    console.error("PDF REPORT ERROR:", err);
-    return NextResponse.json({ error: err?.message ?? "UNKNOWN", stack: err?.stack?.split("\n").slice(0, 5) }, { status: 500 });
+    return new NextResponse(html, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  } catch (err: any) {
+    console.error("REPORT ERROR:", err);
+    return NextResponse.json({ error: err?.message ?? "UNKNOWN", stack: err?.stack?.split("\\n").slice(0, 5) }, { status: 500 });
   }
 }
