@@ -55,9 +55,11 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
         data: goals.map((g: any) => ({
           occupationalProfileId: profile.id,
           text: g.text ?? "",
-          area: g.area ?? "Datos generales",
+          area: g.area ?? "Cuidado de sí mismo",
           status: g.status ?? "En curso",
+          startDate: g.startDate ? new Date(g.startDate) : null,
           targetDate: g.targetDate ? new Date(g.targetDate) : null,
+          evaluation: g.evaluation ?? "",
         })),
       });
     }

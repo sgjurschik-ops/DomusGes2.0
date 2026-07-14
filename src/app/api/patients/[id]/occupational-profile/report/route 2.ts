@@ -204,7 +204,6 @@ class PageManager {
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
- try {
   const prof = await requireProfessional();
   const { id } = await params;
 
@@ -598,7 +597,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       pm.page.drawText(goal.status, { x: M + 20 + areaW + 6, y: cardY + 1, size: 7, font: fontBold, color: sc.text });
 
       // Dates
-      const dateStr = `Inicio: ${fmtDate(goal.startDate)} > Objetivo: ${fmtDate(goal.targetDate)}`;
+      const dateStr = `Inicio: ${fmtDate(goal.startDate)} → Objetivo: ${fmtDate(goal.targetDate)}`;
       pm.page.drawText(dateStr, { x: M + 14 + areaW + statusW + 16, y: cardY + 1, size: 7, font, color: GRAY });
       cardY -= 16;
 
@@ -645,8 +644,4 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       "Content-Disposition": `attachment; filename="${fileName}.pdf"`,
     },
   });
- } catch (err: any) {
-    console.error("PDF REPORT ERROR:", err);
-    return NextResponse.json({ error: err?.message ?? "UNKNOWN", stack: err?.stack?.split("\n").slice(0, 5) }, { status: 500 });
-  }
 }

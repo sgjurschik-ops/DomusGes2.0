@@ -226,6 +226,17 @@ model OccupationalProfile {
 
   desiredImprovements String?
 
+  // New structured fields
+  dailyRoutine String?
+  activitiesPastSelfcare String?
+  activitiesPastProductivity String?
+  activitiesPastLeisure String?
+  activitiesDesiredSelfcare String?
+  activitiesDesiredProductivity String?
+  activitiesDesiredLeisure String?
+  problemsUser String?
+  problemsProfessional String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -258,7 +269,9 @@ model OccupationalGoal {
   text                   String
   area                   String   // "Social-familiar" | "Laboral y económica" | "Hábitos y rutinas" | "Intereses y motivaciones" | "Datos generales"
   status                 String   @default("En curso") // En curso | Conseguido | Abandonado
+  startDate              DateTime?
   targetDate             DateTime?
+  evaluation             String?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 

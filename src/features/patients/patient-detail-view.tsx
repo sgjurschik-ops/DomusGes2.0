@@ -46,6 +46,7 @@ import {
 } from "recharts";
 import { toast } from "@/hooks/use-toast";
 import { OccupationalProfileTab } from "./occupational-profile-tab";
+import { Mic, MicOff } from "lucide-react";
 
 export function PatientDetailView() {
   const { selectedPatientId, navigate, back } = useNav();
@@ -57,6 +58,18 @@ export function PatientDetailView() {
   const updatePatient = useUpdatePatient();
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
   const [openVisitId, setOpenVisitId] = useState<string | null>(null);
+  const [problemsUser, setProblemsUser] = useState<string>("");
+
+  // Fetch patient-reported problems from occupational profile
+  useEffect(() => {
+    if (!selectedPatientId) return;
+    fetch(`/api/patients/${selectedPatientId}/occupational-profile`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.problemsUser) setProblemsUser(data.problemsUser);
+      })
+      .catch(() => {});
+  }, [selectedPatientId]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
 
@@ -237,6 +250,21 @@ export function PatientDetailView() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Patient-reported problems from occupational profile */}
+          {problemsUser && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                  Problemas detectados por el/la paciente
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: problemsUser }} />
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Visits */}

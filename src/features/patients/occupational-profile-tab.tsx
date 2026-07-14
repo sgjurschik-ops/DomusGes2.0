@@ -21,6 +21,8 @@ import {
   Plus,
   Trash2,
   LayoutGrid,
+  Mic,
+  MicOff,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -169,7 +171,9 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
               text: g.text,
               area: g.area,
               status: g.status,
+              startDate: g.startDate ? g.startDate.slice(0, 10) : null,
               targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
+              evaluation: g.evaluation ?? "",
             }))
           : [],
       });
@@ -275,7 +279,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition") ?? "";
       const match = disposition.match(/filename="([^"]+)"/);
-      const fileName = match?.[1] ?? "Perfil_ocupacional.docx";
+      const fileName = match?.[1] ?? "Perfil_ocupacional.pdf";
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -293,7 +297,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
     } catch {
       toast({
         title: "Error",
-        description: "No se ha podido generar el informe Word.",
+        description: "No se ha podido generar el informe PDF.",
         variant: "destructive",
       });
     } finally {
@@ -624,7 +628,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={generateReport} disabled={generatingReport || saving}>
           <FileDown className="w-4 h-4 mr-1.5" />
-          {generatingReport ? "Generando…" : "Generar informe Word"}
+          {generatingReport ? "Generando…" : "Generar informe PDF"}
         </Button>
         <Button onClick={save} disabled={saving || generatingReport}>
           <Save className="w-4 h-4 mr-1.5" />
@@ -913,8 +917,9 @@ function GoalsEditor({
 
 
 
-// ─── Rich text area with bold/italic/underline ────────────────────────────────
+// ─── Rich text area with bold/italic/underline + voice dictation ──────────────
 // Uses contentEditable for inline formatting. Stores HTML.
+// Voice dictation uses the Web Speech API (SpeechRecognition).
 function RichTextarea({
   value,
   onChange,
@@ -928,6 +933,8 @@ function RichTextarea({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
 
   // Sync external value on mount or when value changes and div is not focused
   useEffect(() => {
@@ -944,12 +951,67 @@ function RichTextarea({
     if (ref.current) onChange(ref.current.innerHTML);
   }
 
+  function toggleDictation() {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast({ title: "Dictado no disponible", description: "Tu navegador no soporta reconocimiento de voz.", variant: "destructive" });
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "es-ES";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognitionRef.current = recognition;
+
+    recognition.onresult = (event: any) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      if (event.results[event.results.length - 1].isFinal && ref.current) {
+        // Append the final transcript to current content
+        const current = ref.current.innerHTML;
+        const separator = current && !current.endsWith(" ") && !current.endsWith("<br>") ? " " : "";
+        ref.current.innerHTML = current + separator + transcript;
+        onChange(ref.current.innerHTML);
+      }
+    };
+
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+
+    recognition.start();
+    setIsListening(true);
+  }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { recognitionRef.current?.stop(); };
+  }, []);
+
   return (
     <div className={`rounded-md border ${focused ? "ring-2 ring-ring" : ""} ${!value ? "bg-muted/60" : ""}`}>
       <div className="flex items-center gap-0.5 px-2 py-1 border-b bg-muted/30">
         <button type="button" className="px-1.5 py-0.5 rounded text-xs font-bold hover:bg-muted" onClick={() => handleFormat("bold")} title="Negrita"><b>N</b></button>
         <button type="button" className="px-1.5 py-0.5 rounded text-xs italic hover:bg-muted" onClick={() => handleFormat("italic")} title="Cursiva"><i>K</i></button>
         <button type="button" className="px-1.5 py-0.5 rounded text-xs underline hover:bg-muted" onClick={() => handleFormat("underline")} title="Subrayado"><u>S</u></button>
+        <div className="flex-1" />
+        <button
+          type="button"
+          className={`px-1.5 py-0.5 rounded text-xs hover:bg-muted flex items-center gap-1 ${isListening ? "text-red-500 bg-red-50" : "text-muted-foreground"}`}
+          onClick={toggleDictation}
+          title={isListening ? "Detener dictado" : "Dictar por voz"}
+        >
+          {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+          <span>{isListening ? "Dictando…" : "Dictar"}</span>
+        </button>
       </div>
       <div
         ref={ref}
