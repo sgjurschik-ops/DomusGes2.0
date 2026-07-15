@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
-import { X, Save, Trash2, CalendarDays, Printer } from "lucide-react";
+import { X, Save, Trash2, CalendarDays, Printer, User, Briefcase, Smile } from "lucide-react";
 import {
   useRoutineRecords,
   useRoutineRecord,
@@ -26,6 +26,10 @@ export type BalanceGroup = typeof BALANCE_GROUPS[number];
 
 export const BALANCE_GROUP_COLORS: Record<BalanceGroup, string> = {
   Autocuidado: "#f6a96a", Productividad: "#5a9fd4", Ocio: "#6dbb74",
+};
+
+export const BALANCE_GROUP_ICONS: Record<BalanceGroup, typeof User> = {
+  Autocuidado: User, Productividad: Briefcase, Ocio: Smile,
 };
 
 export const BALANCE_GROUP_REFERENCE: Record<BalanceGroup, number> = {
@@ -334,13 +338,12 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = f
   const bytes = await pdfDoc.save();
   const blob = new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `planning-${empty ? "vacio" : date}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  // Open in a new tab (like the occupational profile report) instead of forcing
+  // a direct download — the browser's own PDF viewer lets the user look it over,
+  // print, or save it from there.
+  window.open(url, "_blank");
+  // Revoke well after the new tab has had time to load the blob.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 // ─── Context menu ─────────────────────────────────────────────────────────────
@@ -391,6 +394,8 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   const dragDayRef = useRef<number | null>(null);
   const dragEndRef = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const [rangeDraft, setRangeDraft] = useState<{ activity: string; category: RoutineCategory | ""; group: BalanceGroup | "" }>({ activity: "", category: "", group: "" });
   const [openCell, setOpenCell] = useState<{ day: number; halfHour: number } | null>(null);
 
@@ -711,12 +716,22 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                     // For merged blocks: paint the td background directly so there are zero gaps
                     const tdBg = isPartOfBlock && bg ? bg : undefined;
                     const btnBg = isPartOfBlock ? "transparent" : bg;
+                    // Rounded outer corners for the whole merged block: top corners on the
+                    // first cell of the block, bottom corners on the last — interior stays square
+                    const blockRadius = isPartOfBlock ? {
+                      borderTopLeftRadius: !isContinuation ? 6 : 0,
+                      borderTopRightRadius: !isContinuation ? 6 : 0,
+                      borderBottomLeftRadius: !continuesBelow ? 6 : 0,
+                      borderBottomRightRadius: !continuesBelow ? 6 : 0,
+                    } : undefined;
+                    const groupForIcon = (cell?.group as BalanceGroup) || (cell?.category ? OTPF_TO_GROUP[cell.category] : undefined);
+                    const GroupIcon = groupForIcon ? BALANCE_GROUP_ICONS[groupForIcon] : null;
 
                     return (
                       <td
                         key={day}
                         className={`relative p-0 ${isFullHour && !isContinuation ? "" : isContinuation ? "" : "border-t border-t-dashed border-border/30"}`}
-                        style={{ backgroundColor: tdBg }}
+                        style={{ backgroundColor: tdBg, ...blockRadius }}
                       >
                         <Popover
                           open={isOpen && !isDragging && !rangeReady}
@@ -759,6 +774,39 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                 if (!isDragging || day !== dragDayRef.current) return;
                                 dragEndRef.current = slot;
                               }}
+                              onClick={(e) => {
+                                // Require a double-click (or long-press on touch) to open a cell —
+                                // a plain click just starts/continues a drag-selection instead.
+                                e.preventDefault();
+                              }}
+                              onDoubleClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setOpenCell({ day, halfHour: slot });
+                              }}
+                              onTouchStart={(e) => {
+                                const t = e.touches[0];
+                                touchStartPosRef.current = { x: t.clientX, y: t.clientY };
+                                if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+                                longPressTimerRef.current = setTimeout(() => {
+                                  setOpenCell({ day, halfHour: slot });
+                                  touchStartPosRef.current = null;
+                                }, 500);
+                              }}
+                              onTouchMove={(e) => {
+                                const start = touchStartPosRef.current;
+                                if (!start) return;
+                                const t = e.touches[0];
+                                if (Math.abs(t.clientX - start.x) > 10 || Math.abs(t.clientY - start.y) > 10) {
+                                  if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+                                }
+                              }}
+                              onTouchEnd={() => {
+                                if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+                              }}
+                              onTouchCancel={() => {
+                                if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+                              }}
                               onContextMenu={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -787,7 +835,12 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                               style={{ backgroundColor: btnBg }}
                               title={cell?.activity || undefined}
                             >
-                              {isContinuation ? "" : (cell?.activity || "")}
+                              {!isContinuation && (cell?.activity || GroupIcon) ? (
+                                <span className="flex items-center gap-1 min-w-0">
+                                  {GroupIcon && <GroupIcon className="w-3 h-3 shrink-0 opacity-70" />}
+                                  <span className="truncate">{cell?.activity || ""}</span>
+                                </span>
+                              ) : null}
                             </button>
                           </PopoverTrigger>
 
