@@ -55,15 +55,15 @@ export const OTPF_TO_GROUP: Record<RoutineCategory | string, BalanceGroup> = {
 };
 
 export const ROUTINE_CATEGORY_COLORS: Record<RoutineCategory, string> = {
-  "Cuidado personal (AVDs)": "#EAC9A8",
-  "Movilidad funcional": "#B9D9B0",
-  "Gestión comunitaria": "#AECBEA",
-  "Trabajo remunerado/voluntario": "#E5B3B3",
-  "Manejo del hogar": "#E8D89A",
-  "Juego/escuela": "#C9B7E0",
-  "Recreación tranquila": "#A9DBCE",
-  "Recreación activa": "#E8C49A",
-  "Socialización": "#E3AECB",
+  "Cuidado personal (AVDs)": "#E8B48C",
+  "Movilidad funcional": "#9CCB9A",
+  "Gestión comunitaria": "#93BFE8",
+  "Trabajo remunerado/voluntario": "#D99999",
+  "Manejo del hogar": "#E0C97A",
+  "Juego/escuela": "#B79EDB",
+  "Recreación tranquila": "#8FCEC0",
+  "Recreación activa": "#E0AD79",
+  "Socialización": "#D993BB",
 };
 
 export const ROUTINE_CATEGORY_LABELS: Record<RoutineCategory, string> = {

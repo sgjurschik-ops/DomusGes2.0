@@ -1035,6 +1035,24 @@ function OccupationalBalanceCharts({ cells }: { cells: RoutineCell[] }) {
     name: grp, hours: groupCounts[grp] * 0.5, pct: ((groupCounts[grp] / totalSlots) * 100).toFixed(1), fill: BALANCE_GROUP_COLORS[grp],
   })).filter((d) => d.hours > 0);
 
+  // Build Grupo → Categoría → actividades identificadas (deduplicated, in order of appearance)
+  const activityTree: { group: BalanceGroup; category: string; label: string; activities: string[] }[] = [];
+  for (const grp of BALANCE_GROUPS) {
+    const catsInGroup = presentCats.filter((cat) => ((OTPF_TO_GROUP[cat] as BalanceGroup) ?? null) === grp);
+    for (const cat of catsInGroup) {
+      const seen = new Set<string>();
+      const activities: string[] = [];
+      for (const c of filled) {
+        if (c.category !== cat || !c.activity?.trim()) continue;
+        const name = c.activity.trim();
+        if (!seen.has(name)) { seen.add(name); activities.push(name); }
+      }
+      if (activities.length > 0) {
+        activityTree.push({ group: grp, category: cat, label: ROUTINE_CATEGORY_LABELS[cat as RoutineCategory] ?? cat, activities });
+      }
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -1092,6 +1110,33 @@ function OccupationalBalanceCharts({ cells }: { cells: RoutineCell[] }) {
           </table>
         </div>
         <p className="text-[10px] text-muted-foreground/60 mt-1.5 italic">Ref. = porcentaje de referencia de equilibrio ocupacional (caso típico de adulto activo)</p>
+
+        {activityTree.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Actividades identificadas</p>
+            <div className="space-y-2">
+              {BALANCE_GROUPS.map((grp) => {
+                const rows = activityTree.filter((r) => r.group === grp);
+                if (rows.length === 0) return null;
+                return (
+                  <div key={grp} className="rounded-md border overflow-hidden">
+                    <div className="px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: BALANCE_GROUP_COLORS[grp], color: "#1a1a1a" }}>{grp}</div>
+                    <table className="w-full text-xs">
+                      <tbody>
+                        {rows.map((r) => (
+                          <tr key={r.category} className="border-t first:border-t-0">
+                            <td className="py-1 px-2.5 text-muted-foreground whitespace-nowrap align-top w-1/3">{r.label}</td>
+                            <td className="py-1 px-2.5">{r.activities.join(", ")}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
