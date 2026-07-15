@@ -98,59 +98,64 @@ export function PatientDetailView() {
         <ArrowLeft className="w-4 h-4" /> Volver
       </button>
 
-      {/* Header card — compressed */}
+      {/* Header card */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex gap-4">
+        <CardContent className="p-5">
+          <div className="flex gap-5">
             {/* Left: patient info */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 space-y-3">
+              {/* Row 1: Identity */}
               <div className="flex items-center gap-3">
                 <Avatar name={patient.fullName} color={patient.color} size={44} />
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-lg font-bold">{patient.fullName}</h2>
                     <SpecialtyBadge specialty={patient.specialty} />
                     <StatusBadge status={patient.status} />
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {patient.age} años · {patient.totalVisits} seguimientos · Inicio {formatDate(patient.startDate)}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 ml-auto">
-                  <Button size="sm" onClick={() => { useNav.getState().setNewVisitPatient(patient.id); navigate("new-visit"); }} disabled={!professionals?.length}>
-                    <Plus className="w-4 h-4 mr-1.5" />Registrar seguimiento
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setReportDialogOpen(true)}>
-                    <FileDown className="w-4 h-4 mr-1.5" />Generar informe
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Más acciones"><MoreVertical className="w-4 h-4" /></Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => navigate("edit-patient")}><Pencil className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
-                      <DropdownMenuItem variant="destructive" onClick={() => setDeleteDialogOpen(true)}><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
               </div>
 
-              {(patient.alerts ?? []).length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {(patient.alerts ?? []).map((alert) => (
-                    <span key={alert} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: "var(--chip-orange-bg)", color: "var(--chip-orange-text)" }}>
-                      <AlertTriangle className="w-3 h-3" />{alert}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {/* Row 2: Actions + alerts */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button size="sm" onClick={() => { useNav.getState().setNewVisitPatient(patient.id); navigate("new-visit"); }} disabled={!professionals?.length}>
+                  <Plus className="w-4 h-4 mr-1.5" />Registrar seguimiento
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setReportDialogOpen(true)}>
+                  <FileDown className="w-4 h-4 mr-1.5" />Generar informe
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Más acciones"><MoreVertical className="w-4 h-4" /></Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => navigate("edit-patient")}><Pencil className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
+                    <DropdownMenuItem variant="destructive" onClick={() => setDeleteDialogOpen(true)}><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {(patient.alerts ?? []).length > 0 && (
+                  <>
+                    <span className="w-px h-5 bg-border mx-1" />
+                    {(patient.alerts ?? []).map((alert) => (
+                      <span key={alert} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: "var(--chip-orange-bg)", color: "var(--chip-orange-text)" }}>
+                        <AlertTriangle className="w-3 h-3" />{alert}
+                      </span>
+                    ))}
+                  </>
+                )}
+              </div>
 
-              <div className="mt-2 rounded-md bg-accent/40 px-3 py-2 space-y-1">
+              {/* Row 3: Clinical info */}
+              <div className="rounded-md bg-accent/40 px-3 py-2 space-y-1">
                 <InfoRow icon={Stethoscope} label="Diagnóstico / motivo de derivación" value={patient.diagnosis ?? "—"} />
                 <InfoRow icon={Target} label="Objetivo terapéutico" value={patient.objective ?? "—"} />
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm">
+              {/* Row 4: Contact & scheduling */}
+              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
                 <InfoRow icon={Phone} label="Teléfono" value={patient.phone ?? "—"} />
                 <InfoRow icon={MapPin} label="Dirección" value={patient.address ?? "—"} />
                 <InfoRow icon={User2} label="Referente" value={patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"} />
@@ -168,7 +173,9 @@ export function PatientDetailView() {
                   </div>
                 </div>
               </div>
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
+
+              {/* Row 5: Therapists */}
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-muted-foreground">Terapeutas:</span>
                 {patient.therapistNames.length === 0 ? (
                   <span className="text-xs text-muted-foreground italic">Sin asignar</span>
