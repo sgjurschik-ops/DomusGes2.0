@@ -39,13 +39,13 @@ import { CopmFields, formatCopmScore } from "./copm-fields";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { VisitDetailDialog } from "./visit-detail-dialog";
 import { PatientReportDialog } from "./patient-report-dialog";
-import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle, FileDown } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle, FileDown, Activity, ListChecks, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Dot,
 } from "recharts";
 import { toast } from "@/hooks/use-toast";
-import { OccupationalProfileTab } from "./occupational-profile-tab";
+import { OccupationalProfileTab, getProfileCompletion } from "./occupational-profile-tab";
 import { Mic, MicOff } from "lucide-react";
 
 export function PatientDetailView() {
@@ -59,14 +59,16 @@ export function PatientDetailView() {
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
   const [openVisitId, setOpenVisitId] = useState<string | null>(null);
   const [problemsUser, setProblemsUser] = useState<string>("");
+  const [profileCompletion, setProfileCompletion] = useState<{ filled: number; total: number } | null>(null);
 
-  // Fetch patient-reported problems from occupational profile
+  // Fetch patient-reported problems and profile completion from occupational profile
   useEffect(() => {
     if (!selectedPatientId) return;
     fetch(`/api/patients/${selectedPatientId}/occupational-profile`)
       .then((r) => r.json())
       .then((data) => {
         if (data?.problemsUser) setProblemsUser(data.problemsUser);
+        setProfileCompletion(getProfileCompletion(data ?? {}));
       })
       .catch(() => {});
   }, [selectedPatientId]);
@@ -118,7 +120,8 @@ export function PatientDetailView() {
                   {(patient.alerts ?? []).map((alert) => (
                     <span
                       key={alert}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-amber-100 border border-amber-300 text-amber-900 font-medium"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                      style={{ backgroundColor: "var(--chip-orange-bg)", color: "var(--chip-orange-text)" }}
                     >
                       <AlertTriangle className="w-3 h-3" />
                       {alert}
@@ -211,6 +214,33 @@ export function PatientDetailView() {
 
         {/* Overview */}
         <TabsContent value="overview" className="mt-4 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <KpiChip
+              icon={Calendar}
+              color="blue"
+              label="Última visita"
+              value={visits && visits.length > 0 ? formatDate(visits[0].date) : "Sin visitas"}
+            />
+            <KpiChip
+              icon={ClipboardList}
+              color="green"
+              label="Seguimientos"
+              value={`${patient.totalVisits}`}
+            />
+            <KpiChip
+              icon={Activity}
+              color="purple"
+              label="Última evaluación"
+              value={assessments && assessments.length > 0 ? `${assessments[0].scale} · ${assessments[0].score}` : "Sin registrar"}
+            />
+            <KpiChip
+              icon={ListChecks}
+              color="yellow"
+              label="Perfil ocupacional"
+              value={profileCompletion ? `${profileCompletion.filled}/${profileCompletion.total} campos` : "—"}
+            />
+          </div>
+
           <div className="grid lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-2">
@@ -428,6 +458,39 @@ export function PatientDetailView() {
         patientId={patient.id}
         patientName={patient.fullName}
       />
+    </div>
+  );
+}
+
+type ChipColor = "blue" | "green" | "orange" | "purple" | "yellow";
+
+const CHIP_VARS: Record<ChipColor, { bg: string; text: string }> = {
+  blue: { bg: "var(--chip-blue-bg)", text: "var(--chip-blue-text)" },
+  green: { bg: "var(--chip-green-bg)", text: "var(--chip-green-text)" },
+  orange: { bg: "var(--chip-orange-bg)", text: "var(--chip-orange-text)" },
+  purple: { bg: "var(--chip-purple-bg)", text: "var(--chip-purple-text)" },
+  yellow: { bg: "var(--chip-yellow-bg)", text: "var(--chip-yellow-text)" },
+};
+
+function KpiChip({
+  icon: Icon,
+  color,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  color: ChipColor;
+  label: string;
+  value: string;
+}) {
+  const chip = CHIP_VARS[color];
+  return (
+    <div className="rounded-md p-3" style={{ backgroundColor: chip.bg }}>
+      <p className="text-xs mb-1 flex items-center gap-1.5 opacity-80" style={{ color: chip.text }}>
+        <Icon className="w-3.5 h-3.5" />
+        {label}
+      </p>
+      <p className="text-sm font-semibold" style={{ color: chip.text }}>{value}</p>
     </div>
   );
 }

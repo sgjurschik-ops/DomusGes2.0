@@ -23,6 +23,8 @@ import {
   LayoutGrid,
   Mic,
   MicOff,
+  Pencil,
+  Eye,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -42,27 +44,35 @@ import { useRoutineRecords } from "@/hooks/api";
 
 type Profile = Record<string, any>;
 
-// Each section declares which profile fields belong to it, so we can show a
-// "filled / total" indicator on the collapsed header without guessing.
 function countFilled(profile: Profile, fields: string[]) {
   const filled = fields.filter((f) => {
     const v = profile[f];
     if (v === undefined || v === null) return false;
     if (typeof v === "string") return v.trim() !== "";
     if (Array.isArray(v)) return v.length > 0;
-    return true; // booleans (e.g. currentlyDrives) count as filled once set
+    return true;
   }).length;
   return { filled, total: fields.length };
 }
 
-// Areas a goal can be linked to — mirrors the profile's own section titles,
-// so "which area does this objective belong to" always matches a real
-// section the person can see, rather than a free-floating list.
-const GOAL_AREAS = [
-  "Cuidado de sí mismo",
-  "Productividad",
-  "Ocio",
-] as const;
+const ALL_PROFILE_FIELDS = [
+  "summary",
+  "drivingLicense", "currentlyDrives", "drivingReason", "maritalStatus",
+  "partnerInfo", "livingSituation", "familyComposition", "supportNetwork",
+  "educationLevel", "otherEducation", "workHistory", "currentOccupation", "economicManagement",
+  "dailyRoutineMorningWeekday", "dailyRoutineAfternoonWeekday",
+  "dailyRoutineMorningWeekend", "dailyRoutineAfternoonWeekend",
+  "activitiesPastSelfcare", "activitiesPastProductivity", "activitiesPastLeisure",
+  "activitiesDesiredSelfcare", "activitiesDesiredProductivity", "activitiesDesiredLeisure",
+  "desiredImprovements",
+  "problemsUser", "problemsProfessional",
+];
+
+export function getProfileCompletion(profile: Record<string, any>): { filled: number; total: number } {
+  return countFilled(profile, ALL_PROFILE_FIELDS);
+}
+
+const GOAL_AREAS = ["Cuidado de sí mismo", "Productividad", "Ocio"] as const;
 type GoalArea = typeof GOAL_AREAS[number];
 const GOAL_AREA_COLORS: Record<GoalArea, string> = {
   "Cuidado de sí mismo": "#14b8a6",
@@ -89,6 +99,13 @@ interface FamilyMember {
   notes: string;
 }
 
+interface SupportContact {
+  name: string;
+  relationship: string;
+  frequency: string;
+  notes: string;
+}
+
 interface WorkHistoryEntry {
   company: string;
   role: string;
@@ -96,9 +113,6 @@ interface WorkHistoryEntry {
   notes: string;
 }
 
-// Safely parses a JSON-encoded array field, falling back to [] for blank,
-// null, or pre-existing free-text values that don't parse as JSON (older
-// profiles saved before this structured format existed).
 function parseJsonArray<T>(raw: string | null | undefined): T[] {
   if (!raw) return [];
   try {
@@ -110,6 +124,7 @@ function parseJsonArray<T>(raw: string | null | undefined): T[] {
 }
 
 const emptyProfile: Profile = {
+  summary: "",
   documentsAttached: "",
   interventionReason: "",
   referralResource: "",
@@ -131,8 +146,13 @@ const emptyProfile: Profile = {
   approximateIncome: "",
   moneyManager: "",
   incomeOrganization: "",
+  economicManagement: "",
   weeklyRoutine: [] as RoutineCell[],
   dailyRoutine: "",
+  dailyRoutineMorningWeekday: "",
+  dailyRoutineAfternoonWeekday: "",
+  dailyRoutineMorningWeekend: "",
+  dailyRoutineAfternoonWeekend: "",
   activitiesPastSelfcare: "",
   activitiesPastProductivity: "",
   activitiesPastLeisure: "",
@@ -151,8 +171,15 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
   const [saving, setSaving] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [routineEditorOpen, setRoutineEditorOpen] = useState(false);
+  // Per-section editing state
+  const [editingSections, setEditingSections] = useState<Record<string, boolean>>({});
 
   const routineRecords = useRoutineRecords(patientId);
+
+  function toggleEditing(key: string) {
+    setEditingSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+  function isEditing(key: string) { return !!editingSections[key]; }
 
   useEffect(() => {
     async function loadProfile() {
@@ -163,6 +190,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         ...emptyProfile,
         ...(data ?? {}),
         familyComposition: parseJsonArray<FamilyMember>(data?.familyComposition),
+        supportNetwork: parseJsonArray<SupportContact>(data?.supportNetwork),
         workHistory: parseJsonArray<WorkHistoryEntry>(data?.workHistory),
         weeklyRoutine: parseJsonArray<RoutineCell>(data?.weeklyRoutine),
         goals: Array.isArray(data?.goals)
@@ -179,7 +207,6 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       });
       setLoading(false);
     }
-
     loadProfile();
   }, [patientId]);
 
@@ -187,13 +214,11 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
     setProfile((prev) => ({ ...prev, [field]: value }));
   }
 
-  // The form keeps familyComposition/workHistory as in-memory arrays for
-  // easy editing, but the database column is a JSON string — serialize
-  // only at the save boundary, not throughout the component.
   function buildSavePayload() {
     return {
       ...profile,
       familyComposition: JSON.stringify(profile.familyComposition ?? []),
+      supportNetwork: JSON.stringify(profile.supportNetwork ?? []),
       workHistory: JSON.stringify(profile.workHistory ?? []),
       weeklyRoutine: JSON.stringify(profile.weeklyRoutine ?? []),
     };
@@ -201,21 +226,19 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
 
   async function save() {
     setSaving(true);
-
     try {
       const res = await fetch(`/api/patients/${patientId}/occupational-profile`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildSavePayload()),
       });
-
       if (!res.ok) throw new Error("SAVE_ERROR");
-
       const saved = await res.json();
       setProfile({
         ...emptyProfile,
         ...(saved ?? {}),
         familyComposition: parseJsonArray<FamilyMember>(saved?.familyComposition),
+        supportNetwork: parseJsonArray<SupportContact>(saved?.supportNetwork),
         workHistory: parseJsonArray<WorkHistoryEntry>(saved?.workHistory),
         weeklyRoutine: parseJsonArray<RoutineCell>(saved?.weeklyRoutine),
         goals: Array.isArray(saved?.goals)
@@ -224,21 +247,15 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
               text: g.text,
               area: g.area,
               status: g.status,
+              startDate: g.startDate ? g.startDate.slice(0, 10) : null,
               targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
+              evaluation: g.evaluation ?? "",
             }))
           : [],
       });
-
-      toast({
-        title: "Perfil ocupacional guardado",
-        description: "La información se ha actualizado correctamente.",
-      });
+      toast({ title: "Perfil ocupacional guardado", description: "La información se ha actualizado correctamente." });
     } catch {
-      toast({
-        title: "Error",
-        description: "No se ha podido guardar el perfil ocupacional.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "No se ha podido guardar el perfil ocupacional.", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -247,8 +264,6 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
   async function generateReport() {
     setGeneratingReport(true);
     try {
-      // Save first so the report always reflects what's currently on
-      // screen, even if the person hasn't clicked "Guardar" yet.
       const saveRes = await fetch(`/api/patients/${patientId}/occupational-profile`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -260,30 +275,20 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         ...emptyProfile,
         ...(saved ?? {}),
         familyComposition: parseJsonArray<FamilyMember>(saved?.familyComposition),
+        supportNetwork: parseJsonArray<SupportContact>(saved?.supportNetwork),
         workHistory: parseJsonArray<WorkHistoryEntry>(saved?.workHistory),
         weeklyRoutine: parseJsonArray<RoutineCell>(saved?.weeklyRoutine),
         goals: Array.isArray(saved?.goals)
           ? saved.goals.map((g: any) => ({
-              id: g.id,
-              text: g.text,
-              area: g.area,
-              status: g.status,
+              id: g.id, text: g.text, area: g.area, status: g.status,
               targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
             }))
           : [],
       });
-
       window.open(`/api/patients/${patientId}/occupational-profile/report`, "_blank");
-      toast({
-        title: "Informe generado",
-        description: "Se ha abierto en una nueva pestana. Usa Cmd+P para guardar como PDF.",
-      });
+      toast({ title: "Informe generado", description: "Se ha abierto en una nueva pestana. Usa Cmd+P para guardar como PDF." });
     } catch {
-      toast({
-        title: "Error",
-        description: "No se ha podido generar el informe Word.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "No se ha podido generar el informe Word.", variant: "destructive" });
     } finally {
       setGeneratingReport(false);
     }
@@ -295,60 +300,36 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
 
   return (
     <div className="space-y-4">
-      <Section
-        title="Datos generales"
-        description="Información inicial de la valoración."
-        icon={ClipboardList}
-        defaultOpen
-        profile={profile}
-        fields={["documentsAttached", "referralResource", "interventionReason"]}
-      >
-        <Field label="Documentos que adjunta">
-          <Textarea value={profile.documentsAttached ?? ""} onChange={(e) => update("documentsAttached", e.target.value)} className={!profile.documentsAttached ? "bg-muted/60" : ""} />
-        </Field>
-        <Field label="Recurso que deriva">
-          <Input value={profile.referralResource ?? ""} onChange={(e) => update("referralResource", e.target.value)} className={!profile.referralResource ? "bg-muted/60" : ""} />
-        </Field>
-        <Field label="Motivo de intervención">
-          <Textarea value={profile.interventionReason ?? ""} onChange={(e) => update("interventionReason", e.target.value)} className={!profile.interventionReason ? "bg-muted/60" : ""} />
-        </Field>
+      {/* ─── 1. Datos generales ─── */}
+      <Section title="Datos generales" description="Resumen general de la valoración." icon={ClipboardList} color="blue" defaultOpen profile={profile} fields={["summary"]}
+        editing={isEditing("general")} onToggleEdit={() => toggleEditing("general")}>
+        {isEditing("general") ? (
+          <Field label="Resumen">
+            <RichTextarea rows={5} value={profile.summary ?? ""} onChange={(v) => update("summary", v)} placeholder="Resumen general del caso — más adelante la IA podrá generarlo automáticamente a partir de los demás apartados." />
+          </Field>
+        ) : (
+          <ReadOnlyHtml value={profile.summary} placeholder="Sin resumen aún." />
+        )}
       </Section>
 
-      <Section
-        title="Área social-familiar"
-        description="Convivencia, red de apoyo y relaciones significativas."
-        icon={Users}
-        profile={profile}
-        fields={[
-          "drivingLicense",
-          "currentlyDrives",
-          "drivingReason",
-          "maritalStatus",
-          "partnerInfo",
-          "livingSituation",
-          "familyComposition",
-          "supportNetwork",
-          "bestRelationship",
-          "worstRelationship",
-        ]}
-      >
+      {/* ─── 2. Área social-familiar ─── */}
+      <Section title="Área social-familiar" description="Convivencia, red de apoyo y relaciones significativas." icon={Users} color="purple" profile={profile}
+        fields={["drivingLicense", "currentlyDrives", "drivingReason", "maritalStatus", "partnerInfo", "livingSituation", "familyComposition", "supportNetwork"]}
+        editing={isEditing("social")} onToggleEdit={() => toggleEditing("social")}>
+        {/* Dropdowns — always interactive */}
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Carné de conducir">
             <Select value={profile.drivingLicense ?? ""} onValueChange={(v) => update("drivingLicense", v)}>
-              <SelectTrigger className={!profile.drivingLicense ? "bg-muted/60" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectTrigger className={!profile.drivingLicense ? "border-dashed border-muted-foreground/40" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Sí">Sí</SelectItem>
                 <SelectItem value="No">No</SelectItem>
               </SelectContent>
             </Select>
           </Field>
-
           <Field label="¿Conduce actualmente?">
-            <Select
-              value={profile.currentlyDrives === true ? "Sí" : profile.currentlyDrives === false ? "No" : ""}
-              onValueChange={(v) => update("currentlyDrives", v === "Sí")}
-            >
-              <SelectTrigger className={profile.currentlyDrives === undefined ? "bg-muted/60" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+            <Select value={profile.currentlyDrives === true ? "Sí" : profile.currentlyDrives === false ? "No" : ""} onValueChange={(v) => update("currentlyDrives", v === "Sí")}>
+              <SelectTrigger className={profile.currentlyDrives === undefined ? "border-dashed border-muted-foreground/40" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Sí">Sí</SelectItem>
                 <SelectItem value="No">No</SelectItem>
@@ -356,23 +337,30 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
             </Select>
           </Field>
         </div>
-
         <Field label="Motivo si no conduce o información relevante">
-          <Input value={profile.drivingReason ?? ""} onChange={(e) => update("drivingReason", e.target.value)} className={!profile.drivingReason ? "bg-muted/60" : ""} />
+          <Input value={profile.drivingReason ?? ""} onChange={(e) => update("drivingReason", e.target.value)} className={!profile.drivingReason ? "border-dashed border-muted-foreground/40" : ""} />
         </Field>
-
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Estado civil">
-            <Input value={profile.maritalStatus ?? ""} onChange={(e) => update("maritalStatus", e.target.value)} className={!profile.maritalStatus ? "bg-muted/60" : ""} />
+            <Select value={profile.maritalStatus ?? ""} onValueChange={(v) => update("maritalStatus", v)}>
+              <SelectTrigger className={!profile.maritalStatus ? "border-dashed border-muted-foreground/40" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Soltero/a">Soltero/a</SelectItem>
+                <SelectItem value="Casado/a">Casado/a</SelectItem>
+                <SelectItem value="Divorciado/a">Divorciado/a</SelectItem>
+                <SelectItem value="Viudo/a">Viudo/a</SelectItem>
+                <SelectItem value="Pareja de hecho">Pareja de hecho</SelectItem>
+                <SelectItem value="Otro">Otro</SelectItem>
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="Nombre y edad / información pareja">
-            <Input value={profile.partnerInfo ?? ""} onChange={(e) => update("partnerInfo", e.target.value)} className={!profile.partnerInfo ? "bg-muted/60" : ""} />
+            <Input value={profile.partnerInfo ?? ""} onChange={(e) => update("partnerInfo", e.target.value)} className={!profile.partnerInfo ? "border-dashed border-muted-foreground/40" : ""} />
           </Field>
         </div>
-
         <Field label="Convivencia actual">
           <Select value={profile.livingSituation ?? ""} onValueChange={(v) => update("livingSituation", v)}>
-            <SelectTrigger className={!profile.livingSituation ? "bg-muted/60" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+            <SelectTrigger className={!profile.livingSituation ? "border-dashed border-muted-foreground/40" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="Casa propia">Casa propia</SelectItem>
               <SelectItem value="Casa familiar">Casa familiar</SelectItem>
@@ -383,50 +371,27 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
           </Select>
         </Field>
 
-        <FamilyMembersEditor
-          value={profile.familyComposition ?? []}
-          onChange={(members) => update("familyComposition", members)}
-        />
-
-        <Field label="Red de apoyo / amistades">
-          <Textarea
-            rows={4}
-            placeholder="Nombre, relación, frecuencia de contacto, vía de contacto..."
-            value={profile.supportNetwork ?? ""}
-            onChange={(e) => update("supportNetwork", e.target.value)}
-            className={!profile.supportNetwork ? "bg-muted/60" : ""}
-          />
-        </Field>
-
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Con quién tiene mejor relación">
-            <Input value={profile.bestRelationship ?? ""} onChange={(e) => update("bestRelationship", e.target.value)} className={!profile.bestRelationship ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Con quién tiene peor relación">
-            <Input value={profile.worstRelationship ?? ""} onChange={(e) => update("worstRelationship", e.target.value)} className={!profile.worstRelationship ? "bg-muted/60" : ""} />
-          </Field>
-        </div>
+        {/* Family & Support — view/edit toggle */}
+        {isEditing("social") ? (
+          <>
+            <FamilyMembersEditor value={profile.familyComposition ?? []} onChange={(members) => update("familyComposition", members)} />
+            <SupportNetworkEditor value={profile.supportNetwork ?? []} onChange={(contacts) => update("supportNetwork", contacts)} />
+          </>
+        ) : (
+          <>
+            <ReadOnlyList label="Composición familiar" items={Array.isArray(profile.familyComposition) ? profile.familyComposition : []} renderItem={(m: FamilyMember) => `${m.name} — ${m.relationship}${m.occupation ? ` (${m.occupation})` : ""}${m.notes ? ` · ${m.notes}` : ""}`} emptyText="Sin familiares añadidos." />
+            <ReadOnlyList label="Red de apoyo / amistades" items={Array.isArray(profile.supportNetwork) ? profile.supportNetwork : []} renderItem={(c: SupportContact) => `${c.name} — ${c.relationship}${c.frequency ? ` · ${c.frequency}` : ""}${c.notes ? ` · ${c.notes}` : ""}`} emptyText="Sin contactos de apoyo." />
+          </>
+        )}
       </Section>
 
-      <Section
-        title="Área laboral y económica"
-        description="Formación, trayectoria laboral y autonomía económica."
-        icon={Briefcase}
-        profile={profile}
-        fields={[
-          "educationLevel",
-          "otherEducation",
-          "workHistory",
-          "currentWorkSituation",
-          "currentOccupation",
-          "approximateIncome",
-          "moneyManager",
-          "incomeOrganization",
-        ]}
-      >
+      {/* ─── 3. Área laboral y económica ─── */}
+      <Section title="Área laboral y económica" description="Formación, trayectoria laboral y autonomía económica." icon={Briefcase} color="orange" profile={profile}
+        fields={["educationLevel", "otherEducation", "workHistory", "currentOccupation", "economicManagement"]}
+        editing={isEditing("work")} onToggleEdit={() => toggleEditing("work")}>
         <Field label="Estudios realizados">
           <Select value={profile.educationLevel ?? ""} onValueChange={(v) => update("educationLevel", v)}>
-            <SelectTrigger className={!profile.educationLevel ? "bg-muted/60" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+            <SelectTrigger className={!profile.educationLevel ? "border-dashed border-muted-foreground/40" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="Sin escolarizar">Sin escolarizar</SelectItem>
               <SelectItem value="ESO">ESO</SelectItem>
@@ -438,46 +403,37 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
             </SelectContent>
           </Select>
         </Field>
-
         <Field label="Otros estudios, cursos o talleres">
-          <Textarea value={profile.otherEducation ?? ""} onChange={(e) => update("otherEducation", e.target.value)} className={!profile.otherEducation ? "bg-muted/60" : ""} />
+          <Textarea value={profile.otherEducation ?? ""} onChange={(e) => update("otherEducation", e.target.value)} className={!profile.otherEducation ? "border-dashed border-muted-foreground/40" : ""} />
         </Field>
 
-        <WorkHistoryEditor
-          value={profile.workHistory ?? []}
-          onChange={(entries) => update("workHistory", entries)}
-        />
+        {isEditing("work") ? (
+          <WorkHistoryEditor value={profile.workHistory ?? []} onChange={(entries) => update("workHistory", entries)} />
+        ) : (
+          <ReadOnlyList label="Trabajos realizados" items={Array.isArray(profile.workHistory) ? profile.workHistory : []} renderItem={(w: WorkHistoryEntry) => `${w.company}${w.role ? ` — ${w.role}` : ""}${w.year ? ` (${w.year})` : ""}${w.notes ? ` · ${w.notes}` : ""}`} emptyText="Sin trabajos añadidos." />
+        )}
 
-        <Field label="Situación laboral actual">
-          <Input value={profile.currentWorkSituation ?? ""} onChange={(e) => update("currentWorkSituation", e.target.value)} className={!profile.currentWorkSituation ? "bg-muted/60" : ""} />
-        </Field>
-
-        <Field label="Trabajo u ocupación actual">
-          <Textarea value={profile.currentOccupation ?? ""} onChange={(e) => update("currentOccupation", e.target.value)} className={!profile.currentOccupation ? "bg-muted/60" : ""} />
-        </Field>
-
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Ingresos aproximados">
-            <Input value={profile.approximateIncome ?? ""} onChange={(e) => update("approximateIncome", e.target.value)} className={!profile.approximateIncome ? "bg-muted/60" : ""} />
-          </Field>
-          <Field label="Quién gestiona el dinero">
-            <Input value={profile.moneyManager ?? ""} onChange={(e) => update("moneyManager", e.target.value)} className={!profile.moneyManager ? "bg-muted/60" : ""} />
-          </Field>
-        </div>
-
-        <Field label="Organización de ingresos / autonomía económica">
-          <Textarea value={profile.incomeOrganization ?? ""} onChange={(e) => update("incomeOrganization", e.target.value)} className={!profile.incomeOrganization ? "bg-muted/60" : ""} />
-        </Field>
+        {isEditing("work") ? (
+          <>
+            <Field label="Trabajo u ocupación actual">
+              <Textarea value={profile.currentOccupation ?? ""} onChange={(e) => update("currentOccupation", e.target.value)} className={!profile.currentOccupation ? "border-dashed border-muted-foreground/40" : ""} />
+            </Field>
+            <Field label="Gestión económica">
+              <RichTextarea rows={3} value={profile.economicManagement ?? ""} onChange={(v) => update("economicManagement", v)} placeholder="Quién gestiona el dinero, organización de ingresos, autonomía económica..." />
+            </Field>
+          </>
+        ) : (
+          <>
+            <ReadOnlyField label="Trabajo u ocupación actual" value={profile.currentOccupation} />
+            <ReadOnlyHtml label="Gestión económica" value={profile.economicManagement} placeholder="Sin completar." />
+          </>
+        )}
       </Section>
 
-      <Section
-        title="Hábitos y rutinas"
-        description="Rutina diaria y planning semanal."
-        icon={CalendarClock}
-        profile={profile}
-        fields={["dailyRoutine"]}
-      >
-        {/* Planning semanal — opens the full-screen editor */}
+      {/* ─── 4. Hábitos y rutinas ─── */}
+      <Section title="Hábitos y rutinas" description="Rutina diaria y planning semanal." icon={CalendarClock} color="yellow" profile={profile}
+        fields={["dailyRoutineMorningWeekday", "dailyRoutineAfternoonWeekday", "dailyRoutineMorningWeekend", "dailyRoutineAfternoonWeekend"]}
+        editing={isEditing("habits")} onToggleEdit={() => toggleEditing("habits")}>
         <div className="rounded-md border p-3 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -493,120 +449,127 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
               Abrir planning
             </Button>
           </div>
-
-          {/* Balance chart — shows aggregate of most recent record */}
           {(routineRecords.data?.length ?? 0) > 0 && (
             <RoutineBalanceFromRecords patientId={patientId} />
           )}
         </div>
 
-        <Field label="Rutina de un día">
-          <RichTextarea
-            rows={6}
-            placeholder="Describa la rutina habitual de un día típico del/la paciente..."
-            value={profile.dailyRoutine ?? ""}
-            onChange={(v) => update("dailyRoutine", v)}
-          />
-        </Field>
+        {isEditing("habits") ? (
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lunes a viernes</p>
+              <Field label="Mañana">
+                <RichTextarea rows={3} value={profile.dailyRoutineMorningWeekday ?? ""} onChange={(v) => update("dailyRoutineMorningWeekday", v)} placeholder="Rutina de mañana entre semana..." />
+              </Field>
+              <Field label="Tarde">
+                <RichTextarea rows={3} value={profile.dailyRoutineAfternoonWeekday ?? ""} onChange={(v) => update("dailyRoutineAfternoonWeekday", v)} placeholder="Rutina de tarde entre semana..." />
+              </Field>
+            </div>
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fin de semana</p>
+              <Field label="Mañana">
+                <RichTextarea rows={3} value={profile.dailyRoutineMorningWeekend ?? ""} onChange={(v) => update("dailyRoutineMorningWeekend", v)} placeholder="Rutina de mañana el fin de semana..." />
+              </Field>
+              <Field label="Tarde">
+                <RichTextarea rows={3} value={profile.dailyRoutineAfternoonWeekend ?? ""} onChange={(v) => update("dailyRoutineAfternoonWeekend", v)} placeholder="Rutina de tarde el fin de semana..." />
+              </Field>
+            </div>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Lunes a viernes</p>
+              <ReadOnlyHtml label="Mañana" value={profile.dailyRoutineMorningWeekday} placeholder="Sin completar." />
+              <ReadOnlyHtml label="Tarde" value={profile.dailyRoutineAfternoonWeekday} placeholder="Sin completar." />
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fin de semana</p>
+              <ReadOnlyHtml label="Mañana" value={profile.dailyRoutineMorningWeekend} placeholder="Sin completar." />
+              <ReadOnlyHtml label="Tarde" value={profile.dailyRoutineAfternoonWeekend} placeholder="Sin completar." />
+            </div>
+          </div>
+        )}
       </Section>
 
-      {/* Full-screen weekly planning editor */}
       {routineEditorOpen && (
-        <WeeklyRoutineEditor
-          patientId={patientId}
-          onClose={() => setRoutineEditorOpen(false)}
-        />
+        <WeeklyRoutineEditor patientId={patientId} onClose={() => setRoutineEditorOpen(false)} />
       )}
 
-      <Section
-        title="Actividades realizadas y deseadas"
-        description="Actividades que realizaba y las que le gustaría retomar o realizar actualmente."
-        icon={Heart}
-        profile={profile}
-        fields={[
-          "activitiesPastSelfcare",
-          "activitiesPastProductivity",
-          "activitiesPastLeisure",
-          "activitiesDesiredSelfcare",
-          "activitiesDesiredProductivity",
-          "activitiesDesiredLeisure",
-        ]}
-      >
-        <div className="grid sm:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <p className="text-sm font-semibold mb-2">Actividades que realizaba</p>
+      {/* ─── 5. Actividades realizadas y deseadas ─── */}
+      <Section title="Actividades realizadas y deseadas" description="Actividades que realizaba y las que le gustaría retomar o realizar actualmente." icon={Heart} color="green" profile={profile}
+        fields={["activitiesPastSelfcare", "activitiesPastProductivity", "activitiesPastLeisure", "activitiesDesiredSelfcare", "activitiesDesiredProductivity", "activitiesDesiredLeisure"]}
+        editing={isEditing("activities")} onToggleEdit={() => toggleEditing("activities")}>
+        {isEditing("activities") ? (
+          <div className="grid sm:grid-cols-2 gap-6">
             <div className="space-y-3">
-              <div className="rounded-lg border-l-4 border-l-teal-500 pl-3 space-y-1.5">
-                <p className="text-xs font-medium text-teal-700">Cuidado de sí mismo</p>
-                <p className="text-[11px] text-muted-foreground">Cuidado personal, movilidad, gestión comunitaria</p>
-                <RichTextarea value={profile.activitiesPastSelfcare ?? ""} onChange={(v) => update("activitiesPastSelfcare", v)} rows={2} />
-              </div>
-              <div className="rounded-lg border-l-4 border-l-amber-500 pl-3 space-y-1.5">
-                <p className="text-xs font-medium text-amber-700">Productividad</p>
-                <p className="text-[11px] text-muted-foreground">Trabajo o voluntariado, manejo del hogar, estudios</p>
-                <RichTextarea value={profile.activitiesPastProductivity ?? ""} onChange={(v) => update("activitiesPastProductivity", v)} rows={2} />
-              </div>
-              <div className="rounded-lg border-l-4 border-l-violet-500 pl-3 space-y-1.5">
-                <p className="text-xs font-medium text-violet-700">Ocio</p>
-                <p className="text-[11px] text-muted-foreground">Recreación tranquila, activa y socialización (adjuntar listado de intereses)</p>
-                <RichTextarea value={profile.activitiesPastLeisure ?? ""} onChange={(v) => update("activitiesPastLeisure", v)} rows={2} />
-              </div>
+              <p className="text-sm font-semibold mb-2">Actividades que realizaba</p>
+              <AreaBlock color="teal" label="Cuidado de sí mismo" desc="Cuidado personal, movilidad, gestión comunitaria" value={profile.activitiesPastSelfcare ?? ""} onChange={(v) => update("activitiesPastSelfcare", v)} />
+              <AreaBlock color="amber" label="Productividad" desc="Trabajo o voluntariado, manejo del hogar, estudios" value={profile.activitiesPastProductivity ?? ""} onChange={(v) => update("activitiesPastProductivity", v)} />
+              <AreaBlock color="violet" label="Ocio" desc="Recreación tranquila, activa y socialización" value={profile.activitiesPastLeisure ?? ""} onChange={(v) => update("activitiesPastLeisure", v)} />
+            </div>
+            <div className="space-y-3">
+              <p className="text-sm font-semibold mb-2">Actividades que le gustaría retomar o realizar</p>
+              <AreaBlock color="teal" label="Cuidado de sí mismo" desc="Cuidado personal, movilidad, gestión comunitaria" value={profile.activitiesDesiredSelfcare ?? ""} onChange={(v) => update("activitiesDesiredSelfcare", v)} />
+              <AreaBlock color="amber" label="Productividad" desc="Trabajo o voluntariado, manejo del hogar, estudios" value={profile.activitiesDesiredProductivity ?? ""} onChange={(v) => update("activitiesDesiredProductivity", v)} />
+              <AreaBlock color="violet" label="Ocio" desc="Recreación tranquila, activa y socialización" value={profile.activitiesDesiredLeisure ?? ""} onChange={(v) => update("activitiesDesiredLeisure", v)} />
             </div>
           </div>
-
-          <div className="space-y-3">
-            <p className="text-sm font-semibold mb-2">Actividades que le gustaría retomar o realizar</p>
-            <div className="space-y-3">
-              <div className="rounded-lg border-l-4 border-l-teal-500 pl-3 space-y-1.5">
-                <p className="text-xs font-medium text-teal-700">Cuidado de sí mismo</p>
-                <p className="text-[11px] text-muted-foreground">Cuidado personal, movilidad, gestión comunitaria</p>
-                <RichTextarea value={profile.activitiesDesiredSelfcare ?? ""} onChange={(v) => update("activitiesDesiredSelfcare", v)} rows={2} />
-              </div>
-              <div className="rounded-lg border-l-4 border-l-amber-500 pl-3 space-y-1.5">
-                <p className="text-xs font-medium text-amber-700">Productividad</p>
-                <p className="text-[11px] text-muted-foreground">Trabajo o voluntariado, manejo del hogar, estudios</p>
-                <RichTextarea value={profile.activitiesDesiredProductivity ?? ""} onChange={(v) => update("activitiesDesiredProductivity", v)} rows={2} />
-              </div>
-              <div className="rounded-lg border-l-4 border-l-violet-500 pl-3 space-y-1.5">
-                <p className="text-xs font-medium text-violet-700">Ocio</p>
-                <p className="text-[11px] text-muted-foreground">Recreación tranquila, activa y socialización (adjuntar listado de intereses)</p>
-                <RichTextarea value={profile.activitiesDesiredLeisure ?? ""} onChange={(v) => update("activitiesDesiredLeisure", v)} rows={2} />
-              </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Actividades que realizaba</p>
+              <ReadOnlyHtml label="Cuidado de sí mismo" value={profile.activitiesPastSelfcare} placeholder="Sin completar." />
+              <ReadOnlyHtml label="Productividad" value={profile.activitiesPastProductivity} placeholder="Sin completar." />
+              <ReadOnlyHtml label="Ocio" value={profile.activitiesPastLeisure} placeholder="Sin completar." />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Actividades deseadas</p>
+              <ReadOnlyHtml label="Cuidado de sí mismo" value={profile.activitiesDesiredSelfcare} placeholder="Sin completar." />
+              <ReadOnlyHtml label="Productividad" value={profile.activitiesDesiredProductivity} placeholder="Sin completar." />
+              <ReadOnlyHtml label="Ocio" value={profile.activitiesDesiredLeisure} placeholder="Sin completar." />
             </div>
           </div>
-        </div>
+        )}
       </Section>
 
-      <Section
-        title="Problemas detectados"
-        description="Problemas identificados por el/la usuario/a y por el/la profesional."
-        icon={ClipboardList}
-        profile={profile}
+      {/* ─── 6. Problemas detectados ─── */}
+      <Section title="Problemas detectados" description="Problemas identificados por el/la usuario/a y por el/la profesional." icon={ClipboardList} color="orange" profile={profile}
         fields={["problemsUser", "problemsProfessional"]}
-      >
-        <Field label="Problemas detectados por el/la usuario/a">
-          <RichTextarea rows={4} value={profile.problemsUser ?? ""} onChange={(v) => update("problemsUser", v)} placeholder="Problemas que el/la paciente identifica como principales..." />
-        </Field>
-        <Field label="Problemas detectados por el/la profesional">
-          <RichTextarea rows={4} value={profile.problemsProfessional ?? ""} onChange={(v) => update("problemsProfessional", v)} placeholder="Problemas identificados por el/la terapeuta durante la evaluación..." />
-        </Field>
+        editing={isEditing("problems")} onToggleEdit={() => toggleEditing("problems")}>
+        {isEditing("problems") ? (
+          <>
+            <Field label="Problemas detectados por el/la usuario/a">
+              <RichTextarea rows={4} value={profile.problemsUser ?? ""} onChange={(v) => update("problemsUser", v)} placeholder="Problemas que el/la paciente identifica como principales..." />
+            </Field>
+            <Field label="Problemas detectados por el/la profesional">
+              <RichTextarea rows={4} value={profile.problemsProfessional ?? ""} onChange={(v) => update("problemsProfessional", v)} placeholder="Problemas identificados por el/la terapeuta durante la evaluación..." />
+            </Field>
+          </>
+        ) : (
+          <>
+            <ReadOnlyHtml label="Por el/la usuario/a" value={profile.problemsUser} placeholder="Sin completar." />
+            <ReadOnlyHtml label="Por el/la profesional" value={profile.problemsProfessional} placeholder="Sin completar." />
+          </>
+        )}
       </Section>
 
-      <Section
-        title="Objetivos y planificación"
-        description="Objetivos ocupacionales con seguimiento temporal."
-        icon={Target}
-        profile={profile}
+      {/* ─── 7. Objetivos y planificación ─── */}
+      <Section title="Objetivos y planificación" description="Objetivos ocupacionales con seguimiento temporal." icon={Target} color="blue" profile={profile}
         fields={["desiredImprovements"]}
-      >
-        <Field label="Qué le gustaría conseguir o mejorar">
-          <RichTextarea rows={3} value={profile.desiredImprovements ?? ""} onChange={(v) => update("desiredImprovements", v)} />
-        </Field>
-
-        <GoalsEditor
-          value={profile.goals ?? []}
-          onChange={(goals) => update("goals", goals)}
-        />
+        editing={isEditing("goals")} onToggleEdit={() => toggleEditing("goals")}>
+        {isEditing("goals") ? (
+          <>
+            <Field label="Qué le gustaría conseguir o mejorar">
+              <RichTextarea rows={3} value={profile.desiredImprovements ?? ""} onChange={(v) => update("desiredImprovements", v)} />
+            </Field>
+            <GoalsEditor value={profile.goals ?? []} onChange={(goals) => update("goals", goals)} />
+          </>
+        ) : (
+          <>
+            <ReadOnlyHtml label="Qué le gustaría conseguir" value={profile.desiredImprovements} placeholder="Sin completar." />
+            <ReadOnlyGoals goals={profile.goals ?? []} />
+          </>
+        )}
       </Section>
 
       <div className="flex justify-end gap-2">
@@ -623,33 +586,36 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
   );
 }
 
+// ─── Helper components ──────────────────────────────────────────────────────
+
+type ChipColor = "blue" | "green" | "orange" | "purple" | "yellow";
+
+const CHIP_VARS: Record<ChipColor, { bg: string; text: string }> = {
+  blue: { bg: "var(--chip-blue-bg)", text: "var(--chip-blue-text)" },
+  green: { bg: "var(--chip-green-bg)", text: "var(--chip-green-text)" },
+  orange: { bg: "var(--chip-orange-bg)", text: "var(--chip-orange-text)" },
+  purple: { bg: "var(--chip-purple-bg)", text: "var(--chip-purple-text)" },
+  yellow: { bg: "var(--chip-yellow-bg)", text: "var(--chip-yellow-text)" },
+};
+
 function Section({
-  title,
-  description,
-  icon: Icon,
-  defaultOpen = false,
-  profile,
-  fields,
-  children,
+  title, description, icon: Icon, color = "blue", defaultOpen = false, profile, fields, children, editing, onToggleEdit,
 }: {
-  title: string;
-  description?: string;
-  icon?: LucideIcon;
-  defaultOpen?: boolean;
-  profile: Profile;
-  fields: string[];
-  children: React.ReactNode;
+  title: string; description?: string; icon?: LucideIcon; color?: ChipColor; defaultOpen?: boolean;
+  profile: Profile; fields: string[]; children: React.ReactNode;
+  editing?: boolean; onToggleEdit?: () => void;
 }) {
   const { filled, total } = countFilled(profile, fields);
   const isComplete = filled === total;
   const isEmpty = filled === 0;
+  const chip = CHIP_VARS[color];
 
   return (
     <details open={defaultOpen} className="group rounded-lg border bg-card shadow-sm overflow-hidden">
       <summary className="cursor-pointer list-none px-4 py-3 border-b bg-muted flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {Icon && (
-            <span className="flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 text-primary shrink-0">
+            <span className="flex items-center justify-center w-8 h-8 rounded-md shrink-0" style={{ backgroundColor: chip.bg, color: chip.text }}>
               <Icon className="w-4 h-4" />
             </span>
           )}
@@ -659,17 +625,14 @@ function Section({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span
-            className={
-              "text-xs rounded-full px-2 py-0.5 font-medium border " +
-              (isComplete
-                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                : isEmpty
-                ? "bg-background text-muted-foreground border-border"
-                : "bg-amber-100 text-amber-700 border-amber-200")
-            }
-            title={`${filled} de ${total} campos rellenados`}
-          >
+          {onToggleEdit && (
+            <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={(e) => { e.preventDefault(); onToggleEdit(); }}>
+              {editing ? <><Eye className="w-3.5 h-3.5 mr-1" />Ver</> : <><Pencil className="w-3.5 h-3.5 mr-1" />Editar</>}
+            </Button>
+          )}
+          <span className="text-xs rounded-full px-2 py-0.5 font-medium"
+            style={isComplete ? { backgroundColor: "var(--chip-green-bg)", color: "var(--chip-green-text)" } : isEmpty ? { backgroundColor: "var(--muted)", color: "var(--muted-foreground)" } : { backgroundColor: "var(--chip-yellow-bg)", color: "var(--chip-yellow-text)" }}
+            title={`${filled} de ${total} campos rellenados`}>
             {filled}/{total}
           </span>
           <span className="text-muted-foreground text-xs transition-transform group-open:rotate-90">▶</span>
@@ -680,48 +643,110 @@ function Section({
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs">{label}</Label>
+      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</Label>
       {children}
     </div>
   );
 }
 
-// Repeatable list editor for family members — one row per person, with a
-// free-text "Otros" column for whatever doesn't fit a dedicated field
-// (support level, cohabitation, contact frequency, etc.) instead of
-// modeling every possible attribute as its own column.
-function FamilyMembersEditor({
-  value,
-  onChange,
-}: {
-  value: FamilyMember[];
-  onChange: (members: FamilyMember[]) => void;
-}) {
-  function addRow() {
-    onChange([...value, { name: "", relationship: "", occupation: "", notes: "" }]);
-  }
-  function updateRow(i: number, patch: Partial<FamilyMember>) {
-    onChange(value.map((m, idx) => (idx === i ? { ...m, ...patch } : m)));
-  }
-  function removeRow(i: number) {
-    onChange(value.filter((_, idx) => idx !== i));
-  }
+function ReadOnlyField({ label, value }: { label: string; value?: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      {value?.trim() ? (
+        <p className="text-sm bg-muted/40 rounded-md px-3 py-2">{value}</p>
+      ) : (
+        <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">Sin completar.</p>
+      )}
+    </div>
+  );
+}
+
+function ReadOnlyHtml({ label, value, placeholder = "Sin completar." }: { label?: string; value?: string; placeholder?: string }) {
+  const hasValue = value && value.replace(/<[^>]*>/g, "").trim();
+  return (
+    <div className="space-y-1">
+      {label && <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>}
+      {hasValue ? (
+        <div className="text-sm prose prose-sm max-w-none bg-muted/40 rounded-md px-3 py-2" dangerouslySetInnerHTML={{ __html: value! }} />
+      ) : (
+        <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">{placeholder}</p>
+      )}
+    </div>
+  );
+}
+
+function ReadOnlyList<T>({ label, items, renderItem, emptyText }: { label: string; items: T[]; renderItem: (item: T) => string; emptyText: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      {items.length === 0 ? (
+        <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">{emptyText}</p>
+      ) : (
+        <ul className="space-y-1">
+          {items.map((item, i) => (
+            <li key={i} className="text-sm bg-muted/40 rounded-md px-3 py-2">{renderItem(item)}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const GOAL_STATUS_STYLES: Record<GoalStatus, string> = {
+  "En curso": "bg-sky-100 text-sky-900",
+  "Conseguido": "bg-emerald-100 text-emerald-900",
+  "Abandonado": "bg-zinc-100 text-zinc-700",
+};
+
+function ReadOnlyGoals({ goals }: { goals: Goal[] }) {
+  if (goals.length === 0) return <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">Sin objetivos añadidos.</p>;
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Objetivos</p>
+      {goals.map((g, i) => {
+        const areaColor = GOAL_AREA_COLORS[g.area] ?? "#6b7280";
+        return (
+          <div key={i} className="rounded-lg border bg-muted/40 p-3 space-y-1" style={{ borderLeftWidth: "4px", borderLeftColor: areaColor }}>
+            <p className="text-sm font-medium">{g.text || "Sin descripción"}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs" style={{ color: areaColor }}>{g.area}</span>
+              <span className={`text-xs rounded-full px-2 py-0.5 ${GOAL_STATUS_STYLES[g.status]}`}>{g.status}</span>
+              {g.startDate && <span className="text-xs text-muted-foreground">Inicio: {g.startDate}</span>}
+              {g.targetDate && <span className="text-xs text-muted-foreground">Objetivo: {g.targetDate}</span>}
+            </div>
+            {g.evaluation && <p className="text-xs text-muted-foreground mt-1">{g.evaluation}</p>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function AreaBlock({ color, label, desc, value, onChange }: { color: string; label: string; desc: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className={`rounded-lg border-l-4 border-l-${color}-500 pl-3 space-y-1.5`}>
+      <p className={`text-xs font-medium text-${color}-700`}>{label}</p>
+      <p className="text-[11px] text-muted-foreground">{desc}</p>
+      <RichTextarea value={value} onChange={onChange} rows={2} />
+    </div>
+  );
+}
+
+// ─── List editors ────────────────────────────────────────────────────────────
+
+function FamilyMembersEditor({ value, onChange }: { value: FamilyMember[]; onChange: (members: FamilyMember[]) => void }) {
+  function addRow() { onChange([...value, { name: "", relationship: "", occupation: "", notes: "" }]); }
+  function updateRow(i: number, patch: Partial<FamilyMember>) { onChange(value.map((m, idx) => (idx === i ? { ...m, ...patch } : m))); }
+  function removeRow(i: number) { onChange(value.filter((_, idx) => idx !== i)); }
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs">Composición familiar</Label>
-      {value.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">Sin familiares añadidos.</p>
-      )}
+      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Composición familiar</Label>
+      {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin familiares añadidos.</p>}
       <div className="space-y-2">
         {value.map((member, i) => (
           <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr_1.4fr_auto] gap-2 items-start">
@@ -742,30 +767,44 @@ function FamilyMembersEditor({
   );
 }
 
-// Same repeatable-row pattern for work history.
-function WorkHistoryEditor({
-  value,
-  onChange,
-}: {
-  value: WorkHistoryEntry[];
-  onChange: (entries: WorkHistoryEntry[]) => void;
-}) {
-  function addRow() {
-    onChange([...value, { company: "", role: "", year: "", notes: "" }]);
-  }
-  function updateRow(i: number, patch: Partial<WorkHistoryEntry>) {
-    onChange(value.map((w, idx) => (idx === i ? { ...w, ...patch } : w)));
-  }
-  function removeRow(i: number) {
-    onChange(value.filter((_, idx) => idx !== i));
-  }
+function SupportNetworkEditor({ value, onChange }: { value: SupportContact[]; onChange: (contacts: SupportContact[]) => void }) {
+  function addRow() { onChange([...value, { name: "", relationship: "", frequency: "", notes: "" }]); }
+  function updateRow(i: number, patch: Partial<SupportContact>) { onChange(value.map((c, idx) => (idx === i ? { ...c, ...patch } : c))); }
+  function removeRow(i: number) { onChange(value.filter((_, idx) => idx !== i)); }
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs">Trabajos realizados</Label>
-      {value.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">Sin trabajos añadidos.</p>
-      )}
+      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Red de apoyo / amistades</Label>
+      {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin contactos de apoyo añadidos.</p>}
+      <div className="space-y-2">
+        {value.map((contact, i) => (
+          <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr_1.4fr_auto] gap-2 items-start">
+            <Input placeholder="Nombre" value={contact.name} onChange={(e) => updateRow(i, { name: e.target.value })} />
+            <Input placeholder="Relación (ej. Amigo)" value={contact.relationship} onChange={(e) => updateRow(i, { relationship: e.target.value })} />
+            <Input placeholder="Frecuencia contacto" value={contact.frequency} onChange={(e) => updateRow(i, { frequency: e.target.value })} />
+            <Input placeholder="Otros (vía de contacto, nivel apoyo...)" value={contact.notes} onChange={(e) => updateRow(i, { notes: e.target.value })} />
+            <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => removeRow(i)} aria-label="Quitar contacto">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={addRow}>
+        <Plus className="w-3.5 h-3.5 mr-1.5" /> Añadir contacto
+      </Button>
+    </div>
+  );
+}
+
+function WorkHistoryEditor({ value, onChange }: { value: WorkHistoryEntry[]; onChange: (entries: WorkHistoryEntry[]) => void }) {
+  function addRow() { onChange([...value, { company: "", role: "", year: "", notes: "" }]); }
+  function updateRow(i: number, patch: Partial<WorkHistoryEntry>) { onChange(value.map((w, idx) => (idx === i ? { ...w, ...patch } : w))); }
+  function removeRow(i: number) { onChange(value.filter((_, idx) => idx !== i)); }
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Trabajos realizados</Label>
+      {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin trabajos añadidos.</p>}
       <div className="space-y-2">
         {value.map((entry, i) => (
           <div key={i} className="grid grid-cols-[1.3fr_1.3fr_0.7fr_1.4fr_auto] gap-2 items-start">
@@ -786,28 +825,11 @@ function WorkHistoryEditor({
   );
 }
 
-// Goals editor: free text + status + optional target date + which profile
-// area it relates to, replacing the old 3 fixed "Objetivo 1/2/3" boxes
-// with an open-ended, trackable list.
-const GOAL_STATUS_STYLES: Record<GoalStatus, string> = {
-  "En curso": "bg-sky-100 text-sky-900 border-sky-200",
-  "Conseguido": "bg-emerald-100 text-emerald-900 border-emerald-200",
-  "Abandonado": "bg-zinc-100 text-zinc-700 border-zinc-200",
-};
-
-function GoalsEditor({
-  value,
-  onChange,
-}: {
-  value: Goal[];
-  onChange: (goals: Goal[]) => void;
-}) {
+function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goal[]) => void }) {
   function addRow() {
     onChange([...value, { text: "", area: "Cuidado de sí mismo", status: "En curso", startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "" }]);
   }
-  function updateRow(i: number, patch: Partial<Goal>) {
-    onChange(value.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
-  }
+  function updateRow(i: number, patch: Partial<Goal>) { onChange(value.map((g, idx) => (idx === i ? { ...g, ...patch } : g))); }
   function removeRow(i: number) {
     const ok = confirm("¿Seguro que quieres eliminar este objetivo?");
     if (!ok) return;
@@ -816,10 +838,8 @@ function GoalsEditor({
 
   return (
     <div className="space-y-3">
-      <Label className="text-xs">Objetivos</Label>
-      {value.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">Sin objetivos añadidos.</p>
-      )}
+      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Objetivos</Label>
+      {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin objetivos añadidos.</p>}
       <div className="space-y-3">
         {value.map((goal, i) => {
           const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
@@ -828,18 +848,12 @@ function GoalsEditor({
               <div className="p-3 space-y-3">
                 <div className="flex items-start gap-2">
                   <div className="flex-1 space-y-2">
-                    <Textarea
-                      rows={2}
-                      placeholder="Describe el objetivo…"
-                      value={goal.text}
-                      onChange={(e) => updateRow(i, { text: e.target.value })}
-                    />
+                    <Textarea rows={2} placeholder="Describe el objetivo…" value={goal.text} onChange={(e) => updateRow(i, { text: e.target.value })} />
                   </div>
                   <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive shrink-0" onClick={() => removeRow(i)} aria-label="Quitar objetivo">
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
-
                 <div className="grid sm:grid-cols-4 gap-2">
                   <Select value={goal.area} onValueChange={(v) => updateRow(i, { area: v as GoalArea })}>
                     <SelectTrigger className="h-8 text-xs">
@@ -862,9 +876,7 @@ function GoalsEditor({
                   <Select value={goal.status} onValueChange={(v) => updateRow(i, { status: v as GoalStatus })}>
                     <SelectTrigger className={`h-8 text-xs ${GOAL_STATUS_STYLES[goal.status]}`}><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {GOAL_STATUSES.map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
+                      {GOAL_STATUSES.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
                     </SelectContent>
                   </Select>
                   <div className="space-y-0.5">
@@ -876,16 +888,9 @@ function GoalsEditor({
                     <Input type="date" className="h-8 text-xs" value={goal.targetDate ?? ""} onChange={(e) => updateRow(i, { targetDate: e.target.value || null })} />
                   </div>
                 </div>
-
                 <div className="space-y-1">
                   <Label className="text-[10px] text-muted-foreground">Evaluación de la consecución</Label>
-                  <Textarea
-                    rows={2}
-                    placeholder="Valoración del progreso hacia este objetivo..."
-                    value={goal.evaluation ?? ""}
-                    onChange={(e) => updateRow(i, { evaluation: e.target.value })}
-                    className={!goal.evaluation ? "bg-muted/60" : ""}
-                  />
+                  <Textarea rows={2} placeholder="Valoración del progreso hacia este objetivo..." value={goal.evaluation ?? ""} onChange={(e) => updateRow(i, { evaluation: e.target.value })} className={!goal.evaluation ? "border-dashed border-muted-foreground/40" : ""} />
                 </div>
               </div>
             </div>
@@ -899,28 +904,13 @@ function GoalsEditor({
   );
 }
 
-
-
 // ─── Rich text area with bold/italic/underline + voice dictation ──────────────
-// Uses contentEditable for inline formatting. Stores HTML.
-// Voice dictation uses the Web Speech API (SpeechRecognition).
-function RichTextarea({
-  value,
-  onChange,
-  rows = 3,
-  placeholder,
-}: {
-  value: string;
-  onChange: (html: string) => void;
-  rows?: number;
-  placeholder?: string;
-}) {
+function RichTextarea({ value, onChange, rows = 3, placeholder }: { value: string; onChange: (html: string) => void; rows?: number; placeholder?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
 
-  // Sync external value on mount or when value changes and div is not focused
   useEffect(() => {
     if (ref.current && !focused) {
       if (ref.current.innerHTML !== value) {
@@ -936,71 +926,50 @@ function RichTextarea({
   }
 
   function toggleDictation() {
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      return;
-    }
-
+    if (isListening) { recognitionRef.current?.stop(); setIsListening(false); return; }
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       toast({ title: "Dictado no disponible", description: "Tu navegador no soporta reconocimiento de voz.", variant: "destructive" });
       return;
     }
-
     const recognition = new SpeechRecognition();
     recognition.lang = "es-ES";
     recognition.continuous = true;
     recognition.interimResults = true;
     recognitionRef.current = recognition;
-
     recognition.onresult = (event: any) => {
       let transcript = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript;
       }
       if (event.results[event.results.length - 1].isFinal && ref.current) {
-        // Append the final transcript to current content
         const current = ref.current.innerHTML;
         const separator = current && !current.endsWith(" ") && !current.endsWith("<br>") ? " " : "";
         ref.current.innerHTML = current + separator + transcript;
         onChange(ref.current.innerHTML);
       }
     };
-
     recognition.onerror = () => setIsListening(false);
     recognition.onend = () => setIsListening(false);
-
     recognition.start();
     setIsListening(true);
   }
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => { recognitionRef.current?.stop(); };
-  }, []);
+  useEffect(() => { return () => { recognitionRef.current?.stop(); }; }, []);
 
   return (
-    <div className={`rounded-md border ${focused ? "ring-2 ring-ring" : ""} ${!value ? "bg-muted/60" : ""}`}>
+    <div className={`rounded-md border ${focused ? "ring-2 ring-ring" : ""} ${!value ? "border-dashed border-muted-foreground/40" : ""}`}>
       <div className="flex items-center gap-0.5 px-2 py-1 border-b bg-muted/30">
         <button type="button" className="px-1.5 py-0.5 rounded text-xs font-bold hover:bg-muted" onClick={() => handleFormat("bold")} title="Negrita"><b>N</b></button>
         <button type="button" className="px-1.5 py-0.5 rounded text-xs italic hover:bg-muted" onClick={() => handleFormat("italic")} title="Cursiva"><i>K</i></button>
         <button type="button" className="px-1.5 py-0.5 rounded text-xs underline hover:bg-muted" onClick={() => handleFormat("underline")} title="Subrayado"><u>S</u></button>
         <div className="flex-1" />
-        <button
-          type="button"
-          className={`px-1.5 py-0.5 rounded text-xs hover:bg-muted flex items-center gap-1 ${isListening ? "text-red-500 bg-red-50" : "text-muted-foreground"}`}
-          onClick={toggleDictation}
-          title={isListening ? "Detener dictado" : "Dictar por voz"}
-        >
+        <button type="button" className={`px-1.5 py-0.5 rounded text-xs hover:bg-muted flex items-center gap-1 ${isListening ? "text-red-500 bg-red-50" : "text-muted-foreground"}`} onClick={toggleDictation} title={isListening ? "Detener dictado" : "Dictar por voz"}>
           {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
           <span>{isListening ? "Dictando…" : "Dictar"}</span>
         </button>
       </div>
-      <div
-        ref={ref}
-        contentEditable
-        suppressContentEditableWarning
+      <div ref={ref} contentEditable suppressContentEditableWarning
         className="px-3 py-2 text-sm outline-none min-h-[2.5rem] [&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-muted-foreground"
         style={{ minHeight: `${rows * 1.5}rem` }}
         data-placeholder={placeholder ?? ""}
@@ -1013,55 +982,34 @@ function RichTextarea({
 }
 
 // ─── Occupational balance charts ─────────────────────────────────────────────
-// Two charts from the same cell data:
-// 1. OTPF areas (9 categories) — detailed clinical breakdown.
-// 2. Classic 3-group balance (Autocuidado/Productividad/Ocio) — uses the
-//    per-cell "group" field, which is auto-set from OTPF area but
-//    editable per cell.
-
 function OccupationalBalanceCharts({ cells }: { cells: RoutineCell[] }) {
   const filled = cells.filter((c) => c.category);
   const totalSlots = filled.length;
 
   if (totalSlots === 0) {
-    return (
-      <p className="text-xs text-muted-foreground italic">
-        Abre el planning y rellena celdas para ver el análisis de equilibrio ocupacional.
-      </p>
-    );
+    return <p className="text-xs text-muted-foreground italic">Abre el planning y rellena celdas para ver el análisis de equilibrio ocupacional.</p>;
   }
 
   const totalHours = totalSlots * 0.5;
 
-  // Chart 1: by OTPF area
   const otpfData = ROUTINE_CATEGORIES.map((cat) => {
     const slots = filled.filter((c) => c.category === cat).length;
-    return {
-      name: cat,
-      label: ROUTINE_CATEGORY_LABELS[cat],
-      hours: slots * 0.5,
-      pct: ((slots / totalSlots) * 100).toFixed(1),
-      fill: ROUTINE_CATEGORY_COLORS[cat],
-    };
+    return { name: cat, label: ROUTINE_CATEGORY_LABELS[cat], hours: slots * 0.5, pct: ((slots / totalSlots) * 100).toFixed(1), fill: ROUTINE_CATEGORY_COLORS[cat] };
   }).filter((d) => d.hours > 0);
 
-  // Chart 2: by balance group (uses cell.group, fallback to OTPF_TO_GROUP)
   const groupCounts: Record<BalanceGroup, number> = { Autocuidado: 0, Productividad: 0, Ocio: 0 };
   for (const c of filled) {
     const grp = (c.group as BalanceGroup) || (c.category ? OTPF_TO_GROUP[c.category] : null);
     if (grp && grp in groupCounts) groupCounts[grp as BalanceGroup] += 1;
   }
   const groupData = BALANCE_GROUPS.map((grp) => ({
-    name: grp,
-    hours: groupCounts[grp] * 0.5,
-    pct: ((groupCounts[grp] / totalSlots) * 100).toFixed(1),
-    fill: BALANCE_GROUP_COLORS[grp],
+    name: grp, hours: groupCounts[grp] * 0.5, pct: ((groupCounts[grp] / totalSlots) * 100).toFixed(1), fill: BALANCE_GROUP_COLORS[grp],
   })).filter((d) => d.hours > 0);
 
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Por área OTPF</p>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Por categoría</p>
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <PieChart width={150} height={150}>
             <Pie data={otpfData} cx={70} cy={70} innerRadius={38} outerRadius={62} dataKey="hours" strokeWidth={1.5}>
@@ -1070,34 +1018,20 @@ function OccupationalBalanceCharts({ cells }: { cells: RoutineCell[] }) {
             <Tooltip formatter={(v: number, n: string) => [`${(v as number).toFixed(1)} h`, otpfData.find((d) => d.name === n)?.label ?? n]} />
           </PieChart>
           <table className="text-xs w-full">
-            <thead>
-              <tr className="text-muted-foreground border-b">
-                <th className="text-left pb-1 font-medium">Área</th>
-                <th className="text-right pb-1 font-medium">h</th>
-                <th className="text-right pb-1 font-medium">%</th>
-              </tr>
-            </thead>
+            <thead><tr className="text-muted-foreground border-b"><th className="text-left pb-1 font-medium">Categoría</th><th className="text-right pb-1 font-medium">h</th><th className="text-right pb-1 font-medium">%</th></tr></thead>
             <tbody>
               {otpfData.map((row) => (
                 <tr key={row.name} className="border-b last:border-0">
-                  <td className="py-0.5 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-sm inline-block shrink-0" style={{ backgroundColor: row.fill }} />
-                    {row.label}
-                  </td>
+                  <td className="py-0.5 flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm inline-block shrink-0" style={{ backgroundColor: row.fill }} />{row.label}</td>
                   <td className="py-0.5 text-right tabular-nums">{row.hours.toFixed(1)}</td>
                   <td className="py-0.5 text-right tabular-nums text-muted-foreground">{row.pct}%</td>
                 </tr>
               ))}
-              <tr className="font-medium border-t">
-                <td className="pt-1">Total</td>
-                <td className="pt-1 text-right tabular-nums">{totalHours.toFixed(1)}</td>
-                <td className="pt-1 text-right text-muted-foreground">100%</td>
-              </tr>
+              <tr className="font-medium border-t"><td className="pt-1">Total</td><td className="pt-1 text-right tabular-nums">{totalHours.toFixed(1)}</td><td className="pt-1 text-right text-muted-foreground">100%</td></tr>
             </tbody>
           </table>
         </div>
       </div>
-
       <div>
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Equilibrio ocupacional (3 grupos)</p>
         <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -1108,14 +1042,7 @@ function OccupationalBalanceCharts({ cells }: { cells: RoutineCell[] }) {
             <Tooltip formatter={(v: number, n: string) => [`${(v as number).toFixed(1)} h`, n]} />
           </PieChart>
           <table className="text-xs w-full">
-            <thead>
-              <tr className="text-muted-foreground border-b">
-                <th className="text-left pb-1 font-medium">Grupo</th>
-                <th className="text-right pb-1 font-medium">h</th>
-                <th className="text-right pb-1 font-medium">%</th>
-                <th className="text-right pb-1 font-medium text-muted-foreground/60">Ref.</th>
-              </tr>
-            </thead>
+            <thead><tr className="text-muted-foreground border-b"><th className="text-left pb-1 font-medium">Grupo</th><th className="text-right pb-1 font-medium">h</th><th className="text-right pb-1 font-medium">%</th><th className="text-right pb-1 font-medium text-muted-foreground/60">Ref.</th></tr></thead>
             <tbody>
               {BALANCE_GROUPS.map((grp) => {
                 const hours = groupCounts[grp] * 0.5;
@@ -1124,22 +1051,14 @@ function OccupationalBalanceCharts({ cells }: { cells: RoutineCell[] }) {
                 const fill = BALANCE_GROUP_COLORS[grp];
                 return (
                   <tr key={grp} className="border-b last:border-0">
-                    <td className="py-0.5 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-sm inline-block shrink-0" style={{ backgroundColor: fill }} />
-                      {grp}
-                    </td>
+                    <td className="py-0.5 flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm inline-block shrink-0" style={{ backgroundColor: fill }} />{grp}</td>
                     <td className="py-0.5 text-right tabular-nums">{hours.toFixed(1)}</td>
                     <td className="py-0.5 text-right tabular-nums text-muted-foreground">{pct}%</td>
                     <td className="py-0.5 text-right tabular-nums text-muted-foreground/50">~{ref}%</td>
                   </tr>
                 );
               })}
-              <tr className="font-medium border-t">
-                <td className="pt-1">Total</td>
-                <td className="pt-1 text-right tabular-nums">{totalHours.toFixed(1)}</td>
-                <td className="pt-1 text-right text-muted-foreground">100%</td>
-                <td></td>
-              </tr>
+              <tr className="font-medium border-t"><td className="pt-1">Total</td><td className="pt-1 text-right tabular-nums">{totalHours.toFixed(1)}</td><td className="pt-1 text-right text-muted-foreground">100%</td><td></td></tr>
             </tbody>
           </table>
         </div>
@@ -1158,9 +1077,7 @@ function RoutineBalanceFromRecords({ patientId }: { patientId: string }) {
     if (!latestId || !patientId) return;
     fetch(`/api/patients/${patientId}/routine-records/${latestId}`)
       .then((r) => r.json())
-      .then((data) => {
-        try { setCells(JSON.parse(data.cells)); } catch { setCells([]); }
-      })
+      .then((data) => { try { setCells(JSON.parse(data.cells)); } catch { setCells([]); } })
       .catch(() => setCells([]));
   }, [patientId, latestId]);
 

@@ -77,6 +77,18 @@
   --sidebar-accent-foreground: oklch(0.98 0 0);
   --sidebar-border: oklch(0.30 0.02 180);
   --sidebar-ring: oklch(0.55 0.08 180);
+
+  /* Pastel-tierra chip palette */
+  --chip-blue-bg: #E9EFF6;
+  --chip-blue-text: #4A6D8C;
+  --chip-green-bg: #E4ECE3;
+  --chip-green-text: #4E6B4D;
+  --chip-orange-bg: #F4EBE1;
+  --chip-orange-text: #A0713F;
+  --chip-purple-bg: #EFEAF4;
+  --chip-purple-text: #7A5B94;
+  --chip-yellow-bg: #F3EDD8;
+  --chip-yellow-text: #8C7A3D;
 }
 
 .dark {

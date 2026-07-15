@@ -227,7 +227,13 @@ model OccupationalProfile {
   desiredImprovements String?
 
   // New structured fields
-  dailyRoutine String?
+  summary String? // Free-text summary (replaces old documentsAttached, interventionReason, referralResource in UI)
+  dailyRoutine String? // Legacy single-field daily routine
+  dailyRoutineMorningWeekday String?
+  dailyRoutineAfternoonWeekday String?
+  dailyRoutineMorningWeekend String?
+  dailyRoutineAfternoonWeekend String?
+  economicManagement String? // Replaces approximateIncome + moneyManager + incomeOrganization in UI
   activitiesPastSelfcare String?
   activitiesPastProductivity String?
   activitiesPastLeisure String?

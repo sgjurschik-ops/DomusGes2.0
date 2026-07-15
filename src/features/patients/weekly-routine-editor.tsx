@@ -13,10 +13,11 @@ import {
   useDeleteRoutineRecord,
 } from "@/hooks/api";
 
-// ─── OTPF-4 occupational categories ──────────────────────────────────────────
+// ─── Occupational categories ──────────────────────────────────────────
 export const ROUTINE_CATEGORIES = [
-  "AVD", "AIVD", "Gestión de la Salud", "Descanso y Sueño",
-  "Educación", "Trabajo", "Juego", "Ocio / Tiempo Libre", "Participación Social",
+  "Cuidado personal (AVDs)", "Movilidad funcional", "Gestión comunitaria",
+  "Trabajo remunerado/voluntario", "Manejo del hogar", "Juego/escuela",
+  "Recreación tranquila", "Recreación activa", "Socialización",
 ] as const;
 export type RoutineCategory = typeof ROUTINE_CATEGORIES[number];
 
@@ -32,25 +33,39 @@ export const BALANCE_GROUP_REFERENCE: Record<BalanceGroup, number> = {
 };
 
 export const OTPF_TO_GROUP: Record<RoutineCategory, BalanceGroup> = {
-  "AVD": "Autocuidado", "AIVD": "Productividad", "Gestión de la Salud": "Autocuidado",
-  "Descanso y Sueño": "Autocuidado", "Educación": "Productividad", "Trabajo": "Productividad",
-  "Juego": "Ocio", "Ocio / Tiempo Libre": "Ocio", "Participación Social": "Productividad",
+  "Cuidado personal (AVDs)": "Autocuidado",
+  "Movilidad funcional": "Autocuidado",
+  "Gestión comunitaria": "Autocuidado",
+  "Trabajo remunerado/voluntario": "Productividad",
+  "Manejo del hogar": "Productividad",
+  "Juego/escuela": "Productividad",
+  "Recreación tranquila": "Ocio",
+  "Recreación activa": "Ocio",
+  "Socialización": "Ocio",
 };
 
 export const ROUTINE_CATEGORY_COLORS: Record<RoutineCategory, string> = {
-  "AVD": "#f6c5a0", "AIVD": "#f6e4a0", "Gestión de la Salud": "#b8e0b8",
-  "Descanso y Sueño": "#b8d0f0", "Educación": "#d4b8f0", "Trabajo": "#f0b8b8",
-  "Juego": "#f0d4b8", "Ocio / Tiempo Libre": "#b8f0e4", "Participación Social": "#f0b8d4",
+  "Cuidado personal (AVDs)": "#f6c5a0",
+  "Movilidad funcional": "#b8e0b8",
+  "Gestión comunitaria": "#b8d0f0",
+  "Trabajo remunerado/voluntario": "#f0b8b8",
+  "Manejo del hogar": "#f6e4a0",
+  "Juego/escuela": "#d4b8f0",
+  "Recreación tranquila": "#b8f0e4",
+  "Recreación activa": "#f0d4b8",
+  "Socialización": "#f0b8d4",
 };
 
 export const ROUTINE_CATEGORY_LABELS: Record<RoutineCategory, string> = {
-  "AVD": "Actividades de la Vida Diaria",
-  "AIVD": "Actividades Instrumentales de la Vida Diaria",
-  "Gestión de la Salud": "Gestión de la Salud",
-  "Descanso y Sueño": "Descanso y Sueño",
-  "Educación": "Educación", "Trabajo": "Trabajo", "Juego": "Juego",
-  "Ocio / Tiempo Libre": "Ocio / Tiempo Libre",
-  "Participación Social": "Participación Social",
+  "Cuidado personal (AVDs)": "Cuidado personal (AVDs)",
+  "Movilidad funcional": "Movilidad funcional",
+  "Gestión comunitaria": "Gestión comunitaria",
+  "Trabajo remunerado/voluntario": "Trabajo remunerado/voluntario",
+  "Manejo del hogar": "Manejo del hogar",
+  "Juego/escuela": "Juego/escuela",
+  "Recreación tranquila": "Recreación tranquila",
+  "Recreación activa": "Recreación activa",
+  "Socialización": "Socialización",
 };
 
 export const ROUTINE_DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -650,8 +665,15 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                     const isRangeAnchor = rangeReady && selection && day === selection.day && slot === selection.to;
                     const hasContent = !!(cell?.activity || cell?.category);
 
+                    // Cell merging: hide activity label if the cell above has the exact same activity+category
+                    const prevCell = slot > 0 ? cellAt(day, slot - 1) : null;
+                    const isContinuation = !!(hasContent && prevCell && prevCell.activity === cell!.activity && prevCell.category === cell!.category && prevCell.activity);
+                    // Check if next cell continues this block (for bottom border hiding)
+                    const nextCell = slot < 47 ? cellAt(day, slot + 1) : null;
+                    const continuesBelow = !!(hasContent && nextCell && nextCell.activity === cell!.activity && nextCell.category === cell!.category && cell!.activity);
+
                     return (
-                      <td key={day} className={`p-0.5 align-top relative ${isFullHour ? "" : "border-t border-t-dashed border-border/30"}`}>
+                      <td key={day} className={`align-top relative ${isContinuation ? "pt-0 pb-0.5 px-0.5" : "p-0.5"} ${isFullHour && !isContinuation ? "" : isContinuation ? "" : "border-t border-t-dashed border-border/30"}`}>
                         <Popover
                           open={isOpen && !isDragging && !rangeReady}
                           onOpenChange={(o) => setOpenCell(o ? { day, halfHour: slot } : null)}
@@ -659,12 +681,9 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                           <PopoverTrigger asChild>
                             <button
                               type="button"
-                              // HTML5 drag: if selected and part of a multi-selection, drag the block;
-                              // otherwise drag just this cell (single-cell move).
                               draggable={hasContent}
                               onDragStart={(e) => {
                                 if (selected && selectedCells.length > 1) {
-                                  // Store anchor info for block move
                                   e.dataTransfer.setData("text/plain", JSON.stringify({ type: "block", anchorDay: day, anchorSlot: slot }));
                                 } else {
                                   e.dataTransfer.setData("text/plain", JSON.stringify({ type: "single", day, halfHour: slot }));
@@ -714,16 +733,18 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                   setContextMenu({ x: e.clientX, y: e.clientY, selectedCells: [], pasteTarget: { day, halfHour: slot } });
                                 }
                               }}
-                              className={`w-full rounded-sm border text-left px-1.5 truncate select-none text-xs font-medium ${
+                              className={`w-full text-left px-1.5 truncate select-none text-xs font-medium ${
+                                isContinuation ? "rounded-none border-x border-b-0 border-t-0" : continuesBelow ? "rounded-t-sm rounded-b-none border border-b-0" : "rounded-sm border"
+                              } ${
                                 isFullHour ? "h-8" : "h-7"
                               } ${selected
                                 ? "border-foreground ring-1 ring-foreground/40 ring-offset-0"
-                                : "border-transparent hover:border-border"
+                                : isContinuation || continuesBelow ? "border-transparent" : "border-transparent hover:border-border"
                               } ${hasContent ? "cursor-grab active:cursor-grabbing" : ""}`}
                               style={{ backgroundColor: bg }}
                               title={cell?.activity || undefined}
                             >
-                              {cell?.activity || ""}
+                              {isContinuation ? "" : (cell?.activity || "")}
                             </button>
                           </PopoverTrigger>
 
