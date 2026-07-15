@@ -1,14 +1,8 @@
-// /api/patients/[id] — detail, update, delete
+// /api/patients/[id]/occupational-profile — get & save occupational profile
+
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  requireProfessional,
-  canViewPatient,
-  canEditPatient,
-  audit,
-  mapPatient,
-  getPatientTimelineMap,
-} from "@/lib/server";
+import { requireProfessional, audit } from "@/lib/server";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -16,35 +10,19 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id } = await params;
 
-  if (!(await canViewPatient(prof, id))) {
-    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
-  }
-
-  const row = await db.patient.findUnique({
-    where: { id },
-    include: {
-      therapists: { select: { id: true, name: true, color: true, role: true } },
-      _count: { select: { visits: true } },
-    },
+  const profile = await db.occupationalProfile.findUnique({
+    where: { patientId: id },
+    include: { goals: { orderBy: { createdAt: "asc" } } },
   });
-  if (!row) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
-  const { lastVisitMap, nextApptMap } = await getPatientTimelineMap([row.id]);
-  await audit(prof.id, "patient.view", "Patient", row.id);
-  return NextResponse.json(
-    mapPatient(row, {
-      lastVisitDate: lastVisitMap.get(row.id) ?? null,
-      nextAppointmentDate: nextApptMap.get(row.id) ?? null,
-    }),
-  );
+
+  await audit(prof.id, "occupational_profile.view", "OccupationalProfile", id);
+
+  return NextResponse.json(profile ?? null);
 }
 
-export async function PATCH(req: NextRequest, { params }: Ctx) {
+export async function PUT(req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id } = await params;
-
-  if (!(await canEditPatient(prof, id))) {
-    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
-  }
 
   let body: any;
   try {
@@ -53,70 +31,49 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
-  // Only admin can change therapist assignments
-  const therapistUpdate =
-    prof.userRole === "admin" && Array.isArray(body.therapistIds)
-      ? { set: body.therapistIds.map((tid: string) => ({ id: tid })) }
-      : undefined;
-
-  // Admin can only edit contact/admin fields, not clinical ones
-  const isAdmin = prof.userRole === "admin";
-
-  const row = await db.patient.update({
-    where: { id },
-    data: {
-      firstName: body.firstName,
-      lastName: body.lastName,
-      birthDate: body.birthDate ? new Date(body.birthDate) : undefined,
-      specialty: body.specialty,
-      status: body.status,
-      phone: body.phone || null,
-      address: body.address || null,
-      startDate: body.startDate ? new Date(body.startDate) : undefined,
-      referentName: body.referentName || null,
-      referentPhone: body.referentPhone || null,
-      therapists: therapistUpdate,
-      // Quick notes (any role can edit)
-      quickNotes: typeof body.quickNotes === "string" ? body.quickNotes : undefined,
-      // Clinical fields — only non-admin can edit
-      ...(isAdmin ? {} : {
-        diagnosis: body.diagnosis || null,
-        objective: body.objective || null,
-        alerts: Array.isArray(body.alerts) ? body.alerts : undefined,
-      }),
-    },
-    include: {
-      therapists: { select: { id: true, name: true } },
-      _count: { select: { visits: true } },
-    },
-  });
-
-  const { lastVisitMap, nextApptMap } = await getPatientTimelineMap([row.id]);
-  await audit(prof.id, "patient.update", "Patient", row.id);
-
-  return NextResponse.json(
-    mapPatient(row, {
-      lastVisitDate: lastVisitMap.get(row.id) ?? null,
-      nextAppointmentDate: nextApptMap.get(row.id) ?? null,
-    }),
-  );
-}
-
-export async function DELETE(_req: NextRequest, { params }: Ctx) {
-  const prof = await requireProfessional();
-  if (prof.userRole !== "admin") {
-    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  // `goals` is a relation, not a scalar column — handled separately below.
+  // Only include scalar fields that were explicitly sent (not undefined),
+  // so partial saves (e.g. from a single section) don't wipe other sections.
+  const { goals, id: _id, patientId: _pid, createdAt: _ca, updatedAt: _ua, ...rawFields } = body;
+  const scalarFields: Record<string, any> = {};
+  for (const [key, value] of Object.entries(rawFields)) {
+    if (value !== undefined) scalarFields[key] = value;
   }
-  const { id } = await params;
 
-  await db.$transaction(async (tx) => {
-    await tx.appointment.deleteMany({ where: { patientId: id } });
-    await tx.assessment.deleteMany({ where: { patientId: id } });
-    await tx.visit.deleteMany({ where: { patientId: id } });
-    await tx.patient.update({ where: { id }, data: { therapists: { set: [] } } });
-    await tx.patient.delete({ where: { id } });
+  const profile = await db.occupationalProfile.upsert({
+    where: { patientId: id },
+    create: {
+      patientId: id,
+      ...scalarFields,
+    },
+    update: {
+      ...scalarFields,
+    },
   });
 
-  await audit(prof.id, "patient.delete", "Patient", id);
-  return NextResponse.json({ ok: true });
+  if (Array.isArray(goals)) {
+    await db.occupationalGoal.deleteMany({ where: { occupationalProfileId: profile.id } });
+    if (goals.length > 0) {
+      await db.occupationalGoal.createMany({
+        data: goals.map((g: any) => ({
+          occupationalProfileId: profile.id,
+          text: g.text ?? "",
+          area: g.area ?? "Cuidado de sí mismo",
+          status: g.status ?? "En curso",
+          startDate: g.startDate ? new Date(g.startDate) : null,
+          targetDate: g.targetDate ? new Date(g.targetDate) : null,
+          evaluation: g.evaluation ?? "",
+        })),
+      });
+    }
+  }
+
+  const withGoals = await db.occupationalProfile.findUnique({
+    where: { id: profile.id },
+    include: { goals: { orderBy: { createdAt: "asc" } } },
+  });
+
+  await audit(prof.id, "occupational_profile.upsert", "OccupationalProfile", profile.id);
+
+  return NextResponse.json(withGoals);
 }
