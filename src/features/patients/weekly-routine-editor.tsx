@@ -684,8 +684,17 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                     const nextCell = slot < 47 ? cellAt(day, slot + 1) : null;
                     const continuesBelow = !!(hasContent && nextCell && nextCell.activity === cell!.activity && nextCell.category === cell!.category && cell!.activity);
 
+                    const isPartOfBlock = isContinuation || continuesBelow;
+                    // For merged blocks: paint the td background directly so there are zero gaps
+                    const tdBg = isPartOfBlock && bg ? bg : undefined;
+                    const btnBg = isPartOfBlock ? "transparent" : bg;
+
                     return (
-                      <td key={day} className={`align-top relative ${isContinuation ? "p-0 px-0.5" : "p-0.5"} ${isFullHour && !isContinuation ? "" : isContinuation ? "" : "border-t border-t-dashed border-border/30"}`}>
+                      <td
+                        key={day}
+                        className={`relative p-0 ${isFullHour && !isContinuation ? "" : isContinuation ? "" : "border-t border-t-dashed border-border/30"}`}
+                        style={{ backgroundColor: tdBg }}
+                      >
                         <Popover
                           open={isOpen && !isDragging && !rangeReady}
                           onOpenChange={(o) => setOpenCell(o ? { day, halfHour: slot } : null)}
@@ -745,26 +754,22 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                 }
                               }}
                               className={`w-full text-left px-1.5 select-none text-xs font-medium ${
-                                isContinuation
-                                  ? "rounded-none border-x border-b-0 border-t-0"
-                                  : continuesBelow
-                                  ? "rounded-t-sm rounded-b-none border border-b-0"
-                                  : "rounded-sm border"
+                                isPartOfBlock ? "rounded-none border-none" : "rounded-sm border border-transparent hover:border-border m-0.5"
                               } ${
-                                isContinuation ? "h-full" : isFullHour ? "h-8" : "h-7"
+                                isFullHour ? "h-8" : "h-7"
                               } ${selected
-                                ? "border-foreground ring-1 ring-foreground/40 ring-offset-0"
-                                : isContinuation || continuesBelow ? "border-transparent" : "border-transparent hover:border-border"
+                                ? "!border-foreground ring-1 ring-foreground/40 ring-offset-0"
+                                : ""
                               } ${hasContent ? "cursor-grab active:cursor-grabbing" : ""} ${isContinuation ? "" : "truncate"}`}
-                              style={{ backgroundColor: bg }}
+                              style={{ backgroundColor: btnBg }}
                               title={cell?.activity || undefined}
                             >
-                              {isContinuation ? "\u00A0" : (cell?.activity || "")}
+                              {isContinuation ? "" : (cell?.activity || "")}
                             </button>
                           </PopoverTrigger>
 
                           {/* Single-cell edit popover */}
-                          <PopoverContent className="w-96 space-y-3" side="right" align="start">
+                          <PopoverContent className="w-[28rem] space-y-3" side="right" align="start">
                             <p className="text-sm font-semibold">{ROUTINE_DAYS_FULL[day]} · {label}</p>
                             <Input placeholder="Actividad…" value={cell?.activity ?? ""}
                               onChange={(e) => setCell(day, slot, { activity: e.target.value })}
@@ -808,7 +813,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                             <PopoverTrigger asChild>
                               <span className="absolute inset-0 pointer-events-none" />
                             </PopoverTrigger>
-                            <PopoverContent className="w-96 space-y-3" side="right" align="start">
+                            <PopoverContent className="w-[28rem] space-y-3" side="right" align="start">
                               <p className="text-sm font-semibold">
                                 {ROUTINE_DAYS_FULL[selection.day]} · {slotLabel(selection.from)} – {slotLabel(selection.to)} ({selection.to - selection.from + 1} franjas)
                               </p>
