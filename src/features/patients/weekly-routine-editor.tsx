@@ -68,6 +68,18 @@ export const ROUTINE_CATEGORY_LABELS: Record<RoutineCategory, string> = {
   "Socialización": "Socialización",
 };
 
+export const ROUTINE_CATEGORY_EXAMPLES: Record<RoutineCategory, string> = {
+  "Cuidado personal (AVDs)": "Ej. vestirse, bañarse, alimentarse, abstinencia",
+  "Movilidad funcional": "Ej. traslado interior, exterior",
+  "Gestión comunitaria": "Ej. transporte, compras, finanzas",
+  "Trabajo remunerado/voluntario": "Ej. encontrar/mantener un empleo, voluntariado",
+  "Manejo del hogar": "Ej. limpieza, lavado de ropa, cocina",
+  "Juego/escuela": "Ej. destreza en el juego, tareas escolares",
+  "Recreación tranquila": "Ej. pasatiempos, manualidades, lectura",
+  "Recreación activa": "Ej. deportes, paseos, viajes",
+  "Socialización": "Ej. visitas, llamadas, fiestas, correspondencia",
+};
+
 export const ROUTINE_DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 export const ROUTINE_DAYS_FULL = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 export const HALF_HOUR_SLOTS = Array.from({ length: 48 }, (_, i) => i);
@@ -673,7 +685,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                     const continuesBelow = !!(hasContent && nextCell && nextCell.activity === cell!.activity && nextCell.category === cell!.category && cell!.activity);
 
                     return (
-                      <td key={day} className={`align-top relative ${isContinuation ? "pt-0 pb-0.5 px-0.5" : "p-0.5"} ${isFullHour && !isContinuation ? "" : isContinuation ? "" : "border-t border-t-dashed border-border/30"}`}>
+                      <td key={day} className={`align-top relative ${isContinuation ? "p-0 px-0.5" : "p-0.5"} ${isFullHour && !isContinuation ? "" : isContinuation ? "" : "border-t border-t-dashed border-border/30"}`}>
                         <Popover
                           open={isOpen && !isDragging && !rangeReady}
                           onOpenChange={(o) => setOpenCell(o ? { day, halfHour: slot } : null)}
@@ -712,7 +724,6 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                 setDragDay(day); setDragStart(slot); setDragEnd(slot); setIsDragging(true);
                               }}
                               onMouseEnter={() => {
-                                // Update ref only during drag — no setState, no re-render
                                 if (!isDragging || day !== dragDayRef.current) return;
                                 dragEndRef.current = slot;
                               }}
@@ -733,18 +744,22 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                   setContextMenu({ x: e.clientX, y: e.clientY, selectedCells: [], pasteTarget: { day, halfHour: slot } });
                                 }
                               }}
-                              className={`w-full text-left px-1.5 truncate select-none text-xs font-medium ${
-                                isContinuation ? "rounded-none border-x border-b-0 border-t-0" : continuesBelow ? "rounded-t-sm rounded-b-none border border-b-0" : "rounded-sm border"
+                              className={`w-full text-left px-1.5 select-none text-xs font-medium ${
+                                isContinuation
+                                  ? "rounded-none border-x border-b-0 border-t-0"
+                                  : continuesBelow
+                                  ? "rounded-t-sm rounded-b-none border border-b-0"
+                                  : "rounded-sm border"
                               } ${
-                                isFullHour ? "h-8" : "h-7"
+                                isContinuation ? "h-full" : isFullHour ? "h-8" : "h-7"
                               } ${selected
                                 ? "border-foreground ring-1 ring-foreground/40 ring-offset-0"
                                 : isContinuation || continuesBelow ? "border-transparent" : "border-transparent hover:border-border"
-                              } ${hasContent ? "cursor-grab active:cursor-grabbing" : ""}`}
+                              } ${hasContent ? "cursor-grab active:cursor-grabbing" : ""} ${isContinuation ? "" : "truncate"}`}
                               style={{ backgroundColor: bg }}
                               title={cell?.activity || undefined}
                             >
-                              {isContinuation ? "" : (cell?.activity || "")}
+                              {isContinuation ? "\u00A0" : (cell?.activity || "")}
                             </button>
                           </PopoverTrigger>
 
@@ -755,11 +770,12 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                               onChange={(e) => setCell(day, slot, { activity: e.target.value })}
                               className="h-9 text-sm" autoFocus />
                             <div>
-                              <p className="text-xs text-muted-foreground mb-1.5 font-medium">Área OTPF</p>
+                              <p className="text-xs text-muted-foreground mb-1.5 font-medium">Categoría</p>
                               <div className="grid grid-cols-3 gap-1.5">
                                 {ROUTINE_CATEGORIES.map((cat) => (
                                   <button key={cat} type="button" onClick={() => setCell(day, slot, { category: cat })}
-                                    className={`h-8 rounded-md text-[11px] border-2 transition-all px-1 leading-tight ${cell?.category === cat ? "border-foreground/50" : "border-transparent"}`}
+                                    title={ROUTINE_CATEGORY_EXAMPLES[cat]}
+                                    className={`min-h-[2.5rem] py-1.5 rounded-md text-[11px] border-2 transition-all px-2 leading-tight ${cell?.category === cat ? "border-foreground/50" : "border-transparent"}`}
                                     style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }}>{cat}</button>
                                 ))}
                               </div>
@@ -801,12 +817,13 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                 className="h-9 text-sm" autoFocus
                                 onKeyDown={(e) => { if (e.key === "Enter") applyRange(); }} />
                               <div>
-                                <p className="text-xs text-muted-foreground mb-1.5 font-medium">Área OTPF</p>
+                                <p className="text-xs text-muted-foreground mb-1.5 font-medium">Categoría</p>
                                 <div className="grid grid-cols-3 gap-1.5">
                                   {ROUTINE_CATEGORIES.map((cat) => (
                                     <button key={cat} type="button"
                                       onClick={() => setRangeDraft((d) => ({ ...d, category: cat, group: OTPF_TO_GROUP[cat] ?? "" }))}
-                                      className={`h-8 rounded-md text-[11px] border-2 transition-all px-1 leading-tight ${rangeDraft.category === cat ? "border-foreground/50" : "border-transparent"}`}
+                                      title={ROUTINE_CATEGORY_EXAMPLES[cat]}
+                                      className={`min-h-[2.5rem] py-1.5 rounded-md text-[11px] border-2 transition-all px-2 leading-tight ${rangeDraft.category === cat ? "border-foreground/50" : "border-transparent"}`}
                                       style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }}>{cat}</button>
                                   ))}
                                 </div>
