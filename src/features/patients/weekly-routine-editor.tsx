@@ -45,15 +45,15 @@ export const OTPF_TO_GROUP: Record<RoutineCategory, BalanceGroup> = {
 };
 
 export const ROUTINE_CATEGORY_COLORS: Record<RoutineCategory, string> = {
-  "Cuidado personal (AVDs)": "#f6c5a0",
-  "Movilidad funcional": "#b8e0b8",
-  "Gestión comunitaria": "#b8d0f0",
-  "Trabajo remunerado/voluntario": "#f0b8b8",
-  "Manejo del hogar": "#f6e4a0",
-  "Juego/escuela": "#d4b8f0",
-  "Recreación tranquila": "#b8f0e4",
-  "Recreación activa": "#f0d4b8",
-  "Socialización": "#f0b8d4",
+  "Cuidado personal (AVDs)": "#F5E6DA",
+  "Movilidad funcional": "#E0EDDF",
+  "Gestión comunitaria": "#DEEAF4",
+  "Trabajo remunerado/voluntario": "#F2DEDE",
+  "Manejo del hogar": "#F0EBDA",
+  "Juego/escuela": "#E8E0F0",
+  "Recreación tranquila": "#DAEEE8",
+  "Recreación activa": "#F0E4DA",
+  "Socialización": "#F0DAE6",
 };
 
 export const ROUTINE_CATEGORY_LABELS: Record<RoutineCategory, string> = {
@@ -671,7 +671,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                   </td>
                   {ROUTINE_DAYS.map((_, day) => {
                     const cell = cellAt(day, slot);
-                    const bg = cell?.category ? (BALANCE_GROUP_COLORS[(cell.group as BalanceGroup) || OTPF_TO_GROUP[cell.category]] ?? ROUTINE_CATEGORY_COLORS[cell.category]) : undefined;
+                    const bg = cell?.category ? ROUTINE_CATEGORY_COLORS[cell.category] : undefined;
                     const isOpen = openCell?.day === day && openCell?.halfHour === slot;
                     const selected = isCellSelected(day, slot);
                     const isRangeAnchor = rangeReady && selection && day === selection.day && slot === selection.to;
