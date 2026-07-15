@@ -32,7 +32,7 @@ export const BALANCE_GROUP_REFERENCE: Record<BalanceGroup, number> = {
   Autocuidado: 46, Productividad: 33, Ocio: 20,
 };
 
-export const OTPF_TO_GROUP: Record<RoutineCategory, BalanceGroup> = {
+export const OTPF_TO_GROUP: Record<RoutineCategory | string, BalanceGroup> = {
   "Cuidado personal (AVDs)": "Autocuidado",
   "Movilidad funcional": "Autocuidado",
   "Gestión comunitaria": "Autocuidado",
@@ -42,18 +42,28 @@ export const OTPF_TO_GROUP: Record<RoutineCategory, BalanceGroup> = {
   "Recreación tranquila": "Ocio",
   "Recreación activa": "Ocio",
   "Socialización": "Ocio",
+  // Legacy category names (data saved before category rename)
+  "AVD": "Autocuidado",
+  "AIVD": "Productividad",
+  "Gestión de la Salud": "Autocuidado",
+  "Descanso y Sueño": "Autocuidado",
+  "Educación": "Productividad",
+  "Trabajo": "Productividad",
+  "Juego": "Ocio",
+  "Ocio / Tiempo Libre": "Ocio",
+  "Participación Social": "Productividad",
 };
 
 export const ROUTINE_CATEGORY_COLORS: Record<RoutineCategory, string> = {
-  "Cuidado personal (AVDs)": "#F5E6DA",
-  "Movilidad funcional": "#E0EDDF",
-  "Gestión comunitaria": "#DEEAF4",
-  "Trabajo remunerado/voluntario": "#F2DEDE",
-  "Manejo del hogar": "#F0EBDA",
-  "Juego/escuela": "#E8E0F0",
-  "Recreación tranquila": "#DAEEE8",
-  "Recreación activa": "#F0E4DA",
-  "Socialización": "#F0DAE6",
+  "Cuidado personal (AVDs)": "#EAC9A8",
+  "Movilidad funcional": "#B9D9B0",
+  "Gestión comunitaria": "#AECBEA",
+  "Trabajo remunerado/voluntario": "#E5B3B3",
+  "Manejo del hogar": "#E8D89A",
+  "Juego/escuela": "#C9B7E0",
+  "Recreación tranquila": "#A9DBCE",
+  "Recreación activa": "#E8C49A",
+  "Socialización": "#E3AECB",
 };
 
 export const ROUTINE_CATEGORY_LABELS: Record<RoutineCategory, string> = {
@@ -66,6 +76,13 @@ export const ROUTINE_CATEGORY_LABELS: Record<RoutineCategory, string> = {
   "Recreación tranquila": "Recreación tranquila",
   "Recreación activa": "Recreación activa",
   "Socialización": "Socialización",
+};
+
+// Legacy colors for cells saved with old category names
+export const LEGACY_CATEGORY_COLORS: Record<string, string> = {
+  "AVD": "#F5E6DA", "AIVD": "#F0EBDA", "Gestión de la Salud": "#E0EDDF",
+  "Descanso y Sueño": "#DEEAF4", "Educación": "#E8E0F0", "Trabajo": "#F2DEDE",
+  "Juego": "#F0E4DA", "Ocio / Tiempo Libre": "#DAEEE8", "Participación Social": "#F0DAE6",
 };
 
 export const ROUTINE_CATEGORY_EXAMPLES: Record<RoutineCategory, string> = {
@@ -191,7 +208,7 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = f
       const x = MARGIN + COL_TIME + day * COL_DAY;
       const cell = empty ? null : cells.find((c) => c.day === day && c.halfHour === slot);
       if (cell?.category) {
-        const hex = ROUTINE_CATEGORY_COLORS[cell.category as RoutineCategory];
+        const hex = ROUTINE_CATEGORY_COLORS[cell.category as RoutineCategory] ?? LEGACY_CATEGORY_COLORS[cell.category] ?? "#e5e5e5";
         const r = parseInt(hex.slice(1, 3), 16) / 255;
         const g = parseInt(hex.slice(3, 5), 16) / 255;
         const b = parseInt(hex.slice(5, 7), 16) / 255;
@@ -250,10 +267,12 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = f
       hours: groupCounts[grp] * 0.5,
     }));
 
-    // ── Calculate OTPF data ──────────────────────────────────────────────────
-    const otpfSlices = ROUTINE_CATEGORIES.map((cat) => {
+    // ── Calculate OTPF data (dynamic: covers both new and legacy category names) ──
+    const presentCats = Array.from(new Set(filled.map((c) => c.category).filter(Boolean))) as string[];
+    const otpfSlices = presentCats.map((cat) => {
       const slots = filled.filter((c) => c.category === cat).length;
-      return { cat, hex: ROUTINE_CATEGORY_COLORS[cat], pct: totalSlots > 0 ? (slots / totalSlots) * 100 : 0, hours: slots * 0.5 };
+      const hex = ROUTINE_CATEGORY_COLORS[cat as RoutineCategory] ?? LEGACY_CATEGORY_COLORS[cat] ?? "#e5e5e5";
+      return { cat, hex, pct: totalSlots > 0 ? (slots / totalSlots) * 100 : 0, hours: slots * 0.5 };
     }).filter((s) => s.hours > 0);
 
     // ── Donut chart 1: 3 groups (left side) ─────────────────────────────────
@@ -671,7 +690,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                   </td>
                   {ROUTINE_DAYS.map((_, day) => {
                     const cell = cellAt(day, slot);
-                    const bg = cell?.category ? ROUTINE_CATEGORY_COLORS[cell.category] : undefined;
+                    const bg = cell?.category ? (ROUTINE_CATEGORY_COLORS[cell.category as RoutineCategory] ?? LEGACY_CATEGORY_COLORS[cell.category] ?? "#f0f0f0") : undefined;
                     const isOpen = openCell?.day === day && openCell?.halfHour === slot;
                     const selected = isCellSelected(day, slot);
                     const isRangeAnchor = rangeReady && selection && day === selection.day && slot === selection.to;

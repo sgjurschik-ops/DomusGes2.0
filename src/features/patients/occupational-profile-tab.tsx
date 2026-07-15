@@ -28,9 +28,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-  ROUTINE_CATEGORIES,
   ROUTINE_CATEGORY_COLORS,
   ROUTINE_CATEGORY_LABELS,
+  LEGACY_CATEGORY_COLORS,
   BALANCE_GROUPS,
   BALANCE_GROUP_COLORS,
   BALANCE_GROUP_REFERENCE,
@@ -1018,9 +1018,12 @@ function OccupationalBalanceCharts({ cells }: { cells: RoutineCell[] }) {
 
   const totalHours = totalSlots * 0.5;
 
-  const otpfData = ROUTINE_CATEGORIES.map((cat) => {
+  const presentCats = Array.from(new Set(filled.map((c) => c.category).filter(Boolean))) as string[];
+  const otpfData = presentCats.map((cat) => {
     const slots = filled.filter((c) => c.category === cat).length;
-    return { name: cat, label: ROUTINE_CATEGORY_LABELS[cat], hours: slots * 0.5, pct: ((slots / totalSlots) * 100).toFixed(1), fill: ROUTINE_CATEGORY_COLORS[cat] };
+    const fill = ROUTINE_CATEGORY_COLORS[cat as RoutineCategory] ?? LEGACY_CATEGORY_COLORS[cat] ?? "#e5e5e5";
+    const label = ROUTINE_CATEGORY_LABELS[cat as RoutineCategory] ?? cat;
+    return { name: cat, label, hours: slots * 0.5, pct: ((slots / totalSlots) * 100).toFixed(1), fill };
   }).filter((d) => d.hours > 0);
 
   const groupCounts: Record<BalanceGroup, number> = { Autocuidado: 0, Productividad: 0, Ocio: 0 };

@@ -18,6 +18,10 @@ const OTPF_TO_GROUP: Record<string, string> = {
   "Recreación tranquila": "Ocio",
   "Recreación activa": "Ocio",
   "Socialización": "Ocio",
+  // Legacy
+  "AVD": "Autocuidado", "AIVD": "Productividad", "Gestión de la Salud": "Autocuidado",
+  "Descanso y Sueño": "Autocuidado", "Educación": "Productividad", "Trabajo": "Productividad",
+  "Juego": "Ocio", "Ocio / Tiempo Libre": "Ocio", "Participación Social": "Productividad",
 };
 
 const OTPF_COLORS: Record<string, string> = {
