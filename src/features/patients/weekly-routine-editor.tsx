@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
-import { X, Save, Trash2, CalendarDays, Printer, User, Briefcase, Smile } from "lucide-react";
+import { X, Save, Trash2, CalendarDays, Printer, User, Briefcase, Smile, Plus } from "lucide-react";
 import {
   useRoutineRecords,
   useRoutineRecord,
@@ -377,6 +377,17 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   const records = useRoutineRecords(patientId);
   const saveRecord = useSaveRoutineRecord(patientId);
   const deleteRecord = useDeleteRoutineRecord(patientId);
+
+  // Auto-load the most recent saved record on first open
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  useEffect(() => {
+    if (initialLoaded || !records.data) return;
+    if (records.data.length > 0) {
+      setDate(records.data[0].date);
+    }
+    setInitialLoaded(true);
+  }, [records.data, initialLoaded]);
+
   const existingRecord = records.data?.find((r) => r.date === date);
   const recordDetail = useRoutineRecord(patientId, existingRecord?.id ?? null);
 
@@ -392,12 +403,16 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
     loadRecord(recordDetail.data ?? (existingRecord ? undefined : null));
   }, [recordDetail.data, existingRecord, loadRecord]);
 
-  // ─── Range-select state ───────────────────────────────────────────────────────
-  // dragDay/dragStart/dragEnd drive the visual highlight. To avoid re-rendering
-  // all 336 cells on every mouseenter during a drag, we track the live drag
-  // position in refs and only flush to state on mouseup (which triggers one
-  // single re-render instead of one per cell the mouse passes over).
-  const [dragDay, setDragDay] = useState<number | null>(null);
+  function createNewRecord() {
+    setDate(today);
+    setCells([]);
+    setNotes("");
+    setIsDirty(false);
+  }
+
+  // ─── Range-select state (rectangular, multi-day) ─────────────────────────────
+  const [dragDayStart, setDragDayStart] = useState<number | null>(null);
+  const [dragDayEnd, setDragDayEnd] = useState<number | null>(null);
   const [dragStart, setDragStart] = useState<number | null>(null);
   const [dragEnd, setDragEnd] = useState<number | null>(null);
   const dragDayRef = useRef<number | null>(null);
@@ -405,14 +420,15 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  // Live drag preview: poll refs during drag to update a visual-only state
   const [liveDragEnd, setLiveDragEnd] = useState<number | null>(null);
+  const [liveDragDay, setLiveDragDay] = useState<number | null>(null);
   const rafRef = useRef<number>(0);
 
   useEffect(() => {
-    if (!isDragging) { setLiveDragEnd(null); return; }
+    if (!isDragging) { setLiveDragEnd(null); setLiveDragDay(null); return; }
     function poll() {
       setLiveDragEnd(dragEndRef.current);
+      setLiveDragDay(dragDayRef.current);
       rafRef.current = requestAnimationFrame(poll);
     }
     rafRef.current = requestAnimationFrame(poll);
@@ -424,36 +440,47 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   // ─── Context menu state ───────────────────────────────────────────────────────
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
-  const selection = dragDay !== null && dragStart !== null && dragEnd !== null
-    ? { day: dragDay, from: Math.min(dragStart, dragEnd), to: Math.max(dragStart, dragEnd) }
+  const selection = dragDayStart !== null && dragDayEnd !== null && dragStart !== null && dragEnd !== null
+    ? {
+        dayFrom: Math.min(dragDayStart, dragDayEnd),
+        dayTo: Math.max(dragDayStart, dragDayEnd),
+        from: Math.min(dragStart, dragEnd),
+        to: Math.max(dragStart, dragEnd),
+      }
     : null;
-  const rangeReady = !isDragging && selection !== null && selection.from !== selection.to;
+  const rangeReady = !isDragging && selection !== null && (selection.from !== selection.to || selection.dayFrom !== selection.dayTo);
 
-  // Cells in current selection
+  // Cells in current selection (rectangular)
   const selectedCells = selection
-    ? Array.from({ length: selection.to - selection.from + 1 }, (_, i) => ({
-        day: selection.day, halfHour: selection.from + i,
-      }))
+    ? (() => {
+        const cells: { day: number; halfHour: number }[] = [];
+        for (let d = selection.dayFrom; d <= selection.dayTo; d++) {
+          for (let s = selection.from; s <= selection.to; s++) {
+            cells.push({ day: d, halfHour: s });
+          }
+        }
+        return cells;
+      })()
     : [];
 
   useEffect(() => {
     if (!isDragging) return;
     function onUp() {
-      // Flush ref values to state once on mouseup instead of on every mouseenter
       const finalEnd = dragEndRef.current;
       const finalDay = dragDayRef.current;
       setIsDragging(false);
       if (finalDay !== null && finalEnd !== null) {
-        setDragDay(finalDay);
+        setDragDayEnd(finalDay);
         setDragEnd(finalEnd);
       }
-      if (dragStart === dragEndRef.current) {
-        setDragDay(null); setDragStart(null); setDragEnd(null);
+      // If single cell click (no drag distance), clear selection
+      if (dragStart === dragEndRef.current && dragDayStart === dragDayRef.current) {
+        setDragDayStart(null); setDragDayEnd(null); setDragStart(null); setDragEnd(null);
       }
     }
     document.addEventListener("mouseup", onUp);
     return () => document.removeEventListener("mouseup", onUp);
-  }, [isDragging, dragStart]);
+  }, [isDragging, dragStart, dragDayStart]);
 
   // Close context menu on click outside
   useEffect(() => {
@@ -468,15 +495,44 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   }
 
   function isCellSelected(day: number, halfHour: number) {
-    // Committed selection (after mouseup)
-    if (selection && day === selection.day && halfHour >= selection.from && halfHour <= selection.to) return true;
-    // Live drag preview (during drag)
-    if (isDragging && dragDayRef.current === day && dragStart !== null && liveDragEnd !== null) {
-      const from = Math.min(dragStart, liveDragEnd);
-      const to = Math.max(dragStart, liveDragEnd);
-      return halfHour >= from && halfHour <= to;
+    // Committed selection
+    if (selection && day >= selection.dayFrom && day <= selection.dayTo && halfHour >= selection.from && halfHour <= selection.to) return true;
+    // Live drag preview
+    if (isDragging && dragDayStart !== null && dragStart !== null && liveDragEnd !== null && liveDragDay !== null) {
+      const dFrom = Math.min(dragDayStart, liveDragDay);
+      const dTo = Math.max(dragDayStart, liveDragDay);
+      const sFrom = Math.min(dragStart, liveDragEnd);
+      const sTo = Math.max(dragStart, liveDragEnd);
+      return day >= dFrom && day <= dTo && halfHour >= sFrom && halfHour <= sTo;
     }
     return false;
+  }
+
+  // Helper: find the extent of a merged block starting at (day, slot)
+  function getBlockInfo(day: number, slot: number): { startSlot: number; endSlot: number; hours: string; range: string } | null {
+    const cell = cellAt(day, slot);
+    if (!cell?.activity) return null;
+    // Find the start of the block (walk up)
+    let start = slot;
+    while (start > 0) {
+      const prev = cellAt(day, start - 1);
+      if (prev?.activity === cell.activity && prev?.category === cell.category) start--;
+      else break;
+    }
+    // Find the end (walk down)
+    let end = slot;
+    while (end < 47) {
+      const next = cellAt(day, end + 1);
+      if (next?.activity === cell.activity && next?.category === cell.category) end++;
+      else break;
+    }
+    const count = end - start + 1;
+    const totalMin = count * 30;
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    const hours = h > 0 && m > 0 ? `${h}h ${m}min` : h > 0 ? `${h}h` : `${m}min`;
+    const range = `${slotLabel(start)}-${slotLabel(end + 1 <= 47 ? end + 1 : 47)}`;
+    return { startSlot: start, endSlot: end, hours, range };
   }
 
   function setCell(day: number, halfHour: number, patch: Partial<RoutineCell>) {
@@ -492,18 +548,23 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
 
   function applyRange() {
     if (!selection) return;
-    const slots: number[] = [];
-    for (let s = selection.from; s <= selection.to; s++) slots.push(s);
-    const withoutRange = cells.filter((c) => !(c.day === selection.day && slots.includes(c.halfHour)));
+    const keys = new Set<string>();
+    const filled: RoutineCell[] = [];
     const autoGroup: BalanceGroup | "" = rangeDraft.category ? (OTPF_TO_GROUP[rangeDraft.category] ?? "") : "";
-    const filled = slots.map((s) => ({ day: selection.day, halfHour: s, activity: rangeDraft.activity.trim(), category: rangeDraft.category, group: autoGroup }));
+    for (let d = selection.dayFrom; d <= selection.dayTo; d++) {
+      for (let s = selection.from; s <= selection.to; s++) {
+        keys.add(`${d}-${s}`);
+        filled.push({ day: d, halfHour: s, activity: rangeDraft.activity.trim(), category: rangeDraft.category, group: autoGroup });
+      }
+    }
+    const withoutRange = cells.filter((c) => !keys.has(`${c.day}-${c.halfHour}`));
     setCells([...withoutRange, ...filled]);
     setIsDirty(true);
-    setDragDay(null); setDragStart(null); setDragEnd(null);
+    clearSelection();
     setRangeDraft({ activity: "", category: "", group: "" });
   }
 
-  function clearSelection() { setDragDay(null); setDragStart(null); setDragEnd(null); }
+  function clearSelection() { setDragDayStart(null); setDragDayEnd(null); setDragStart(null); setDragEnd(null); }
 
   // ─── Move block of selected cells ────────────────────────────────────────────
   // When dragging a selected cell, all selected cells move together.
@@ -659,6 +720,9 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
               {records.data?.map((r) => <option key={r.id} value={r.id}>{r.date}</option>)}
             </select>
           )}
+          <Button variant="outline" size="sm" onClick={createNewRecord}>
+            <Plus className="w-3.5 h-3.5 mr-1.5" />Crear nuevo
+          </Button>
           <Button variant="outline" size="sm" onClick={() => handlePrint(true)} disabled={printing}>
             <Printer className="w-3.5 h-3.5 mr-1.5" />PDF vacío
           </Button>
@@ -731,7 +795,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                     const bg = cell?.category ? (ROUTINE_CATEGORY_COLORS[cell.category as RoutineCategory] ?? LEGACY_CATEGORY_COLORS[cell.category] ?? "#f0f0f0") : undefined;
                     const isOpen = openCell?.day === day && openCell?.halfHour === slot;
                     const selected = isCellSelected(day, slot);
-                    const isRangeAnchor = rangeReady && selection && day === selection.day && slot === selection.to;
+                    const isRangeAnchor = rangeReady && selection && day === selection.dayTo && slot === selection.to;
                     const hasContent = !!(cell?.activity || cell?.category);
 
                     // Cell merging: hide activity label if the cell above has the exact same activity+category
@@ -797,10 +861,12 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                 setOpenCell(null);
                                 dragDayRef.current = day;
                                 dragEndRef.current = slot;
-                                setDragDay(day); setDragStart(slot); setDragEnd(slot); setIsDragging(true);
+                                setDragDayStart(day); setDragDayEnd(day);
+                                setDragStart(slot); setDragEnd(slot); setIsDragging(true);
                               }}
                               onMouseEnter={() => {
-                                if (!isDragging || day !== dragDayRef.current) return;
+                                if (!isDragging) return;
+                                dragDayRef.current = day;
                                 dragEndRef.current = slot;
                               }}
                               onClick={(e) => {
@@ -839,15 +905,11 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                               onContextMenu={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                const currentSelection = selection
-                                  ? Array.from({ length: selection.to - selection.from + 1 }, (_, i) => ({
-                                      day: selection.day, halfHour: selection.from + i,
-                                    }))
-                                  : [];
+                                const currentSelection = selection ? selectedCells : [];
                                 if (selected && currentSelection.length > 1) {
                                   setContextMenu({ x: e.clientX, y: e.clientY, selectedCells: currentSelection });
                                 } else if (hasContent) {
-                                  setDragDay(day); setDragStart(slot); setDragEnd(slot);
+                                  setDragDayStart(day); setDragDayEnd(day); setDragStart(slot); setDragEnd(slot);
                                   setContextMenu({ x: e.clientX, y: e.clientY, selectedCells: [{ day, halfHour: slot }] });
                                 } else if (clipboardCount > 0) {
                                   setContextMenu({ x: e.clientX, y: e.clientY, selectedCells: [], pasteTarget: { day, halfHour: slot } });
@@ -863,8 +925,16 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                             >
                               {!isContinuation && (cell?.activity || GroupIcon) ? (
                                 <span className="flex items-center gap-1 min-w-0">
-                                  {GroupIcon && <GroupIcon className="w-3 h-3 shrink-0 opacity-70" />}
-                                  <span className="truncate">{cell?.activity || ""}</span>
+                                  {GroupIcon && <GroupIcon className="w-3 h-3 shrink-0 opacity-60" />}
+                                  <span className="truncate">
+                                    {cell?.activity || ""}
+                                    {(() => {
+                                      const info = cell?.activity ? getBlockInfo(day, slot) : null;
+                                      return info && info.endSlot > info.startSlot ? (
+                                        <span className="text-[9px] italic opacity-60 ml-1">({info.range} / {info.hours})</span>
+                                      ) : null;
+                                    })()}
+                                  </span>
                                 </span>
                               ) : null}
                             </button>
@@ -922,7 +992,10 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                             </PopoverTrigger>
                             <PopoverContent className="w-[28rem] space-y-3" side="right" align="start">
                               <p className="text-sm font-semibold">
-                                {ROUTINE_DAYS_FULL[selection.day]} · {slotLabel(selection.from)} – {slotLabel(selection.to)} ({selection.to - selection.from + 1} franjas)
+                                {selection.dayFrom === selection.dayTo
+                                  ? `${ROUTINE_DAYS_FULL[selection.dayFrom]} · ${slotLabel(selection.from)} – ${slotLabel(selection.to)} (${selection.to - selection.from + 1} franjas)`
+                                  : `${ROUTINE_DAYS[selection.dayFrom]} a ${ROUTINE_DAYS[selection.dayTo]} · ${slotLabel(selection.from)} – ${slotLabel(selection.to)} (${selectedCells.length} celdas)`
+                                }
                               </p>
                               <Input placeholder="Actividad…" value={rangeDraft.activity}
                                 onChange={(e) => setRangeDraft((d) => ({ ...d, activity: e.target.value }))}
