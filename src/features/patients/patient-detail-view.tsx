@@ -101,35 +101,35 @@ export function PatientDetailView() {
       {/* Header card */}
       <Card>
         <CardContent className="p-5">
-          <div className="flex gap-5">
+          <div className="flex gap-0">
             {/* Left: patient info */}
-            <div className="flex-1 min-w-0 space-y-3">
+            <div className="flex-1 min-w-0 space-y-2.5">
               {/* Row 1: Identity */}
               <div className="flex items-center gap-3">
-                <Avatar name={patient.fullName} color={patient.color} size={44} />
+                <Avatar name={patient.fullName} color={patient.color} size={40} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-lg font-bold">{patient.fullName}</h2>
+                    <h2 className="text-lg font-bold leading-tight">{patient.fullName}</h2>
                     <SpecialtyBadge specialty={patient.specialty} />
                     <StatusBadge status={patient.status} />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
                     {patient.age} años · {patient.totalVisits} seguimientos · Inicio {formatDate(patient.startDate)}
                   </p>
                 </div>
               </div>
 
-              {/* Row 2: Actions + alerts */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button size="sm" onClick={() => { useNav.getState().setNewVisitPatient(patient.id); navigate("new-visit"); }} disabled={!professionals?.length}>
-                  <Plus className="w-4 h-4 mr-1.5" />Registrar seguimiento
+              {/* Row 2: Actions + alerts — smaller buttons */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Button size="sm" className="h-7 text-xs px-2.5" onClick={() => { useNav.getState().setNewVisitPatient(patient.id); navigate("new-visit"); }} disabled={!professionals?.length}>
+                  <Plus className="w-3.5 h-3.5 mr-1" />Registrar seguimiento
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setReportDialogOpen(true)}>
-                  <FileDown className="w-4 h-4 mr-1.5" />Generar informe
+                <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" onClick={() => setReportDialogOpen(true)}>
+                  <FileDown className="w-3.5 h-3.5 mr-1" />Generar informe
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Más acciones"><MoreVertical className="w-4 h-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Más acciones"><MoreVertical className="w-3.5 h-3.5" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => navigate("edit-patient")}><Pencil className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
@@ -138,9 +138,9 @@ export function PatientDetailView() {
                 </DropdownMenu>
                 {(patient.alerts ?? []).length > 0 && (
                   <>
-                    <span className="w-px h-5 bg-border mx-1" />
+                    <span className="w-px h-4 bg-border mx-0.5" />
                     {(patient.alerts ?? []).map((alert) => (
-                      <span key={alert} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: "var(--chip-orange-bg)", color: "var(--chip-orange-text)" }}>
+                      <span key={alert} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium" style={{ backgroundColor: "var(--chip-orange-bg)", color: "var(--chip-orange-text)" }}>
                         <AlertTriangle className="w-3 h-3" />{alert}
                       </span>
                     ))}
@@ -149,43 +149,62 @@ export function PatientDetailView() {
               </div>
 
               {/* Row 3: Clinical info */}
-              <div className="rounded-md bg-accent/40 px-3 py-2 space-y-1">
-                <InfoRow icon={Stethoscope} label="Diagnóstico / motivo de derivación" value={patient.diagnosis ?? "—"} />
-                <InfoRow icon={Target} label="Objetivo terapéutico" value={patient.objective ?? "—"} />
+              <div className="rounded-md bg-accent/40 px-3 py-2 space-y-0.5">
+                <div className="flex items-start gap-2">
+                  <Stethoscope className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <p className="text-xs"><span className="text-muted-foreground">Diagnóstico: </span><span className="font-medium">{patient.diagnosis ?? "—"}</span></p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Target className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <p className="text-xs"><span className="text-muted-foreground">Objetivo: </span><span className="font-medium">{patient.objective ?? "—"}</span></p>
+                </div>
               </div>
 
-              {/* Row 4: Contact & scheduling */}
-              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-                <InfoRow icon={Phone} label="Teléfono" value={patient.phone ?? "—"} />
-                <InfoRow icon={MapPin} label="Dirección" value={patient.address ?? "—"} />
-                <InfoRow icon={User2} label="Referente" value={patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"} />
-                <div className="flex items-start gap-2">
-                  <Calendar className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                  <div className="min-w-0">
-                    <span className="text-xs text-muted-foreground">Próxima cita: </span>
-                    {patient.nextAppointmentDate ? (
-                      <button type="button" onClick={() => navigate("calendar")} className="text-sm text-primary hover:underline font-medium">
-                        {formatDateTime(patient.nextAppointmentDate)}
-                      </button>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">Sin cita</span>
-                    )}
-                  </div>
+              {/* Row 4: Contact & scheduling — smaller text */}
+              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Teléfono:</span>
+                  <span className="font-medium">{patient.phone ?? "—"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Dirección:</span>
+                  <span className="font-medium">{patient.address ?? "—"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <User2 className="w-3 h-3 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Referente:</span>
+                  <span className="font-medium">{patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-3 h-3 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Próxima cita:</span>
+                  {patient.nextAppointmentDate ? (
+                    <button type="button" onClick={() => navigate("calendar")} className="text-xs text-primary hover:underline font-medium">
+                      {formatDateTime(patient.nextAppointmentDate)}
+                    </button>
+                  ) : (
+                    <span className="font-medium">Sin cita</span>
+                  )}
                 </div>
               </div>
 
               {/* Row 5: Therapists */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-muted-foreground">Terapeutas:</span>
+                <span className="text-[11px] text-muted-foreground">Terapeutas:</span>
                 {patient.therapistNames.length === 0 ? (
-                  <span className="text-xs text-muted-foreground italic">Sin asignar</span>
+                  <span className="text-[11px] text-muted-foreground italic">Sin asignar</span>
                 ) : (
-                  patient.therapistNames.map((n) => (<Badge key={n} variant="secondary" className="text-xs">{n}</Badge>))
+                  patient.therapistNames.map((n) => (<Badge key={n} variant="secondary" className="text-[11px] py-0">{n}</Badge>))
                 )}
               </div>
             </div>
 
-            {/* Right: sticky notes */}
+            {/* Divider */}
+            <div className="w-px bg-border mx-4 self-stretch hidden lg:block" />
+
+            {/* Right: sticky notes — separated block */}
             <QuickNotes patientId={patient.id} initial={patient.quickNotes} />
           </div>
         </CardContent>
