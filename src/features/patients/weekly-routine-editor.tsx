@@ -214,6 +214,8 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = f
     ROUTINE_DAYS.forEach((_, day) => {
       const x = MARGIN + COL_TIME + day * COL_DAY;
       const cell = empty ? null : cells.find((c) => c.day === day && c.halfHour === slot);
+      const prevCell = !empty && slot > 0 ? cells.find((c) => c.day === day && c.halfHour === slot - 1) : null;
+      const isContinuation = !!(cell?.activity && prevCell?.activity === cell.activity && prevCell?.category === cell.category);
       if (cell?.category) {
         const hex = ROUTINE_CATEGORY_COLORS[cell.category as RoutineCategory] ?? LEGACY_CATEGORY_COLORS[cell.category] ?? "#e5e5e5";
         const r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -221,16 +223,19 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = f
         const b = parseInt(hex.slice(5, 7), 16) / 255;
         page.drawRectangle({ x: x + 0.5, y: y + 0.5, width: COL_DAY - 1, height: ROW_H - 1, color: rgb(r, g, b) });
       }
-      if (cell?.activity) {
-        const prevCell = !empty && slot > 0 ? cells.find((c) => c.day === day && c.halfHour === slot - 1) : null;
-        const isContinuation = !!(prevCell?.activity === cell.activity && prevCell?.category === cell.category);
-        if (!isContinuation) {
-          const maxChars = Math.floor((COL_DAY - 4) / 2.6);
-          const text = cell.activity.length > maxChars ? cell.activity.slice(0, maxChars - 1) + "…" : cell.activity;
-          page.drawText(text, { x: x + 2, y: y + ROW_H / 2 - 3, size: 5.5, font, color: rgb(0.1, 0.1, 0.1) });
-        }
+      if (cell?.activity && !isContinuation) {
+        const maxChars = Math.floor((COL_DAY - 4) / 2.6);
+        const text = cell.activity.length > maxChars ? cell.activity.slice(0, maxChars - 1) + "…" : cell.activity;
+        page.drawText(text, { x: x + 2, y: y + ROW_H / 2 - 3, size: 5.5, font, color: rgb(0.1, 0.1, 0.1) });
       }
-      page.drawLine({ start: { x, y }, end: { x: x + COL_DAY, y }, thickness: 0.2, color: rgb(0.8, 0.8, 0.8) });
+      // Skip the divider line inside a merged block so the color reads as one continuous bar
+      if (!isContinuation) {
+        page.drawLine({
+          start: { x, y }, end: { x: x + COL_DAY, y },
+          thickness: isFullHour ? 0.4 : 0.15,
+          color: isFullHour ? rgb(0.75, 0.75, 0.75) : rgb(0.88, 0.88, 0.88),
+        });
+      }
       page.drawLine({ start: { x, y }, end: { x, y: y + ROW_H }, thickness: isFullHour ? 0.5 : 0.2, color: rgb(0.7, 0.7, 0.7) });
     });
   });
@@ -255,13 +260,14 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = f
   }
 
   if (!empty && cells.length > 0) {
-    const page2 = pdfDoc.addPage([595.28, 841.89]);
-    const H2 = 841.89;
+    const W2 = 841.89; const H2 = 595.28;
+    const page2 = pdfDoc.addPage([W2, H2]);
+    const M2 = 40;
 
     page2.drawText("Análisis de equilibrio ocupacional", {
-      x: MARGIN, y: H2 - MARGIN - 14, size: 14, font: fontBold, color: rgb(0.1, 0.36, 0.34),
+      x: M2, y: H2 - M2 - 14, size: 14, font: fontBold, color: rgb(0.1, 0.36, 0.34),
     });
-    if (date) page2.drawText(`Fecha: ${date}`, { x: MARGIN, y: H2 - MARGIN - 30, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
+    if (date) page2.drawText(`Fecha: ${date}`, { x: M2, y: H2 - M2 - 30, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
 
     const filled = cells.filter((c) => c.category);
     const totalSlots = filled.length;
@@ -287,56 +293,42 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = f
       return { cat, hex, pct: totalSlots > 0 ? (slots / totalSlots) * 100 : 0, hours: slots * 0.5 };
     }).filter((s) => s.hours > 0);
 
-    // ── Donut chart 1: 3 groups (left side) ─────────────────────────────────
-    const chart1CX = MARGIN + 75;
-    const chart1CY = H2 - MARGIN - 100;
-    drawDonut(page2, chart1CX, chart1CY, 65, 35, groupSlices.map((s) => ({ pct: s.pct, hex: s.hex })), rgb);
+    // Two side-by-side columns, each with its own donut + single-column legend below the header.
+    const colWidth = (W2 - M2 * 2 - 40) / 2;
+    const col1X = M2;
+    const col2X = M2 + colWidth + 40;
+    const sectionTop = H2 - M2 - 70; // generous gap below the title/date so nothing overlaps
 
-    page2.drawText("3 Grupos de equilibrio", {
-      x: chart1CX - 55, y: chart1CY + 75, size: 9, font: fontBold, color: rgb(0.2, 0.2, 0.2),
-    });
+    function drawChartColumn(colX: number, heading: string, donutCX: number, slices: { pct: number; hex: string }[], legendLines: { hex: string; text: string }[], totalLabel: string) {
+      page2.drawText(heading, { x: colX, y: sectionTop, size: 10, font: fontBold, color: rgb(0.2, 0.2, 0.2) });
+      const donutCY = sectionTop - 90;
+      drawDonut(page2, donutCX, donutCY, 60, 32, slices, rgb);
 
-    // Legend for chart 1
-    let ly1 = chart1CY - 75;
-    groupSlices.forEach((s) => {
-      const r = parseInt(s.hex.slice(1, 3), 16) / 255;
-      const g = parseInt(s.hex.slice(3, 5), 16) / 255;
-      const b = parseInt(s.hex.slice(5, 7), 16) / 255;
-      page2.drawRectangle({ x: chart1CX - 55, y: ly1, width: 10, height: 10, color: rgb(r, g, b) });
-      page2.drawText(`${s.grp}: ${s.hours.toFixed(1)}h (${s.pct.toFixed(1)}%)  Ref: ~${BALANCE_GROUP_REFERENCE[s.grp]}%`, {
-        x: chart1CX - 42, y: ly1 + 1, size: 8, font, color: rgb(0.2, 0.2, 0.2),
-      });
-      ly1 -= 16;
-    });
-    page2.drawText(`Total: ${totalHours.toFixed(1)}h`, {
-      x: chart1CX - 55, y: ly1 - 4, size: 8, font: fontBold, color: rgb(0.2, 0.2, 0.2),
-    });
+      let ly = donutCY - 90;
+      for (const line of legendLines) {
+        const r = parseInt(line.hex.slice(1, 3), 16) / 255;
+        const g = parseInt(line.hex.slice(3, 5), 16) / 255;
+        const b = parseInt(line.hex.slice(5, 7), 16) / 255;
+        page2.drawRectangle({ x: colX, y: ly, width: 9, height: 9, color: rgb(r, g, b) });
+        page2.drawText(line.text, { x: colX + 13, y: ly + 1, size: 8, font, color: rgb(0.25, 0.25, 0.25) });
+        ly -= 15;
+      }
+      page2.drawText(totalLabel, { x: colX, y: ly - 4, size: 8, font: fontBold, color: rgb(0.2, 0.2, 0.2) });
+    }
 
-    // ── Donut chart 2: OTPF areas (right side) ─────────────────────────────
-    const chart2CX = MARGIN + 380;
-    const chart2CY = H2 - MARGIN - 100;
-    drawDonut(page2, chart2CX, chart2CY, 65, 35, otpfSlices.map((s) => ({ pct: s.pct, hex: s.hex })), rgb);
+    drawChartColumn(
+      col1X, "3 grupos de equilibrio", col1X + 70,
+      groupSlices.map((s) => ({ pct: s.pct, hex: s.hex })),
+      groupSlices.map((s) => ({ hex: s.hex, text: `${s.grp}: ${s.hours.toFixed(1)}h (${s.pct.toFixed(1)}%)  ref. ~${BALANCE_GROUP_REFERENCE[s.grp]}%` })),
+      `Total: ${totalHours.toFixed(1)}h`,
+    );
 
-    page2.drawText("Áreas OTPF", {
-      x: chart2CX - 25, y: chart2CY + 75, size: 9, font: fontBold, color: rgb(0.2, 0.2, 0.2),
-    });
-
-    // Legend for chart 2 (two columns)
-    let ly2 = chart2CY - 75;
-    const col2x = [chart2CX - 55, chart2CX + 115];
-    otpfSlices.forEach((s, i) => {
-      const colX = col2x[i % 2];
-      if (i % 2 === 0 && i > 0) ly2 -= 14;
-      if (i % 2 === 1 && i === 1) ly2 += 14; // reset to same row as previous
-      const r = parseInt(s.hex.slice(1, 3), 16) / 255;
-      const g = parseInt(s.hex.slice(3, 5), 16) / 255;
-      const b = parseInt(s.hex.slice(5, 7), 16) / 255;
-      page2.drawRectangle({ x: colX, y: ly2, width: 8, height: 8, color: rgb(r, g, b) });
-      page2.drawText(`${s.cat}: ${s.hours.toFixed(1)}h (${s.pct.toFixed(1)}%)`, {
-        x: colX + 11, y: ly2 + 1, size: 7, font, color: rgb(0.2, 0.2, 0.2),
-      });
-      if (i % 2 === 1) ly2 -= 13;
-    });
+    drawChartColumn(
+      col2X, "Categorías", col2X + 70,
+      otpfSlices.map((s) => ({ pct: s.pct, hex: s.hex })),
+      otpfSlices.map((s) => ({ hex: s.hex, text: `${ROUTINE_CATEGORY_LABELS[s.cat as RoutineCategory] ?? s.cat}: ${s.hours.toFixed(1)}h (${s.pct.toFixed(1)}%)` })),
+      `Total: ${totalHours.toFixed(1)}h`,
+    );
   }
 
   const bytes = await pdfDoc.save();

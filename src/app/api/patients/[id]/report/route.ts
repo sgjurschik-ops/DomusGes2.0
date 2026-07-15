@@ -48,7 +48,13 @@ const OTPF_COLORS: Record<string, string> = {
 
 function stripHtml(html: string | null | undefined): string {
   if (!html) return "";
-  return html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "").trim();
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(div|p|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function fmtDate(d: Date | string | null): string {
