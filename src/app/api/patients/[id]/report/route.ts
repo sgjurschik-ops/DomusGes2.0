@@ -25,15 +25,25 @@ const OTPF_TO_GROUP: Record<string, string> = {
 };
 
 const OTPF_COLORS: Record<string, string> = {
-  "Cuidado personal (AVDs)": "#F5E6DA",
-  "Movilidad funcional": "#E0EDDF",
-  "Gestión comunitaria": "#DEEAF4",
-  "Trabajo remunerado/voluntario": "#F2DEDE",
-  "Manejo del hogar": "#F0EBDA",
-  "Juego/escuela": "#E8E0F0",
-  "Recreación tranquila": "#DAEEE8",
-  "Recreación activa": "#F0E4DA",
-  "Socialización": "#F0DAE6",
+  "Cuidado personal (AVDs)": "#E8B48C",
+  "Movilidad funcional": "#9CCB9A",
+  "Gestión comunitaria": "#93BFE8",
+  "Trabajo remunerado/voluntario": "#D99999",
+  "Manejo del hogar": "#E0C97A",
+  "Juego/escuela": "#B79EDB",
+  "Recreación tranquila": "#8FCEC0",
+  "Recreación activa": "#E0AD79",
+  "Socialización": "#D993BB",
+  // Legacy category names (data saved before category rename)
+  "AVD": "#E8B48C",
+  "Gestión de la Salud": "#9CCB9A",
+  "Descanso y Sueño": "#93BFE8",
+  "AIVD": "#D99999",
+  "Educación": "#E0C97A",
+  "Trabajo": "#B79EDB",
+  "Juego": "#8FCEC0",
+  "Ocio / Tiempo Libre": "#E0AD79",
+  "Participación Social": "#D993BB",
 };
 
 function stripHtml(html: string | null | undefined): string {
@@ -120,8 +130,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     }
     const totalSlots = Object.values(balanceCounts).reduce((s, n) => s + n, 0);
 
-    // OTPF data
-    const OTPF_CATS = ["Cuidado personal (AVDs)", "Movilidad funcional", "Gestión comunitaria", "Trabajo remunerado/voluntario", "Manejo del hogar", "Juego/escuela", "Recreación tranquila", "Recreación activa", "Socialización"];
+    // OTPF data (dynamic: covers both new and legacy category names present in the record)
+    const OTPF_CATS = Array.from(new Set(routineCells.map((c) => c.category).filter(Boolean))) as string[];
     const otpfCounts: Record<string, number> = {};
     for (const cat of OTPF_CATS) otpfCounts[cat] = 0;
     for (const c of routineCells) {

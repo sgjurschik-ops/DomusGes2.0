@@ -78,11 +78,18 @@ export const ROUTINE_CATEGORY_LABELS: Record<RoutineCategory, string> = {
   "Socialización": "Socialización",
 };
 
-// Legacy colors for cells saved with old category names
+// Legacy colors for cells saved with old category names — matched in saturation
+// to the new palette, grouped by the same balance group (Autocuidado/Productividad/Ocio)
 export const LEGACY_CATEGORY_COLORS: Record<string, string> = {
-  "AVD": "#F5E6DA", "AIVD": "#F0EBDA", "Gestión de la Salud": "#E0EDDF",
-  "Descanso y Sueño": "#DEEAF4", "Educación": "#E8E0F0", "Trabajo": "#F2DEDE",
-  "Juego": "#F0E4DA", "Ocio / Tiempo Libre": "#DAEEE8", "Participación Social": "#F0DAE6",
+  "AVD": "#E8B48C",
+  "Gestión de la Salud": "#9CCB9A",
+  "Descanso y Sueño": "#93BFE8",
+  "AIVD": "#D99999",
+  "Educación": "#E0C97A",
+  "Trabajo": "#B79EDB",
+  "Juego": "#8FCEC0",
+  "Ocio / Tiempo Libre": "#E0AD79",
+  "Participación Social": "#D993BB",
 };
 
 export const ROUTINE_CATEGORY_EXAMPLES: Record<RoutineCategory, string> = {
