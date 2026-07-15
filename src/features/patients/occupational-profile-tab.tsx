@@ -385,8 +385,20 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
           </>
         ) : (
           <>
-            <ReadOnlyList label="Composición familiar" items={Array.isArray(profile.familyComposition) ? profile.familyComposition : []} renderItem={(m: FamilyMember) => `${m.name} — ${m.relationship}${m.occupation ? ` (${m.occupation})` : ""}${m.notes ? ` · ${m.notes}` : ""}`} emptyText="Sin familiares añadidos." />
-            <ReadOnlyList label="Red de apoyo / amistades" items={Array.isArray(profile.supportNetwork) ? profile.supportNetwork : []} renderItem={(c: SupportContact) => `${c.name} — ${c.relationship}${c.frequency ? ` · ${c.frequency}` : ""}${c.notes ? ` · ${c.notes}` : ""}`} emptyText="Sin contactos de apoyo." />
+            <ReadOnlyTable label="Composición familiar" items={Array.isArray(profile.familyComposition) ? profile.familyComposition : []}
+              columns={[
+                { header: "Nombre", render: (m: FamilyMember) => m.name },
+                { header: "Relación", render: (m: FamilyMember) => m.relationship },
+                { header: "Ocupación", render: (m: FamilyMember) => m.occupation },
+                { header: "Notas", render: (m: FamilyMember) => m.notes },
+              ]} emptyText="Sin familiares añadidos." />
+            <ReadOnlyTable label="Red de apoyo / amistades" items={Array.isArray(profile.supportNetwork) ? profile.supportNetwork : []}
+              columns={[
+                { header: "Nombre", render: (c: SupportContact) => c.name },
+                { header: "Relación", render: (c: SupportContact) => c.relationship },
+                { header: "Frecuencia", render: (c: SupportContact) => c.frequency },
+                { header: "Notas", render: (c: SupportContact) => c.notes },
+              ]} emptyText="Sin contactos de apoyo." />
           </>
         )}
       </Section>
@@ -417,7 +429,13 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         {isEditing("work") ? (
           <WorkHistoryEditor value={profile.workHistory ?? []} onChange={(entries) => update("workHistory", entries)} />
         ) : (
-          <ReadOnlyList label="Trabajos realizados" items={Array.isArray(profile.workHistory) ? profile.workHistory : []} renderItem={(w: WorkHistoryEntry) => `${w.company}${w.role ? ` — ${w.role}` : ""}${w.year ? ` (${w.year})` : ""}${w.notes ? ` · ${w.notes}` : ""}`} emptyText="Sin trabajos añadidos." />
+          <ReadOnlyTable label="Trabajos realizados" items={Array.isArray(profile.workHistory) ? profile.workHistory : []}
+            columns={[
+              { header: "Empresa", render: (w: WorkHistoryEntry) => w.company },
+              { header: "Funciones", render: (w: WorkHistoryEntry) => w.role },
+              { header: "Año", render: (w: WorkHistoryEntry) => w.year },
+              { header: "Notas", render: (w: WorkHistoryEntry) => w.notes },
+            ]} emptyText="Sin trabajos añadidos." />
         )}
 
         {isEditing("work") ? (
@@ -700,22 +718,50 @@ function ReadOnlyHtml({ label, value, placeholder = "Sin completar." }: { label?
   );
 }
 
-function ReadOnlyList<T>({ label, items, renderItem, emptyText }: { label: string; items: T[]; renderItem: (item: T) => string; emptyText: string }) {
+function ReadOnlyTable<T>({
+  label, items, columns, emptyText,
+}: {
+  label: string;
+  items: T[];
+  columns: { header: string; render: (item: T) => string }[];
+  emptyText: string;
+}) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <p className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">{label}</p>
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">{emptyText}</p>
       ) : (
-        <ul className="space-y-1">
-          {items.map((item, i) => (
-            <li key={i} className="text-sm bg-muted/40 rounded-md px-3 py-2">{renderItem(item)}</li>
-          ))}
-        </ul>
+        <div className="rounded-md border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ backgroundColor: "var(--chip-blue-bg)" }}>
+                {columns.map((col) => (
+                  <th key={col.header} className="text-left font-medium px-3 py-1.5" style={{ color: "var(--chip-blue-text)" }}>{col.header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, i) => (
+                <tr key={i} className="border-t">
+                  {columns.map((col) => {
+                    const val = col.render(item);
+                    return (
+                      <td key={col.header} className="px-3 py-2 align-top">
+                        {val ? val : <span className="text-muted-foreground">—</span>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
 }
+
 
 const GOAL_STATUS_STYLES: Record<GoalStatus, string> = {
   "En curso": "bg-sky-100 text-sky-900",
