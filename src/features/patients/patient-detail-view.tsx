@@ -39,7 +39,7 @@ import { CopmFields, formatCopmScore } from "./copm-fields";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { VisitDetailDialog } from "./visit-detail-dialog";
 import { PatientReportDialog } from "./patient-report-dialog";
-import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle, FileDown, Activity, ListChecks, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle, FileDown, Activity, ListChecks, StickyNote, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Dot,
@@ -98,109 +98,90 @@ export function PatientDetailView() {
         <ArrowLeft className="w-4 h-4" /> Volver
       </button>
 
-      {/* Header card */}
+      {/* Header card — compressed */}
       <Card>
-        <CardContent className="p-5">
-          <div className="flex items-start gap-4 flex-wrap">
-            <Avatar name={patient.fullName} color={patient.color} size={56} />
+        <CardContent className="p-4">
+          <div className="flex gap-4">
+            {/* Left: patient info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-bold">{patient.fullName}</h2>
-                <SpecialtyBadge specialty={patient.specialty} />
-                <StatusBadge status={patient.status} />
+              <div className="flex items-center gap-3">
+                <Avatar name={patient.fullName} color={patient.color} size={44} />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-lg font-bold">{patient.fullName}</h2>
+                    <SpecialtyBadge specialty={patient.specialty} />
+                    <StatusBadge status={patient.status} />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {patient.age} años · {patient.totalVisits} seguimientos · Inicio {formatDate(patient.startDate)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 ml-auto">
+                  <Button size="sm" onClick={() => { useNav.getState().setNewVisitPatient(patient.id); navigate("new-visit"); }} disabled={!professionals?.length}>
+                    <Plus className="w-4 h-4 mr-1.5" />Registrar seguimiento
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setReportDialogOpen(true)}>
+                    <FileDown className="w-4 h-4 mr-1.5" />Generar informe
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Más acciones"><MoreVertical className="w-4 h-4" /></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => navigate("edit-patient")}><Pencil className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
+                      <DropdownMenuItem variant="destructive" onClick={() => setDeleteDialogOpen(true)}><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                {patient.age} años · {patient.totalVisits} seguimientos · Inicio {formatDate(patient.startDate)}
-              </p>
 
-              {/* Alerts — shown first, above clinical info, so they're the
-                  very first thing seen before a session */}
               {(patient.alerts ?? []).length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {(patient.alerts ?? []).map((alert) => (
-                    <span
-                      key={alert}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                      style={{ backgroundColor: "var(--chip-orange-bg)", color: "var(--chip-orange-text)" }}
-                    >
-                      <AlertTriangle className="w-3 h-3" />
-                      {alert}
+                    <span key={alert} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: "var(--chip-orange-bg)", color: "var(--chip-orange-text)" }}>
+                      <AlertTriangle className="w-3 h-3" />{alert}
                     </span>
                   ))}
                 </div>
               )}
 
-              {/* Clinical info first — what matters most before a session */}
-              <div className="mt-3 rounded-md bg-accent/40 px-3 py-2.5 space-y-2">
+              <div className="mt-2 rounded-md bg-accent/40 px-3 py-2 space-y-1">
                 <InfoRow icon={Stethoscope} label="Diagnóstico / motivo de derivación" value={patient.diagnosis ?? "—"} />
                 <InfoRow icon={Target} label="Objetivo terapéutico" value={patient.objective ?? "—"} />
               </div>
 
-              {/* Administrative info — contact, scheduling, referral */}
-              <div className="grid sm:grid-cols-2 gap-2 mt-3 text-sm">
+              <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 mt-2 text-sm">
                 <InfoRow icon={Phone} label="Teléfono" value={patient.phone ?? "—"} />
                 <InfoRow icon={MapPin} label="Dirección" value={patient.address ?? "—"} />
-                <InfoRow icon={User2} label="Referente" value={
-                  patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"
-                } />
-                <InfoRow icon={Calendar} label="Próxima cita" value={
-                  patient.nextAppointmentDate ? formatDateTime(patient.nextAppointmentDate) : "Sin cita"
-                } />
+                <InfoRow icon={User2} label="Referente" value={patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"} />
+                <div className="flex items-start gap-2">
+                  <Calendar className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <span className="text-xs text-muted-foreground">Próxima cita: </span>
+                    {patient.nextAppointmentDate ? (
+                      <button type="button" onClick={() => navigate("calendar")} className="text-sm text-primary hover:underline font-medium">
+                        {formatDateTime(patient.nextAppointmentDate)}
+                      </button>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Sin cita</span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="mt-3 flex items-center gap-2 flex-wrap">
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-muted-foreground">Terapeutas:</span>
                 {patient.therapistNames.length === 0 ? (
                   <span className="text-xs text-muted-foreground italic">Sin asignar</span>
                 ) : (
-                  patient.therapistNames.map((n, i) => (
-                    <Badge key={n} variant="secondary" className="text-xs">
-                      {n}
-                    </Badge>
-                  ))
+                  patient.therapistNames.map((n) => (<Badge key={n} variant="secondary" className="text-xs">{n}</Badge>))
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                size="sm"
-                onClick={() => {
-                  useNav.getState().setNewVisitPatient(patient.id);
-                  navigate("new-visit");
-                }}
-                disabled={!professionals?.length}
-              >
-                <Plus className="w-4 h-4 mr-1.5" />
-                Registrar seguimiento
-              </Button>
 
-              <Button variant="outline" size="sm" onClick={() => setReportDialogOpen(true)}>
-                <FileDown className="w-4 h-4 mr-1.5" />
-                Generar informe
-              </Button>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Más acciones">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => navigate("edit-patient")}>
-                    <Pencil className="w-4 h-4 mr-2" />
-                    Editar
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => setDeleteDialogOpen(true)}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Eliminar
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            {/* Right: sticky notes */}
+            <QuickNotes patientId={patient.id} initial={patient.quickNotes} />
           </div>
-       </CardContent>
+        </CardContent>
       </Card>
 
       <Tabs defaultValue="overview" className="w-full">
@@ -491,6 +472,86 @@ function KpiChip({
         {label}
       </p>
       <p className="text-sm font-semibold" style={{ color: chip.text }}>{value}</p>
+    </div>
+  );
+}
+
+const NOTE_COLORS: { bg: string; border: string }[] = [
+  { bg: "var(--chip-blue-bg)", border: "var(--chip-blue-text)" },
+  { bg: "var(--chip-green-bg)", border: "var(--chip-green-text)" },
+  { bg: "var(--chip-orange-bg)", border: "var(--chip-orange-text)" },
+  { bg: "var(--chip-purple-bg)", border: "var(--chip-purple-text)" },
+  { bg: "var(--chip-yellow-bg)", border: "var(--chip-yellow-text)" },
+];
+
+interface QuickNote { id: string; text: string; colorIdx: number; }
+
+function QuickNotes({ patientId, initial }: { patientId: string; initial?: string | null }) {
+  const [notes, setNotes] = useState<QuickNote[]>(() => {
+    if (!initial) return [];
+    try { return JSON.parse(initial); } catch { return []; }
+  });
+  const [saving, setSaving] = useState(false);
+
+  async function persist(updated: QuickNote[]) {
+    setNotes(updated);
+    setSaving(true);
+    try {
+      await fetch(`/api/patients/${patientId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quickNotes: JSON.stringify(updated) }),
+      });
+    } catch { /* silent */ }
+    setSaving(false);
+  }
+
+  function addNote() {
+    const colorIdx = notes.length % NOTE_COLORS.length;
+    persist([...notes, { id: Date.now().toString(), text: "", colorIdx }]);
+  }
+  function updateNote(id: string, text: string) {
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, text } : n)));
+  }
+  function saveNote(id: string) {
+    persist(notes.map((n) => (n.id === id ? { ...n } : n)));
+  }
+  function removeNote(id: string) {
+    persist(notes.filter((n) => n.id !== id));
+  }
+
+  return (
+    <div className="w-56 shrink-0 hidden lg:flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-wide font-bold text-muted-foreground flex items-center gap-1">
+          <StickyNote className="w-3 h-3" /> Notas rápidas
+        </span>
+        <button type="button" onClick={addNote} className="text-xs text-primary hover:underline">+ Añadir</button>
+      </div>
+      {notes.length === 0 && (
+        <p className="text-[11px] text-muted-foreground italic">Sin notas.</p>
+      )}
+      <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
+        {notes.map((note) => {
+          const c = NOTE_COLORS[note.colorIdx % NOTE_COLORS.length];
+          return (
+            <div key={note.id} className="rounded-md p-2 relative group" style={{ backgroundColor: c.bg, borderLeft: `3px solid ${c.border}` }}>
+              <textarea
+                value={note.text}
+                onChange={(e) => updateNote(note.id, e.target.value)}
+                onBlur={() => saveNote(note.id)}
+                placeholder="Escribe una nota…"
+                className="w-full bg-transparent text-xs resize-none outline-none min-h-[2rem] leading-relaxed"
+                rows={2}
+              />
+              <button type="button" onClick={() => removeNote(note.id)}
+                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

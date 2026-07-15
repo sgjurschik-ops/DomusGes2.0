@@ -88,6 +88,7 @@ export interface PatientDTO {
   totalVisits: number;
   lastVisitDate: string | null;
   nextAppointmentDate: string | null;
+  quickNotes: string | null;
 }
 
 export interface VisitDTO {

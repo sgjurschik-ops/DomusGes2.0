@@ -251,6 +251,7 @@ export function mapPatient(
     referentName: p.referentName,
     referentPhone: p.referentPhone,
     color: p.color,
+    quickNotes: p.quickNotes ?? null,
     therapistIds: p.therapists.map((t) => t.id),
     therapistNames: p.therapists.map((t) => t.name),
     totalVisits: p._count.visits,

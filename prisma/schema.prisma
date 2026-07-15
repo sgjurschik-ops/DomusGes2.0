@@ -54,6 +54,7 @@ model Patient {
   referentName  String?
   referentPhone String?
   color         String   @default("#1a5c58")
+  quickNotes    String?  // JSON-encoded QuickNote[]: { id, text, color }[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
