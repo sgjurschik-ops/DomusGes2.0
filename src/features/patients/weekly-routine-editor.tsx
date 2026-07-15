@@ -215,8 +215,13 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = f
         page.drawRectangle({ x: x + 0.5, y: y + 0.5, width: COL_DAY - 1, height: ROW_H - 1, color: rgb(r, g, b) });
       }
       if (cell?.activity) {
-        const text = cell.activity.length > 18 ? cell.activity.slice(0, 16) + "…" : cell.activity;
-        page.drawText(text, { x: x + 2, y: y + ROW_H / 2 - 3, size: 5.5, font, color: rgb(0.1, 0.1, 0.1) });
+        const prevCell = !empty && slot > 0 ? cells.find((c) => c.day === day && c.halfHour === slot - 1) : null;
+        const isContinuation = !!(prevCell?.activity === cell.activity && prevCell?.category === cell.category);
+        if (!isContinuation) {
+          const maxChars = Math.floor((COL_DAY - 4) / 2.6);
+          const text = cell.activity.length > maxChars ? cell.activity.slice(0, maxChars - 1) + "…" : cell.activity;
+          page.drawText(text, { x: x + 2, y: y + ROW_H / 2 - 3, size: 5.5, font, color: rgb(0.1, 0.1, 0.1) });
+        }
       }
       page.drawLine({ start: { x, y }, end: { x: x + COL_DAY, y }, thickness: 0.2, color: rgb(0.8, 0.8, 0.8) });
       page.drawLine({ start: { x, y }, end: { x, y: y + ROW_H }, thickness: isFullHour ? 0.5 : 0.2, color: rgb(0.7, 0.7, 0.7) });
