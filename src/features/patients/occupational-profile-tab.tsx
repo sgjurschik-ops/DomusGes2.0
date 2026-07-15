@@ -180,6 +180,10 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
     setEditingSections((prev) => ({ ...prev, [key]: !prev[key] }));
   }
   function isEditing(key: string) { return !!editingSections[key]; }
+  async function saveSection(key: string) {
+    await save();
+    setEditingSections((prev) => ({ ...prev, [key]: false }));
+  }
 
   useEffect(() => {
     async function loadProfile() {
@@ -302,7 +306,8 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
     <div className="space-y-4">
       {/* ─── 1. Datos generales ─── */}
       <Section title="Datos generales" description="Resumen general de la valoración." icon={ClipboardList} color="blue" defaultOpen profile={profile} fields={["summary"]}
-        editing={isEditing("general")} onToggleEdit={() => toggleEditing("general")}>
+        editing={isEditing("general")} onToggleEdit={() => toggleEditing("general")}
+        onSave={() => saveSection("general")} saving={saving}>
         {isEditing("general") ? (
           <Field label="Resumen">
             <RichTextarea rows={5} value={profile.summary ?? ""} onChange={(v) => update("summary", v)} placeholder="Resumen general del caso — más adelante la IA podrá generarlo automáticamente a partir de los demás apartados." />
@@ -315,7 +320,8 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       {/* ─── 2. Área social-familiar ─── */}
       <Section title="Área social-familiar" description="Convivencia, red de apoyo y relaciones significativas." icon={Users} color="purple" profile={profile}
         fields={["drivingLicense", "currentlyDrives", "drivingReason", "maritalStatus", "partnerInfo", "livingSituation", "familyComposition", "supportNetwork"]}
-        editing={isEditing("social")} onToggleEdit={() => toggleEditing("social")}>
+        editing={isEditing("social")} onToggleEdit={() => toggleEditing("social")}
+        onSave={() => saveSection("social")} saving={saving}>
         {/* Dropdowns — always interactive */}
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Carné de conducir">
@@ -388,7 +394,8 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       {/* ─── 3. Área laboral y económica ─── */}
       <Section title="Área laboral y económica" description="Formación, trayectoria laboral y autonomía económica." icon={Briefcase} color="orange" profile={profile}
         fields={["educationLevel", "otherEducation", "workHistory", "currentOccupation", "economicManagement"]}
-        editing={isEditing("work")} onToggleEdit={() => toggleEditing("work")}>
+        editing={isEditing("work")} onToggleEdit={() => toggleEditing("work")}
+        onSave={() => saveSection("work")} saving={saving}>
         <Field label="Estudios realizados">
           <Select value={profile.educationLevel ?? ""} onValueChange={(v) => update("educationLevel", v)}>
             <SelectTrigger className={!profile.educationLevel ? "border-dashed border-muted-foreground/40" : ""}><SelectValue placeholder="Seleccionar" /></SelectTrigger>
@@ -433,7 +440,8 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       {/* ─── 4. Hábitos y rutinas ─── */}
       <Section title="Hábitos y rutinas" description="Rutina diaria y planning semanal." icon={CalendarClock} color="yellow" profile={profile}
         fields={["dailyRoutineMorningWeekday", "dailyRoutineAfternoonWeekday", "dailyRoutineMorningWeekend", "dailyRoutineAfternoonWeekend"]}
-        editing={isEditing("habits")} onToggleEdit={() => toggleEditing("habits")}>
+        editing={isEditing("habits")} onToggleEdit={() => toggleEditing("habits")}
+        onSave={() => saveSection("habits")} saving={saving}>
         <div className="rounded-md border p-3 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -498,7 +506,8 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       {/* ─── 5. Actividades realizadas y deseadas ─── */}
       <Section title="Actividades realizadas y deseadas" description="Actividades que realizaba y las que le gustaría retomar o realizar actualmente." icon={Heart} color="green" profile={profile}
         fields={["activitiesPastSelfcare", "activitiesPastProductivity", "activitiesPastLeisure", "activitiesDesiredSelfcare", "activitiesDesiredProductivity", "activitiesDesiredLeisure"]}
-        editing={isEditing("activities")} onToggleEdit={() => toggleEditing("activities")}>
+        editing={isEditing("activities")} onToggleEdit={() => toggleEditing("activities")}
+        onSave={() => saveSection("activities")} saving={saving}>
         {isEditing("activities") ? (
           <div className="grid sm:grid-cols-2 gap-6">
             <div className="space-y-3">
@@ -535,7 +544,8 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       {/* ─── 6. Problemas detectados ─── */}
       <Section title="Problemas detectados" description="Problemas identificados por el/la usuario/a y por el/la profesional." icon={ClipboardList} color="orange" profile={profile}
         fields={["problemsUser", "problemsProfessional"]}
-        editing={isEditing("problems")} onToggleEdit={() => toggleEditing("problems")}>
+        editing={isEditing("problems")} onToggleEdit={() => toggleEditing("problems")}
+        onSave={() => saveSection("problems")} saving={saving}>
         {isEditing("problems") ? (
           <>
             <Field label="Problemas detectados por el/la usuario/a">
@@ -556,7 +566,8 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       {/* ─── 7. Objetivos y planificación ─── */}
       <Section title="Objetivos y planificación" description="Objetivos ocupacionales con seguimiento temporal." icon={Target} color="blue" profile={profile}
         fields={["desiredImprovements"]}
-        editing={isEditing("goals")} onToggleEdit={() => toggleEditing("goals")}>
+        editing={isEditing("goals")} onToggleEdit={() => toggleEditing("goals")}
+        onSave={() => saveSection("goals")} saving={saving}>
         {isEditing("goals") ? (
           <>
             <Field label="Qué le gustaría conseguir o mejorar">
@@ -599,11 +610,11 @@ const CHIP_VARS: Record<ChipColor, { bg: string; text: string }> = {
 };
 
 function Section({
-  title, description, icon: Icon, color = "blue", defaultOpen = false, profile, fields, children, editing, onToggleEdit,
+  title, description, icon: Icon, color = "blue", defaultOpen = false, profile, fields, children, editing, onToggleEdit, onSave, saving,
 }: {
   title: string; description?: string; icon?: LucideIcon; color?: ChipColor; defaultOpen?: boolean;
   profile: Profile; fields: string[]; children: React.ReactNode;
-  editing?: boolean; onToggleEdit?: () => void;
+  editing?: boolean; onToggleEdit?: () => void; onSave?: () => void; saving?: boolean;
 }) {
   const { filled, total } = countFilled(profile, fields);
   const isComplete = filled === total;
@@ -636,7 +647,13 @@ function Section({
       <div className="p-4 space-y-4 bg-card">
         {children}
         {onToggleEdit && (
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end gap-2 pt-2">
+            {editing && onSave && (
+              <Button type="button" variant="default" size="sm" className="h-7 px-3 text-xs" disabled={saving} onClick={onSave}>
+                <Save className="w-3.5 h-3.5 mr-1" />
+                {saving ? "Guardando…" : "Guardar"}
+              </Button>
+            )}
             <Button type="button" variant="ghost" size="sm" className="h-7 px-3 text-xs" onClick={onToggleEdit}>
               {editing ? <><Eye className="w-3.5 h-3.5 mr-1" />Ver</> : <><Pencil className="w-3.5 h-3.5 mr-1" />Editar</>}
             </Button>
@@ -650,7 +667,7 @@ function Section({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <Label className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">{label}</Label>
       {children}
     </div>
   );
@@ -659,7 +676,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function ReadOnlyField({ label, value }: { label: string; value?: string }) {
   return (
     <div className="space-y-1">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">{label}</p>
       {value?.trim() ? (
         <p className="text-sm bg-muted/40 rounded-md px-3 py-2">{value}</p>
       ) : (
@@ -673,7 +690,7 @@ function ReadOnlyHtml({ label, value, placeholder = "Sin completar." }: { label?
   const hasValue = value && value.replace(/<[^>]*>/g, "").trim();
   return (
     <div className="space-y-1">
-      {label && <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>}
+      {label && <p className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">{label}</p>}
       {hasValue ? (
         <div className="text-sm prose prose-sm max-w-none bg-muted/40 rounded-md px-3 py-2" dangerouslySetInnerHTML={{ __html: value! }} />
       ) : (
@@ -686,7 +703,7 @@ function ReadOnlyHtml({ label, value, placeholder = "Sin completar." }: { label?
 function ReadOnlyList<T>({ label, items, renderItem, emptyText }: { label: string; items: T[]; renderItem: (item: T) => string; emptyText: string }) {
   return (
     <div className="space-y-1">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">{label}</p>
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">{emptyText}</p>
       ) : (
@@ -710,7 +727,7 @@ function ReadOnlyGoals({ goals }: { goals: Goal[] }) {
   if (goals.length === 0) return <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">Sin objetivos añadidos.</p>;
   return (
     <div className="space-y-2">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Objetivos</p>
+      <p className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">Objetivos</p>
       {goals.map((g, i) => {
         const areaColor = GOAL_AREA_COLORS[g.area] ?? "#6b7280";
         return (
@@ -771,7 +788,7 @@ function FamilyMembersEditor({ value, onChange }: { value: FamilyMember[]; onCha
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Composición familiar</Label>
+      <Label className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">Composición familiar</Label>
       {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin familiares añadidos.</p>}
       <div className="space-y-2">
         {value.map((member, i) => (
@@ -800,7 +817,7 @@ function SupportNetworkEditor({ value, onChange }: { value: SupportContact[]; on
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Red de apoyo / amistades</Label>
+      <Label className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">Red de apoyo / amistades</Label>
       {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin contactos de apoyo añadidos.</p>}
       <div className="space-y-2">
         {value.map((contact, i) => (
@@ -829,7 +846,7 @@ function WorkHistoryEditor({ value, onChange }: { value: WorkHistoryEntry[]; onC
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Trabajos realizados</Label>
+      <Label className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">Trabajos realizados</Label>
       {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin trabajos añadidos.</p>}
       <div className="space-y-2">
         {value.map((entry, i) => (
@@ -864,7 +881,7 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
 
   return (
     <div className="space-y-3">
-      <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Objetivos</Label>
+      <Label className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">Objetivos</Label>
       {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin objetivos añadidos.</p>}
       <div className="space-y-3">
         {value.map((goal, i) => {
