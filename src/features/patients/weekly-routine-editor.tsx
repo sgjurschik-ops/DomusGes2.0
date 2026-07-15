@@ -405,6 +405,19 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  // Live drag preview: poll refs during drag to update a visual-only state
+  const [liveDragEnd, setLiveDragEnd] = useState<number | null>(null);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!isDragging) { setLiveDragEnd(null); return; }
+    function poll() {
+      setLiveDragEnd(dragEndRef.current);
+      rafRef.current = requestAnimationFrame(poll);
+    }
+    rafRef.current = requestAnimationFrame(poll);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [isDragging]);
   const [rangeDraft, setRangeDraft] = useState<{ activity: string; category: RoutineCategory | ""; group: BalanceGroup | "" }>({ activity: "", category: "", group: "" });
   const [openCell, setOpenCell] = useState<{ day: number; halfHour: number } | null>(null);
 
@@ -455,8 +468,15 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
   }
 
   function isCellSelected(day: number, halfHour: number) {
-    if (!selection) return false;
-    return day === selection.day && halfHour >= selection.from && halfHour <= selection.to;
+    // Committed selection (after mouseup)
+    if (selection && day === selection.day && halfHour >= selection.from && halfHour <= selection.to) return true;
+    // Live drag preview (during drag)
+    if (isDragging && dragDayRef.current === day && dragStart !== null && liveDragEnd !== null) {
+      const from = Math.min(dragStart, liveDragEnd);
+      const to = Math.max(dragStart, liveDragEnd);
+      return halfHour >= from && halfHour <= to;
+    }
+    return false;
   }
 
   function setCell(day: number, halfHour: number, patch: Partial<RoutineCell>) {
@@ -702,7 +722,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
               const label = slotLabel(slot);
               const isFullHour = slot % 2 === 0;
               return (
-                <tr key={slot} className={isFullHour ? "border-t border-t-border/60" : ""}>
+                <tr key={slot} className={isFullHour ? "border-t border-border/20" : ""}>
                   <td className="sticky left-0 bg-background border-r p-0.5 text-right text-muted-foreground whitespace-nowrap w-14 text-xs">
                     {isFullHour ? label : <span className="opacity-40">{label}</span>}
                   </td>
@@ -739,7 +759,7 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                     return (
                       <td
                         key={day}
-                        className={`relative p-0 ${isFullHour && !isContinuation ? "" : isContinuation ? "" : "border-t border-t-dashed border-border/30"}`}
+                        className={`relative p-0 ${isFullHour && !isContinuation ? "border-t border-border/30" : ""}`}
                         style={{ backgroundColor: tdBg, ...blockRadius }}
                       >
                         <Popover
@@ -833,15 +853,12 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                                   setContextMenu({ x: e.clientX, y: e.clientY, selectedCells: [], pasteTarget: { day, halfHour: slot } });
                                 }
                               }}
-                              className={`w-full text-left px-1.5 select-none text-xs font-medium ${
-                                isPartOfBlock ? "rounded-none border-none" : "rounded-sm border border-transparent hover:border-border m-0.5"
-                              } ${
-                                isFullHour ? "h-8" : "h-7"
-                              } ${selected
-                                ? "!border-foreground ring-1 ring-foreground/40 ring-offset-0"
-                                : ""
-                              } ${hasContent ? "cursor-grab active:cursor-grabbing" : ""} ${isContinuation ? "" : "truncate"}`}
-                              style={{ backgroundColor: btnBg }}
+                              className={`w-full text-left px-1 select-none text-[11px] font-medium leading-tight ${
+                                isPartOfBlock ? "rounded-none" : "rounded-sm m-px"
+                              } h-6 ${
+                                selected ? "bg-primary/20 ring-1 ring-primary/40" : ""
+                              } ${hasContent && !isPartOfBlock ? "cursor-grab active:cursor-grabbing" : ""}`}
+                              style={{ backgroundColor: selected ? undefined : btnBg }}
                               title={cell?.activity || undefined}
                             >
                               {!isContinuation && (cell?.activity || GroupIcon) ? (
@@ -883,9 +900,14 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                               </div>
                             )}
                             {cell && (cell.activity || cell.category) && (
-                              <div className="flex items-center justify-end pt-1 border-t">
-                                <button type="button" onClick={() => setCell(day, slot, { activity: "", category: "", group: "" })} className="text-xs text-destructive hover:underline">
-                                  Vaciar celda
+                              <div className="flex items-center justify-between pt-2 border-t">
+                                <button type="button" onClick={() => { setCell(day, slot, { activity: "", category: "", group: "" }); setOpenCell(null); }}
+                                  className="text-xs text-destructive hover:underline flex items-center gap-1">
+                                  <Trash2 className="w-3 h-3" /> Borrar celda
+                                </button>
+                                <button type="button" onClick={() => setOpenCell(null)}
+                                  className="text-xs text-muted-foreground hover:underline">
+                                  Cerrar
                                 </button>
                               </div>
                             )}
