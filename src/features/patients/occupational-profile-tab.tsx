@@ -518,15 +518,15 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
           <div className="grid sm:grid-cols-2 gap-6">
             <div className="space-y-2">
               <p className="text-sm font-semibold">Actividades que realizaba</p>
-              <ReadOnlyHtml label="Cuidado de sí mismo" value={profile.activitiesPastSelfcare} placeholder="Sin completar." />
-              <ReadOnlyHtml label="Productividad" value={profile.activitiesPastProductivity} placeholder="Sin completar." />
-              <ReadOnlyHtml label="Ocio" value={profile.activitiesPastLeisure} placeholder="Sin completar." />
+              <ReadOnlyHtmlColored label="Cuidado de sí mismo" value={profile.activitiesPastSelfcare} color="teal" />
+              <ReadOnlyHtmlColored label="Productividad" value={profile.activitiesPastProductivity} color="amber" />
+              <ReadOnlyHtmlColored label="Ocio" value={profile.activitiesPastLeisure} color="violet" />
             </div>
             <div className="space-y-2">
               <p className="text-sm font-semibold">Actividades deseadas</p>
-              <ReadOnlyHtml label="Cuidado de sí mismo" value={profile.activitiesDesiredSelfcare} placeholder="Sin completar." />
-              <ReadOnlyHtml label="Productividad" value={profile.activitiesDesiredProductivity} placeholder="Sin completar." />
-              <ReadOnlyHtml label="Ocio" value={profile.activitiesDesiredLeisure} placeholder="Sin completar." />
+              <ReadOnlyHtmlColored label="Cuidado de sí mismo" value={profile.activitiesDesiredSelfcare} color="teal" />
+              <ReadOnlyHtmlColored label="Productividad" value={profile.activitiesDesiredProductivity} color="amber" />
+              <ReadOnlyHtmlColored label="Ocio" value={profile.activitiesDesiredLeisure} color="violet" />
             </div>
           </div>
         )}
@@ -625,11 +625,6 @@ function Section({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {onToggleEdit && (
-            <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={(e) => { e.preventDefault(); onToggleEdit(); }}>
-              {editing ? <><Eye className="w-3.5 h-3.5 mr-1" />Ver</> : <><Pencil className="w-3.5 h-3.5 mr-1" />Editar</>}
-            </Button>
-          )}
           <span className="text-xs rounded-full px-2 py-0.5 font-medium"
             style={isComplete ? { backgroundColor: "var(--chip-green-bg)", color: "var(--chip-green-text)" } : isEmpty ? { backgroundColor: "var(--muted)", color: "var(--muted-foreground)" } : { backgroundColor: "var(--chip-yellow-bg)", color: "var(--chip-yellow-text)" }}
             title={`${filled} de ${total} campos rellenados`}>
@@ -638,7 +633,16 @@ function Section({
           <span className="text-muted-foreground text-xs transition-transform group-open:rotate-90">▶</span>
         </div>
       </summary>
-      <div className="p-4 space-y-4 bg-card">{children}</div>
+      <div className="p-4 space-y-4 bg-card">
+        {children}
+        {onToggleEdit && (
+          <div className="flex justify-end pt-2">
+            <Button type="button" variant="ghost" size="sm" className="h-7 px-3 text-xs" onClick={onToggleEdit}>
+              {editing ? <><Eye className="w-3.5 h-3.5 mr-1" />Ver</> : <><Pencil className="w-3.5 h-3.5 mr-1" />Editar</>}
+            </Button>
+          </div>
+        )}
+      </div>
     </details>
   );
 }
@@ -726,12 +730,34 @@ function ReadOnlyGoals({ goals }: { goals: Goal[] }) {
   );
 }
 
+const AREA_GROUP_COLORS: Record<string, { border: string; text: string; bg: string }> = {
+  teal: { border: "#5DCAA5", text: "#0F6E56", bg: "#E1F5EE" },
+  amber: { border: "#EF9F27", text: "#854F0B", bg: "#FAEEDA" },
+  violet: { border: "#8b5cf6", text: "#534AB7", bg: "#EEEDFE" },
+};
+
 function AreaBlock({ color, label, desc, value, onChange }: { color: string; label: string; desc: string; value: string; onChange: (v: string) => void }) {
+  const c = AREA_GROUP_COLORS[color] ?? AREA_GROUP_COLORS.teal;
   return (
-    <div className={`rounded-lg border-l-4 border-l-${color}-500 pl-3 space-y-1.5`}>
-      <p className={`text-xs font-medium text-${color}-700`}>{label}</p>
+    <div className="rounded-lg pl-3 space-y-1.5" style={{ borderLeft: `4px solid ${c.border}` }}>
+      <p className="text-xs font-medium" style={{ color: c.text }}>{label}</p>
       <p className="text-[11px] text-muted-foreground">{desc}</p>
       <RichTextarea value={value} onChange={onChange} rows={2} />
+    </div>
+  );
+}
+
+function ReadOnlyHtmlColored({ label, value, color, placeholder = "Sin completar." }: { label: string; value?: string; color: string; placeholder?: string }) {
+  const c = AREA_GROUP_COLORS[color] ?? AREA_GROUP_COLORS.teal;
+  const hasValue = value && value.replace(/<[^>]*>/g, "").trim();
+  return (
+    <div className="rounded-lg pl-3 space-y-1" style={{ borderLeft: `4px solid ${c.border}` }}>
+      <p className="text-[11px] uppercase tracking-wide font-medium" style={{ color: c.text }}>{label}</p>
+      {hasValue ? (
+        <div className="text-sm prose prose-sm max-w-none rounded-md px-3 py-2" style={{ backgroundColor: c.bg }} dangerouslySetInnerHTML={{ __html: value! }} />
+      ) : (
+        <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">{placeholder}</p>
+      )}
     </div>
   );
 }
