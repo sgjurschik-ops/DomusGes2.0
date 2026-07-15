@@ -59,15 +59,15 @@ export const OTPF_TO_GROUP: Record<RoutineCategory | string, BalanceGroup> = {
 };
 
 export const ROUTINE_CATEGORY_COLORS: Record<RoutineCategory, string> = {
-  "Cuidado personal (AVDs)": "#E8B48C",
-  "Movilidad funcional": "#9CCB9A",
-  "Gestión comunitaria": "#93BFE8",
-  "Trabajo remunerado/voluntario": "#D99999",
-  "Manejo del hogar": "#E0C97A",
-  "Juego/escuela": "#B79EDB",
-  "Recreación tranquila": "#8FCEC0",
-  "Recreación activa": "#E0AD79",
-  "Socialización": "#D993BB",
+  "Cuidado personal (AVDs)": "#F0D5BF",
+  "Movilidad funcional": "#C4DDB8",
+  "Gestión comunitaria": "#B8D4EC",
+  "Trabajo remunerado/voluntario": "#E4C4C4",
+  "Manejo del hogar": "#E6D9A8",
+  "Juego/escuela": "#CFBFE0",
+  "Recreación tranquila": "#B4DDD3",
+  "Recreación activa": "#E6CDA8",
+  "Socialización": "#E0B8D0",
 };
 
 export const ROUTINE_CATEGORY_LABELS: Record<RoutineCategory, string> = {
@@ -750,8 +750,19 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
           </span>
         ))}
         {selection && selectedCells.length > 1 && (
-          <span className="ml-auto text-xs font-medium text-foreground">
-            {selectedCells.length} celdas seleccionadas · clic derecho para opciones
+          <span className="ml-auto flex items-center gap-3 text-xs font-medium text-foreground">
+            <span>{selectedCells.length} celdas seleccionadas</span>
+            <button type="button" onClick={() => {
+              const keys = new Set(selectedCells.map((s) => `${s.day}-${s.halfHour}`));
+              setCells(cells.filter((c) => !keys.has(`${c.day}-${c.halfHour}`)));
+              setIsDirty(true);
+              clearSelection();
+            }} className="text-destructive hover:underline flex items-center gap-1">
+              <Trash2 className="w-3 h-3" /> Borrar selección
+            </button>
+            <button type="button" onClick={clearSelection} className="text-muted-foreground hover:underline">
+              Deseleccionar
+            </button>
           </span>
         )}
       </div>
@@ -924,17 +935,17 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                               title={cell?.activity || undefined}
                             >
                               {!isContinuation && (cell?.activity || GroupIcon) ? (
-                                <span className="flex items-center gap-1 min-w-0">
-                                  {GroupIcon && <GroupIcon className="w-3 h-3 shrink-0 opacity-60" />}
-                                  <span className="truncate">
-                                    {cell?.activity || ""}
-                                    {(() => {
-                                      const info = cell?.activity ? getBlockInfo(day, slot) : null;
-                                      return info && info.endSlot > info.startSlot ? (
-                                        <span className="text-[9px] italic opacity-60 ml-1">({info.range} / {info.hours})</span>
-                                      ) : null;
-                                    })()}
+                                <span className="flex flex-col min-w-0 leading-tight">
+                                  <span className="flex items-center gap-1 truncate">
+                                    {GroupIcon && <GroupIcon className="w-3 h-3 shrink-0 opacity-60" />}
+                                    <span className="truncate">{cell?.activity || ""}</span>
                                   </span>
+                                  {(() => {
+                                    const info = cell?.activity ? getBlockInfo(day, slot) : null;
+                                    return info && info.endSlot > info.startSlot ? (
+                                      <span className="text-[8px] italic opacity-50 truncate">{info.range} / {info.hours}</span>
+                                    ) : null;
+                                  })()}
                                 </span>
                               ) : null}
                             </button>
