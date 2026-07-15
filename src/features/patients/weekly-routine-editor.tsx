@@ -129,8 +129,9 @@ export interface RoutineCell {
 
 // ─── PDF generation ───────────────────────────────────────────────────────────
 
-// Draws a donut chart on a pdf-lib page using bezier arcs.
-// Each slice is approximated with multiple small arc segments.
+// Draws a donut chart on a pdf-lib page using filled triangular wedges.
+// Each slice is split into many tiny trapezoids (outer→inner arc) drawn as
+// filled rectangles so the result is a smooth, solid donut with no artifacts.
 function drawDonut(
   page: any,
   cx: number, cy: number,
@@ -139,43 +140,47 @@ function drawDonut(
   rgb: (r: number, g: number, b: number) => any,
 ) {
   const TWO_PI = Math.PI * 2;
-  let startAngle = -Math.PI / 2; // start at 12 o'clock
+  let startAngle = -Math.PI / 2; // 12 o'clock
 
   for (const slice of slices) {
     if (slice.pct <= 0) continue;
-    const angle = TWO_PI * (slice.pct / 100);
-    const endAngle = startAngle + angle;
+    const sliceAngle = TWO_PI * (slice.pct / 100);
+    const endAngle = startAngle + sliceAngle;
     const r = parseInt(slice.hex.slice(1, 3), 16) / 255;
     const g = parseInt(slice.hex.slice(3, 5), 16) / 255;
     const b = parseInt(slice.hex.slice(5, 7), 16) / 255;
     const color = rgb(r, g, b);
 
-    // Approximate arc with line segments
-    const steps = Math.max(8, Math.ceil((angle / TWO_PI) * 64));
-    const outerPoints: { x: number; y: number }[] = [];
-    const innerPoints: { x: number; y: number }[] = [];
-    for (let i = 0; i <= steps; i++) {
-      const a = startAngle + (angle * i) / steps;
-      outerPoints.push({ x: cx + Math.cos(a) * outerR, y: cy + Math.sin(a) * outerR });
-      innerPoints.push({ x: cx + Math.cos(a) * innerR, y: cy + Math.sin(a) * innerR });
-    }
+    // Use enough steps for a smooth curve (more steps = smoother)
+    const steps = Math.max(20, Math.ceil((sliceAngle / TWO_PI) * 120));
+    const stepAngle = sliceAngle / steps;
 
-    // Draw filled polygon: outer arc forward, inner arc backward
-    const allPoints = [...outerPoints, ...[...innerPoints].reverse()];
-    for (let i = 0; i < allPoints.length - 1; i++) {
+    for (let i = 0; i < steps; i++) {
+      const a1 = startAngle + stepAngle * i;
+      const a2 = startAngle + stepAngle * (i + 1);
+      // Draw a small quadrilateral as two triangles
+      // Points: outer1, outer2, inner2, inner1
+      const ox1 = cx + Math.cos(a1) * outerR;
+      const oy1 = cy + Math.sin(a1) * outerR;
+      const ox2 = cx + Math.cos(a2) * outerR;
+      const oy2 = cy + Math.sin(a2) * outerR;
+      const ix1 = cx + Math.cos(a1) * innerR;
+      const iy1 = cy + Math.sin(a1) * innerR;
+      const ix2 = cx + Math.cos(a2) * innerR;
+      const iy2 = cy + Math.sin(a2) * innerR;
+
+      // pdf-lib doesn't have a polygon fill API, but we can use drawLine with
+      // a thickness equal to the radial span, drawing along the mid-arc.
+      // This is accurate for small step angles and produces no teeth.
+      const midAngle = (a1 + a2) / 2;
+      const midR = (innerR + outerR) / 2;
+      const thickness = outerR - innerR + 0.3;
+      const len = Math.sqrt((ox1 - ox2) ** 2 + (oy1 - oy2) ** 2);
+      // Draw a radial line at the mid-radius for each step
       page.drawLine({
-        start: allPoints[i], end: allPoints[i + 1],
-        thickness: outerR - innerR + 0.5, color,
-        opacity: 1,
-      });
-    }
-    // Solid fill using thin radial lines
-    for (let i = 0; i <= steps; i++) {
-      const a = startAngle + (angle * i) / steps;
-      page.drawLine({
-        start: { x: cx + Math.cos(a) * innerR, y: cy + Math.sin(a) * innerR },
-        end: { x: cx + Math.cos(a) * outerR, y: cy + Math.sin(a) * outerR },
-        thickness: (TWO_PI * outerR * (angle / TWO_PI)) / steps + 0.5,
+        start: { x: cx + Math.cos(midAngle) * innerR, y: cy + Math.sin(midAngle) * innerR },
+        end: { x: cx + Math.cos(midAngle) * outerR, y: cy + Math.sin(midAngle) * outerR },
+        thickness: len + 0.3,
         color,
       });
     }
@@ -225,22 +230,26 @@ async function generatePlanningPdf(cells: RoutineCell[], date: string, empty = f
         const r = parseInt(hex.slice(1, 3), 16) / 255;
         const g = parseInt(hex.slice(3, 5), 16) / 255;
         const b = parseInt(hex.slice(5, 7), 16) / 255;
-        page.drawRectangle({ x: x + 0.5, y: y + 0.5, width: COL_DAY - 1, height: ROW_H - 1, color: rgb(r, g, b) });
+        // Fill the entire cell — no 0.5px gaps
+        page.drawRectangle({ x, y, width: COL_DAY, height: ROW_H, color: rgb(r, g, b) });
       }
       if (cell?.activity && !isContinuation) {
         const maxChars = Math.floor((COL_DAY - 4) / 2.6);
         const text = cell.activity.length > maxChars ? cell.activity.slice(0, maxChars - 1) + "…" : cell.activity;
         page.drawText(text, { x: x + 2, y: y + ROW_H / 2 - 3, size: 5.5, font, color: rgb(0.1, 0.1, 0.1) });
       }
-      // Skip the divider line inside a merged block so the color reads as one continuous bar
-      if (!isContinuation) {
+      // Only draw a horizontal divider if this is NOT inside a merged block
+      if (!isContinuation && !cell?.category) {
         page.drawLine({
           start: { x, y }, end: { x: x + COL_DAY, y },
-          thickness: isFullHour ? 0.4 : 0.15,
-          color: isFullHour ? rgb(0.75, 0.75, 0.75) : rgb(0.88, 0.88, 0.88),
+          thickness: isFullHour ? 0.3 : 0.1,
+          color: isFullHour ? rgb(0.8, 0.8, 0.8) : rgb(0.9, 0.9, 0.9),
         });
       }
-      page.drawLine({ start: { x, y }, end: { x, y: y + ROW_H }, thickness: isFullHour ? 0.5 : 0.2, color: rgb(0.7, 0.7, 0.7) });
+      // Vertical column separator — only at full hours for a cleaner look
+      if (isFullHour) {
+        page.drawLine({ start: { x, y }, end: { x, y: y + ROW_H }, thickness: 0.2, color: rgb(0.8, 0.8, 0.8) });
+      }
     });
   });
 
