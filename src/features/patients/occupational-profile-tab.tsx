@@ -685,7 +685,7 @@ function Section({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">{label}</Label>
+      <Label className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">{label}</Label>
       {children}
     </div>
   );
@@ -694,7 +694,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function ReadOnlyField({ label, value }: { label: string; value?: string }) {
   return (
     <div className="space-y-1">
-      <p className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">{label}</p>
+      <p className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">{label}</p>
       {value?.trim() ? (
         <p className="text-sm bg-muted/40 rounded-md px-3 py-2">{value}</p>
       ) : (
@@ -708,7 +708,7 @@ function ReadOnlyHtml({ label, value, placeholder = "Sin completar." }: { label?
   const hasValue = value && value.replace(/<[^>]*>/g, "").trim();
   return (
     <div className="space-y-1">
-      {label && <p className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">{label}</p>}
+      {label && <p className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">{label}</p>}
       {hasValue ? (
         <div className="text-sm prose prose-sm max-w-none bg-muted/40 rounded-md px-3 py-2" dangerouslySetInnerHTML={{ __html: value! }} />
       ) : (
@@ -728,7 +728,7 @@ function ReadOnlyTable<T>({
 }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">{label}</p>
+      <p className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">{label}</p>
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">{emptyText}</p>
       ) : (
@@ -773,7 +773,7 @@ function ReadOnlyGoals({ goals }: { goals: Goal[] }) {
   if (goals.length === 0) return <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">Sin objetivos añadidos.</p>;
   return (
     <div className="space-y-2">
-      <p className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">Objetivos</p>
+      <p className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Objetivos</p>
       {goals.map((g, i) => {
         const areaColor = GOAL_AREA_COLORS[g.area] ?? "#6b7280";
         return (
@@ -803,7 +803,7 @@ function AreaBlock({ color, label, desc, value, onChange }: { color: string; lab
   const c = AREA_GROUP_COLORS[color] ?? AREA_GROUP_COLORS.teal;
   return (
     <div className="rounded-lg pl-3 space-y-1.5" style={{ borderLeft: `4px solid ${c.border}` }}>
-      <p className="text-xs font-medium" style={{ color: c.text }}>{label}</p>
+      <p className="inline-block text-xs font-bold px-2 py-0.5 rounded" style={{ color: c.text, backgroundColor: c.bg }}>{label}</p>
       <p className="text-[11px] text-muted-foreground">{desc}</p>
       <RichTextarea value={value} onChange={onChange} rows={2} />
     </div>
@@ -815,7 +815,7 @@ function ReadOnlyHtmlColored({ label, value, color, placeholder = "Sin completar
   const hasValue = value && value.replace(/<[^>]*>/g, "").trim();
   return (
     <div className="rounded-lg pl-3 space-y-1" style={{ borderLeft: `4px solid ${c.border}` }}>
-      <p className="text-[11px] uppercase tracking-wide font-medium" style={{ color: c.text }}>{label}</p>
+      <p className="inline-block text-[11px] uppercase tracking-wide font-bold px-2 py-0.5 rounded" style={{ color: c.text, backgroundColor: c.bg }}>{label}</p>
       {hasValue ? (
         <div className="text-sm prose prose-sm max-w-none rounded-md px-3 py-2" style={{ backgroundColor: c.bg }} dangerouslySetInnerHTML={{ __html: value! }} />
       ) : (
@@ -834,7 +834,7 @@ function FamilyMembersEditor({ value, onChange }: { value: FamilyMember[]; onCha
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">Composición familiar</Label>
+      <Label className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Composición familiar</Label>
       {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin familiares añadidos.</p>}
       <div className="space-y-2">
         {value.map((member, i) => (
@@ -863,7 +863,7 @@ function SupportNetworkEditor({ value, onChange }: { value: SupportContact[]; on
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">Red de apoyo / amistades</Label>
+      <Label className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Red de apoyo / amistades</Label>
       {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin contactos de apoyo añadidos.</p>}
       <div className="space-y-2">
         {value.map((contact, i) => (
@@ -892,7 +892,7 @@ function WorkHistoryEditor({ value, onChange }: { value: WorkHistoryEntry[]; onC
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">Trabajos realizados</Label>
+      <Label className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Trabajos realizados</Label>
       {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin trabajos añadidos.</p>}
       <div className="space-y-2">
         {value.map((entry, i) => (
@@ -927,7 +927,7 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
 
   return (
     <div className="space-y-3">
-      <Label className="text-[11px] uppercase tracking-wide font-semibold text-foreground/70">Objetivos</Label>
+      <Label className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Objetivos</Label>
       {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin objetivos añadidos.</p>}
       <div className="space-y-3">
         {value.map((goal, i) => {
