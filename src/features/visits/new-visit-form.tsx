@@ -14,12 +14,56 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Save, X, Plus } from "lucide-react";
+import { ArrowLeft, Save, X, Plus, FileText, Bookmark } from "lucide-react";
 import { visitCreateSchema, type VisitCreateInput } from "@/lib/schemas";
 import { toast } from "@/hooks/use-toast";
 import { useState } from "react";
 
 import { z } from "zod";
+
+// ─── Follow-up templates ────────────────────────────────────────────────────
+interface VisitTemplate {
+  id: string;
+  name: string;
+  title: string;
+  notes: string;
+  custom?: boolean;
+}
+
+const PREDEFINED_TEMPLATES: VisitTemplate[] = [
+  {
+    id: "valoracion-inicial",
+    name: "Valoración inicial",
+    title: "Valoración inicial",
+    notes: "<p><strong>Motivo de derivación:</strong></p><p></p><p><strong>Antecedentes relevantes:</strong></p><p></p><p><strong>Evaluación realizada:</strong></p><p></p><p><strong>Impresión clínica:</strong></p><p></p><p><strong>Plan de intervención propuesto:</strong></p>",
+  },
+  {
+    id: "seguimiento",
+    name: "Seguimiento",
+    title: "Seguimiento",
+    notes: "<p><strong>Objetivos trabajados en sesión:</strong></p><p></p><p><strong>Desarrollo de la sesión:</strong></p><p></p><p><strong>Respuesta del paciente:</strong></p><p></p><p><strong>Tareas para la próxima sesión:</strong></p>",
+  },
+  {
+    id: "propuesta-intervencion",
+    name: "Propuesta de intervención",
+    title: "Propuesta intervención",
+    notes: "<p><strong>Resumen de la valoración:</strong></p><p></p><p><strong>Objetivos terapéuticos:</strong></p><ol><li></li></ol><p><strong>Metodología y frecuencia:</strong></p><p></p><p><strong>Criterios de alta:</strong></p>",
+  },
+  {
+    id: "informe-alta",
+    name: "Informe de alta",
+    title: "Informe de alta",
+    notes: "<p><strong>Fecha de inicio del tratamiento:</strong></p><p></p><p><strong>Objetivos planteados:</strong></p><p></p><p><strong>Objetivos conseguidos:</strong></p><p></p><p><strong>Estado actual:</strong></p><p></p><p><strong>Recomendaciones al alta:</strong></p>",
+  },
+];
+
+const CUSTOM_TEMPLATES_KEY = "domusges_visit_templates";
+function loadCustomTemplates(): VisitTemplate[] {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_TEMPLATES_KEY) || "[]"); } catch { return []; }
+}
+function saveCustomTemplates(templates: VisitTemplate[]) {
+  try { localStorage.setItem(CUSTOM_TEMPLATES_KEY, JSON.stringify(templates)); } catch { /* ignore */ }
+}
 
 export function NewVisitForm() {
   const create = useCreateVisit();
@@ -27,6 +71,33 @@ export function NewVisitForm() {
   const { data: professionals } = useProfessionals();
   const { back, newVisitPatientId, selectPatient, navigate } = useNav();
   const [interventionInput, setInterventionInput] = useState("");
+  const [customTemplates, setCustomTemplates] = useState<VisitTemplate[]>(loadCustomTemplates);
+
+  const allTemplates = [...PREDEFINED_TEMPLATES, ...customTemplates];
+
+  function applyTemplate(tpl: VisitTemplate) {
+    setValue("title", tpl.title);
+    setValue("notes", tpl.notes);
+    toast({ title: "Plantilla aplicada", description: tpl.name });
+  }
+
+  function saveAsTemplate() {
+    const title = watch("title")?.trim();
+    const notes = watch("notes")?.trim();
+    if (!title) { toast({ title: "Pon un título primero", variant: "destructive" }); return; }
+    const newTpl: VisitTemplate = { id: `custom-${Date.now()}`, name: title, title, notes: notes ?? "", custom: true };
+    const updated = [...customTemplates, newTpl];
+    setCustomTemplates(updated);
+    saveCustomTemplates(updated);
+    toast({ title: "Plantilla guardada", description: `"${title}" disponible para próximos seguimientos.` });
+  }
+
+  function deleteTemplate(id: string) {
+    const updated = customTemplates.filter((t) => t.id !== id);
+    setCustomTemplates(updated);
+    saveCustomTemplates(updated);
+    toast({ title: "Plantilla eliminada" });
+  }
 
   const {
     register,
@@ -158,6 +229,34 @@ export function NewVisitForm() {
             </div>
 
             <div className="h-px bg-border" />
+
+            {/* Template selector */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground">Plantilla:</span>
+              <div className="flex gap-1.5 flex-wrap flex-1">
+                {allTemplates.map((tpl) => (
+                  <div key={tpl.id} className="flex items-center gap-0">
+                    <button type="button" onClick={() => applyTemplate(tpl)}
+                      className="text-xs px-2.5 py-1 rounded-l-md border hover:bg-muted transition-colors"
+                      style={tpl.custom ? { borderLeft: "3px solid var(--chip-purple-text)" } : undefined}>
+                      {tpl.name}
+                    </button>
+                    {tpl.custom && (
+                      <button type="button" onClick={() => deleteTemplate(tpl.id)}
+                        className="text-xs px-1.5 py-1 rounded-r-md border border-l-0 text-muted-foreground hover:text-destructive hover:bg-muted transition-colors">
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                    {!tpl.custom && <span className="rounded-r-md" />}
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={saveAsTemplate}
+                className="text-xs text-primary hover:underline flex items-center gap-1 shrink-0">
+                <Bookmark className="w-3.5 h-3.5" /> Guardar como plantilla
+              </button>
+            </div>
 
             {/* Title + notes get the visual weight */}
             <div className="space-y-1.5">
