@@ -951,47 +951,82 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                             </button>
                           </PopoverTrigger>
 
-                          {/* Single-cell edit popover */}
+                          {/* Single-cell / block edit popover */}
                           <PopoverContent className="w-[28rem] space-y-3" side="right" align="start">
-                            <p className="text-sm font-semibold">{ROUTINE_DAYS_FULL[day]} · {label}</p>
-                            <Input placeholder="Actividad…" value={cell?.activity ?? ""}
-                              onChange={(e) => setCell(day, slot, { activity: e.target.value })}
-                              className="h-9 text-sm" autoFocus />
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-1.5 font-medium">Categoría</p>
-                              <div className="grid grid-cols-3 gap-1.5">
-                                {ROUTINE_CATEGORIES.map((cat) => (
-                                  <button key={cat} type="button" onClick={() => setCell(day, slot, { category: cat })}
-                                    title={ROUTINE_CATEGORY_EXAMPLES[cat]}
-                                    className={`min-h-[2.5rem] py-1.5 rounded-md text-[11px] border-2 transition-all px-2 leading-tight ${cell?.category === cat ? "border-foreground/50" : "border-transparent"}`}
-                                    style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }}>{cat}</button>
-                                ))}
-                              </div>
-                            </div>
-                            {cell?.category && (
-                              <div>
-                                <p className="text-xs text-muted-foreground mb-1.5 font-medium">Grupo de equilibrio <span className="italic font-normal">(auto — editable)</span></p>
-                                <div className="flex gap-1.5">
-                                  {BALANCE_GROUPS.map((grp) => (
-                                    <button key={grp} type="button" onClick={() => setCell(day, slot, { group: grp })}
-                                      className={`flex-1 h-8 rounded-md text-xs border-2 transition-all font-medium ${cell?.group === grp ? "border-foreground/50" : "border-transparent"}`}
-                                      style={{ backgroundColor: BALANCE_GROUP_COLORS[grp] }}>{grp}</button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            {cell && (cell.activity || cell.category) && (
-                              <div className="flex items-center justify-between pt-2 border-t">
-                                <button type="button" onClick={() => { setCell(day, slot, { activity: "", category: "", group: "" }); setOpenCell(null); }}
-                                  className="text-xs text-destructive hover:underline flex items-center gap-1">
-                                  <Trash2 className="w-3 h-3" /> Borrar celda
-                                </button>
-                                <button type="button" onClick={() => setOpenCell(null)}
-                                  className="text-xs text-muted-foreground hover:underline">
-                                  Cerrar
-                                </button>
-                              </div>
-                            )}
+                            {(() => {
+                              const blockInfo = cell?.activity ? getBlockInfo(day, slot) : null;
+                              const isBlock = blockInfo && blockInfo.endSlot > blockInfo.startSlot;
+
+                              function updateBlock(patch: Partial<RoutineCell>) {
+                                if (!blockInfo) { setCell(day, slot, patch); return; }
+                                setCells((prev) => {
+                                  const updated = [...prev];
+                                  for (let s = blockInfo.startSlot; s <= blockInfo.endSlot; s++) {
+                                    const idx = updated.findIndex((c) => c.day === day && c.halfHour === s);
+                                    if (idx >= 0) updated[idx] = { ...updated[idx], ...patch };
+                                    else updated.push({ day, halfHour: s, activity: "", category: "", group: "", ...patch });
+                                  }
+                                  return updated;
+                                });
+                                setIsDirty(true);
+                              }
+
+                              function deleteBlock() {
+                                if (!blockInfo) { setCell(day, slot, { activity: "", category: "", group: "" }); }
+                                else {
+                                  setCells((prev) => prev.filter((c) => !(c.day === day && c.halfHour >= blockInfo.startSlot && c.halfHour <= blockInfo.endSlot)));
+                                  setIsDirty(true);
+                                }
+                                setOpenCell(null);
+                              }
+
+                              return (
+                                <>
+                                  <p className="text-sm font-semibold">
+                                    {ROUTINE_DAYS_FULL[day]} · {isBlock ? `${blockInfo!.range} (${blockInfo!.hours})` : label}
+                                  </p>
+                                  <Input placeholder="Actividad…" value={cell?.activity ?? ""}
+                                    onChange={(e) => isBlock ? updateBlock({ activity: e.target.value }) : setCell(day, slot, { activity: e.target.value })}
+                                    className="h-9 text-sm" autoFocus />
+                                  <div>
+                                    <p className="text-xs text-muted-foreground mb-1.5 font-medium">Categoría</p>
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                      {ROUTINE_CATEGORIES.map((cat) => (
+                                        <button key={cat} type="button"
+                                          onClick={() => {
+                                            const autoGroup = OTPF_TO_GROUP[cat] ?? "";
+                                            isBlock ? updateBlock({ category: cat, group: autoGroup }) : setCell(day, slot, { category: cat, group: autoGroup });
+                                          }}
+                                          title={ROUTINE_CATEGORY_EXAMPLES[cat]}
+                                          className={`min-h-[2.5rem] py-1.5 rounded-md text-[11px] border-2 transition-all px-2 leading-tight ${cell?.category === cat ? "border-foreground/50" : "border-transparent"}`}
+                                          style={{ backgroundColor: ROUTINE_CATEGORY_COLORS[cat] }}>{cat}</button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  {cell?.category && (
+                                    <div>
+                                      <p className="text-xs text-muted-foreground mb-1.5 font-medium">Grupo de equilibrio <span className="italic font-normal">(auto — editable)</span></p>
+                                      <div className="flex gap-1.5">
+                                        {BALANCE_GROUPS.map((grp) => (
+                                          <button key={grp} type="button"
+                                            onClick={() => isBlock ? updateBlock({ group: grp }) : setCell(day, slot, { group: grp })}
+                                            className={`flex-1 h-8 rounded-md text-xs border-2 transition-all font-medium ${cell?.group === grp ? "border-foreground/50" : "border-transparent"}`}
+                                            style={{ backgroundColor: BALANCE_GROUP_COLORS[grp] }}>{grp}</button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center justify-between pt-2 border-t">
+                                    <button type="button" onClick={deleteBlock}
+                                      className="text-xs text-destructive hover:underline flex items-center gap-1">
+                                      <Trash2 className="w-3 h-3" /> {isBlock ? "Borrar bloque" : "Borrar celda"}
+                                    </button>
+                                    <button type="button" onClick={() => setOpenCell(null)}
+                                      className="text-xs text-muted-foreground hover:underline">Cerrar</button>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </PopoverContent>
                         </Popover>
 
@@ -1004,8 +1039,8 @@ export function WeeklyRoutineEditor({ patientId, onClose }: Props) {
                             <PopoverContent className="w-[28rem] space-y-3" side="right" align="start">
                               <p className="text-sm font-semibold">
                                 {selection.dayFrom === selection.dayTo
-                                  ? `${ROUTINE_DAYS_FULL[selection.dayFrom]} · ${slotLabel(selection.from)} – ${slotLabel(selection.to)} (${selection.to - selection.from + 1} franjas)`
-                                  : `${ROUTINE_DAYS[selection.dayFrom]} a ${ROUTINE_DAYS[selection.dayTo]} · ${slotLabel(selection.from)} – ${slotLabel(selection.to)} (${selectedCells.length} celdas)`
+                                  ? `${ROUTINE_DAYS_FULL[selection.dayFrom]} · ${slotLabel(selection.from)} – ${slotLabel(Math.min(selection.to + 1, 48))} (${selection.to - selection.from + 1} franjas)`
+                                  : `${ROUTINE_DAYS[selection.dayFrom]} a ${ROUTINE_DAYS[selection.dayTo]} · ${slotLabel(selection.from)} – ${slotLabel(Math.min(selection.to + 1, 48))} (${selectedCells.length} celdas)`
                                 }
                               </p>
                               <Input placeholder="Actividad…" value={rangeDraft.activity}
