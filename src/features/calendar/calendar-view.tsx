@@ -2174,27 +2174,6 @@ function ReservationFormDialog({
             />
           </Field>
 
-          <Field label="Terapeuta" error={errors.therapistId?.message} required>
-            <Controller
-              control={control}
-              name="therapistId"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger aria-label="Terapeuta">
-                    <SelectValue placeholder="Selecciona terapeuta" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(professionals ?? []).filter((p) => p.isActive).map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
-
           <Field label="Fecha" error={errors.date?.message} required>
             <Input type="date" {...register("date")} />
           </Field>
