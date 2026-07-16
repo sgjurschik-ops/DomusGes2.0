@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -126,11 +127,6 @@ export function NewVisitForm() {
                 {errors.therapistId && <p className="text-xs text-destructive">{errors.therapistId.message}</p>}
               </div>
               <div className="space-y-1.5 min-w-0">
-                <Label className="text-xs">Duración</Label>
-                <Input type="number" min={15} max={240} step={15} className="px-2" {...register("durationMin")} />
-                {errors.durationMin && <p className="text-xs text-destructive">{errors.durationMin.message}</p>}
-              </div>
-              <div className="space-y-1.5 min-w-0">
                 <Label className="text-xs">Fecha <span className="text-destructive">*</span></Label>
                 <Input type="date" className="px-2" {...register("date")} />
                 {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
@@ -157,11 +153,17 @@ export function NewVisitForm() {
             <div className="space-y-1.5">
               <Label className="text-sm font-semibold">Notas clínicas <span className="text-destructive">*</span></Label>
               <p className="text-xs text-muted-foreground">Observaciones, evolución y plan.</p>
-              <Textarea
-                rows={12}
-                placeholder="Describe la sesión: hallazgos, técnicas aplicadas, respuesta del paciente, plan para el próximo seguimiento…"
-                className="text-sm"
-                {...register("notes")}
+              <Controller
+                control={control}
+                name="notes"
+                render={({ field }) => (
+                  <RichTextarea
+                    rows={12}
+                    placeholder="Describe la sesión: hallazgos, técnicas aplicadas, respuesta del paciente, plan para el próximo seguimiento…"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                  />
+                )}
               />
               {errors.notes && <p className="text-xs text-destructive">{errors.notes.message}</p>}
             </div>
