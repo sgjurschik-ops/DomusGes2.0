@@ -215,7 +215,7 @@ export function PatientDetailView() {
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className={`grid w-full max-w-2xl ${isAdmin ? "grid-cols-1 max-w-xs" : "grid-cols-5"}`}>
           <TabsTrigger value="overview">Resumen</TabsTrigger>
-          {!isAdmin && <TabsTrigger value="visits">Seguimientos ({visits?.length ?? 0})</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="visits">Seguimientos</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="occupational-profile">Perfil ocupacional</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="assessments">Valoración</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="progress">Evolución</TabsTrigger>}
