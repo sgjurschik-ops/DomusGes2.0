@@ -479,16 +479,43 @@ export const STRUCTURED_SCALE_DEFINITIONS: Record<string, ScaleDefinition> = {
 
 export function computeScaleTotal(scaleId: string, itemScores: Record<string, number>): number {
   const def = STRUCTURED_SCALE_DEFINITIONS[scaleId];
-  if (!def) return 0;
-  return def.items.reduce((sum, item) => sum + (itemScores[item.id] ?? 0), 0);
+  if (def) return def.items.reduce((sum, item) => sum + (itemScores[item.id] ?? 0), 0);
+  // Measurement scales: return dominant hand value as primary
+  if (scaleId === "9HPT" || scaleId === "Box and Block") return itemScores["dominant"] ?? 0;
+  if (scaleId === "TUG") return itemScores["time"] ?? 0;
+  return 0;
 }
 
 export function formatScaleScore(scaleId: string, itemScores: Record<string, number>): string {
   const def = STRUCTURED_SCALE_DEFINITIONS[scaleId];
-  if (!def) return "";
-  const total = computeScaleTotal(scaleId, itemScores);
-  return `${total}/${def.maxScore} — ${def.interpret(total)}`;
+  if (def) {
+    const total = computeScaleTotal(scaleId, itemScores);
+    return `${total}/${def.maxScore} — ${def.interpret(total)}`;
+  }
+  // Measurement scales
+  if (scaleId === "9HPT") {
+    const dom = itemScores["dominant"];
+    const noDom = itemScores["nonDominant"];
+    if (dom === undefined && noDom === undefined) return "";
+    return `Dom: ${dom ?? "—"}s / No dom: ${noDom ?? "—"}s`;
+  }
+  if (scaleId === "Box and Block") {
+    const dom = itemScores["dominant"];
+    const noDom = itemScores["nonDominant"];
+    if (dom === undefined && noDom === undefined) return "";
+    return `Dom: ${dom ?? "—"} / No dom: ${noDom ?? "—"} bloques`;
+  }
+  if (scaleId === "TUG") {
+    const time = itemScores["time"];
+    if (time === undefined) return "";
+    const aid = itemScores["aid_idx"] !== undefined ? TUG_AIDS[itemScores["aid_idx"]] : "";
+    return `${time}s${aid ? ` (${aid})` : ""}`;
+  }
+  return "";
 }
+
+export const TUG_AIDS = ["Ninguna", "Bastón", "Muleta", "Andador", "Silla de ruedas", "Otra"] as const;
+export const TUG_ASSISTANCE = ["Independiente", "Supervisión", "Ayuda física"] as const;
 
 // ─── Area summary (strengths vs. areas to work on) ──────────────────────────
 //

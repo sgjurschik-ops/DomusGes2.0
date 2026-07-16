@@ -5,9 +5,14 @@ import {
   VAVDI_BLOCKS,
   computeScaleTotal,
   generateAreaSummaryData,
+  formatScaleScore,
+  TUG_AIDS,
+  TUG_ASSISTANCE,
   type ScaleItem,
 } from "@/lib/scales";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -20,10 +25,17 @@ type Props = {
   onChange: (itemScores: Record<string, number>) => void;
 };
 
+const MEASUREMENT_SCALES = ["9HPT", "Box and Block", "TUG"];
+
 // Renders the item-by-item form for a structured scale (Barthel,
-// Lawton-Brody, VAVDI) and shows the live computed total + interpretation
-// underneath, so the professional never has to add up points by hand.
+// Lawton-Brody, VAVDI) or a measurement scale (9HPT, Box and Block, TUG),
+// and shows the live computed total + interpretation underneath.
 export function StructuredScaleFields({ scale, itemScores, onChange }: Props) {
+  // Measurement scales — specific form fields
+  if (MEASUREMENT_SCALES.includes(scale)) {
+    return <MeasurementScaleFields scale={scale} itemScores={itemScores} onChange={onChange} />;
+  }
+
   const def = STRUCTURED_SCALE_DEFINITIONS[scale];
   if (!def) return null;
 
@@ -129,4 +141,98 @@ function ScaleItemRow({
       </Select>
     </div>
   );
+}
+
+// ─── Measurement scale form fields ──────────────────────────────────────────
+function MeasurementScaleFields({ scale, itemScores, onChange }: Props) {
+  function set(key: string, value: number | string) {
+    const num = typeof value === "string" ? parseFloat(value) : value;
+    if (!isNaN(num)) onChange({ ...itemScores, [key]: num });
+  }
+
+  const score = formatScaleScore(scale, itemScores);
+
+  if (scale === "9HPT") {
+    return (
+      <div className="sm:col-span-2 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Nine Hole Peg Test — Evalúa la destreza manual fina y la coordinación de cada miembro superior. Cuanto menor sea el tiempo, mejor destreza manual.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Mano dominante (segundos)</Label>
+            <Input type="number" step="0.1" min="0" placeholder="Ej. 18.5"
+              value={itemScores["dominant"] ?? ""} onChange={(e) => set("dominant", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Mano no dominante (segundos)</Label>
+            <Input type="number" step="0.1" min="0" placeholder="Ej. 22.3"
+              value={itemScores["nonDominant"] ?? ""} onChange={(e) => set("nonDominant", e.target.value)} />
+          </div>
+        </div>
+        {score && <p className="text-sm font-medium bg-accent/40 rounded-md px-3 py-2">{score}</p>}
+      </div>
+    );
+  }
+
+  if (scale === "Box and Block") {
+    return (
+      <div className="sm:col-span-2 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Box and Block Test — Evalúa la destreza manual gruesa y la velocidad de manipulación. Cuanto mayor sea el número de bloques trasladados en 60 segundos, mejor rendimiento.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Mano dominante (bloques en 60s)</Label>
+            <Input type="number" step="1" min="0" placeholder="Ej. 45"
+              value={itemScores["dominant"] ?? ""} onChange={(e) => set("dominant", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Mano no dominante (bloques en 60s)</Label>
+            <Input type="number" step="1" min="0" placeholder="Ej. 38"
+              value={itemScores["nonDominant"] ?? ""} onChange={(e) => set("nonDominant", e.target.value)} />
+          </div>
+        </div>
+        {score && <p className="text-sm font-medium bg-accent/40 rounded-md px-3 py-2">{score}</p>}
+      </div>
+    );
+  }
+
+  if (scale === "TUG") {
+    return (
+      <div className="sm:col-span-2 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Timed Up and Go — Evalúa la movilidad funcional y el equilibrio dinámico. Cuanto menor sea el tiempo, mejor movilidad funcional.
+        </p>
+        <div className="grid sm:grid-cols-3 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Tiempo (segundos)</Label>
+            <Input type="number" step="0.1" min="0" placeholder="Ej. 12.5"
+              value={itemScores["time"] ?? ""} onChange={(e) => set("time", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Ayuda técnica</Label>
+            <Select value={itemScores["aid_idx"] !== undefined ? String(itemScores["aid_idx"]) : ""} onValueChange={(v) => set("aid_idx", parseInt(v))}>
+              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectContent>
+                {TUG_AIDS.map((aid, i) => <SelectItem key={aid} value={String(i)}>{aid}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Nivel de asistencia</Label>
+            <Select value={itemScores["assist_idx"] !== undefined ? String(itemScores["assist_idx"]) : ""} onValueChange={(v) => set("assist_idx", parseInt(v))}>
+              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectContent>
+                {TUG_ASSISTANCE.map((a, i) => <SelectItem key={a} value={String(i)}>{a}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {score && <p className="text-sm font-medium bg-accent/40 rounded-md px-3 py-2">{score}</p>}
+      </div>
+    );
+  }
+
+  return null;
 }

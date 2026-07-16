@@ -32,17 +32,15 @@ export const ASSESSMENT_SCALES = [
   "Barthel",
   "Lawton-Brody",
   "COPM",
-  "EVN",
-  "PHQ-9",
-  "GAD-7",
-  "Mini-Mental",
-  "FIM",
+  "9HPT",
+  "Box and Block",
+  "TUG",
 ] as const;
 
 // Scales with a structured, item-by-item form (score is computed, not
 // typed in by hand). Any scale not in this list keeps the free-text score
 // field as before.
-export const STRUCTURED_SCALES = ["Barthel", "Lawton-Brody", "VAVDI", "COPM"] as const;
+export const STRUCTURED_SCALES = ["Barthel", "Lawton-Brody", "VAVDI", "COPM", "9HPT", "Box and Block", "TUG"] as const;
 export type StructuredScale = (typeof STRUCTURED_SCALES)[number];
 
 export const PROFESSIONAL_COLORS = [
