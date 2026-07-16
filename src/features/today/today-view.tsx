@@ -171,24 +171,60 @@ export function TodayView() {
     return () => { map.remove(); mapInstance.current = null; };
   }, []);
 
-  // Geocode all active stops
-  const stopsKey = activeStops.map((s) => s.id).join(",");
-  const geocodeAll = useCallback(async () => {
-    if (activeStops.length === 0) { setGeocodedStops([]); setRouteResult(null); return; }
-    setIsCalculating(true);
-    const sCoords = await geocodeAddress(startAddress);
-    setStartCoords(sCoords);
-    const stops: typeof geocodedStops = [];
-    for (const s of activeStops) {
-      const coords = await geocodeAddress(s.address);
-      if (coords) stops.push({ id: s.id, name: s.name, address: s.address, coords });
-      await new Promise((r) => setTimeout(r, 1100));
-    }
-    setGeocodedStops(stops);
-    setIsCalculating(false);
-  }, [stopsKey, startAddress]);
+  // Geocode only NEW stops incrementally (don't re-geocode what's already resolved)
+  const geocodedRef = useRef<Map<string, { name: string; address: string; coords: [number, number] }>>(new Map());
+  const [failedAddresses, setFailedAddresses] = useState<string[]>([]);
 
-  useEffect(() => { geocodeAll(); }, [geocodeAll]);
+  const stopsKey = activeStops.map((s) => s.id).join(",");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      // Geocode start address if changed
+      const sCoords = await geocodeAddress(startAddress);
+      if (cancelled) return;
+      setStartCoords(sCoords);
+
+      // Find which stops need geocoding
+      const currentIds = new Set(activeStops.map((s) => s.id));
+      // Remove stale entries
+      for (const key of geocodedRef.current.keys()) {
+        if (!currentIds.has(key)) geocodedRef.current.delete(key);
+      }
+
+      const toGeocode = activeStops.filter((s) => !geocodedRef.current.has(s.id));
+      if (toGeocode.length > 0) {
+        setIsCalculating(true);
+        const failed: string[] = [];
+        for (const s of toGeocode) {
+          if (cancelled) return;
+          const coords = await geocodeAddress(s.address);
+          if (coords) {
+            geocodedRef.current.set(s.id, { name: s.name, address: s.address, coords });
+          } else {
+            failed.push(s.name);
+          }
+          // Rate limit only if there are more to process
+          if (toGeocode.indexOf(s) < toGeocode.length - 1) {
+            await new Promise((r) => setTimeout(r, 1100));
+          }
+        }
+        if (cancelled) return;
+        setFailedAddresses(failed);
+        setIsCalculating(false);
+      }
+
+      // Build ordered geocoded stops from current active stops
+      const ordered = activeStops
+        .filter((s) => geocodedRef.current.has(s.id))
+        .map((s) => ({ id: s.id, ...geocodedRef.current.get(s.id)! }));
+      if (!cancelled) setGeocodedStops(ordered);
+    }
+
+    run();
+    return () => { cancelled = true; };
+  }, [stopsKey, startAddress]);
 
   // Calculate route
   useEffect(() => {
@@ -421,6 +457,13 @@ export function TodayView() {
                 );
               })}
             </ol>
+          )}
+          {failedAddresses.length > 0 && (
+            <div className="text-xs text-orange-700 bg-orange-50 rounded-md px-3 py-2">
+              <p className="font-medium">Dirección no encontrada:</p>
+              {failedAddresses.map((name) => <p key={name} className="text-orange-600">· {name}</p>)}
+              <p className="mt-1 text-orange-500 italic">Revisa la dirección en la ficha del paciente.</p>
+            </div>
           )}
         </div>
       </div>
