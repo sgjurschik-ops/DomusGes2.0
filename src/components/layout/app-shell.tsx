@@ -27,7 +27,7 @@ const VIEW_TITLES: Record<string, string> = {
 // Logs the user out after IDLE_TIMEOUT_MS of no activity.
 // Shows a warning WARN_BEFORE_MS before the timeout.
 
-const IDLE_TIMEOUT_MS = 20 * 60 * 1000;  // 20 minutes
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;  // 15 minutes
 const WARN_BEFORE_MS = 60 * 1000;        // warn 1 minute before
 
 const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
@@ -49,7 +49,7 @@ function useIdleTimeout() {
     }, IDLE_TIMEOUT_MS - WARN_BEFORE_MS);
 
     timerRef.current = setTimeout(() => {
-      signOut({ redirect: false });
+      signOut({ callbackUrl: "/" });
     }, IDLE_TIMEOUT_MS);
   }, []);
 

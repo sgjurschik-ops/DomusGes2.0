@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 import { loginSchema } from "@/lib/schemas";
 
 export const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt", maxAge: 60 * 60 * 8 }, // 8h idle session
+  session: { strategy: "jwt", maxAge: 60 * 60 }, // 1h — idle timeout in app-shell handles the 15-min cutoff
   pages: { signIn: "/" }, // the SPA handles login UI at /
   providers: [
     CredentialsProvider({

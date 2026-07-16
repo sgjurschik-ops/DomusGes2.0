@@ -20,12 +20,12 @@ export async function GET(req: NextRequest) {
     if (from) where.start.gte = new Date(from);
     if (to) where.start.lte = new Date(to);
   }
-  // Permission: non-admin users only see their own reservations
-  if (prof.userRole !== "admin") {
-    where.therapistId = prof.id;
-  } else if (therapistId) {
-    where.therapistId = therapistId;
+  // Permission: admin cannot see reservations (private to each therapist).
+  // Non-admin users only see their own reservations.
+  if (prof.userRole === "admin") {
+    return NextResponse.json([]);
   }
+  where.therapistId = prof.id;
 
   const rows = await db.slotReservation.findMany({
     where,
