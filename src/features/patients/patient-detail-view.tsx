@@ -256,7 +256,7 @@ export function PatientDetailView() {
                       <p className="text-xs text-muted-foreground mb-1">
                         {formatDateTime(visits[0].date)} · {visits[0].durationMin} min · {visits[0].therapistName}
                       </p>
-                      <p className="text-sm line-clamp-3">{visits[0].notes}</p>
+                      <div className="text-sm line-clamp-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: visits[0].notes }} />
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">Sin seguimientos registrados.</p>

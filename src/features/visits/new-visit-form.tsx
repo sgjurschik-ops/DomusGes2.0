@@ -41,8 +41,13 @@ export function NewVisitForm() {
       patientId: newVisitPatientId ?? "",
       therapistId: "",
       date: new Date().toISOString().slice(0, 10),
-      time: "10:00",
-      durationMin: 45,
+      time: (() => {
+        const now = new Date();
+        const m = Math.round(now.getMinutes() / 15) * 15;
+        const h = m === 60 ? now.getHours() + 1 : now.getHours();
+        return `${String(h % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+      })(),
+      durationMin: 60,
       title: "",
       notes: "",
       interventions: [],
@@ -133,7 +138,21 @@ export function NewVisitForm() {
               </div>
               <div className="space-y-1.5 min-w-0">
                 <Label className="text-xs">Hora <span className="text-destructive">*</span></Label>
-                <Input type="time" className="px-2" {...register("time")} />
+                <Controller control={control} name="time"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger><SelectValue placeholder="Hora" /></SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {Array.from({ length: 24 }, (_, h) =>
+                          [0, 15, 30, 45].map((m) => {
+                            const val = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+                            return <SelectItem key={val} value={val}>{val}</SelectItem>;
+                          })
+                        ).flat()}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 {errors.time && <p className="text-xs text-destructive">{errors.time.message}</p>}
               </div>
             </div>

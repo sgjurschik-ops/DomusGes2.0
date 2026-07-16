@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -116,7 +117,7 @@ function VisitSummary({
       </div>
 
       <div className="rounded-lg border bg-muted/40 px-4 py-3">
-        <p className="text-sm whitespace-pre-wrap">{visit.notes}</p>
+        <div className="text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: visit.notes }} />
       </div>
 
       {(visit.interventions ?? []).length > 0 && (
@@ -262,7 +263,8 @@ function VisitEditForm({
 
       <div className="space-y-1.5">
         <Label className="text-sm font-semibold">Notas clínicas <span className="text-destructive">*</span></Label>
-        <Textarea rows={10} className="text-sm" {...register("notes")} />
+        <Controller control={control} name="notes"
+          render={({ field }) => <RichTextarea rows={10} value={field.value ?? ""} onChange={field.onChange} placeholder="Notas clínicas..." />} />
         {errors.notes && <p className="text-xs text-destructive">{errors.notes.message}</p>}
       </div>
 
