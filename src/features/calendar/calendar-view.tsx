@@ -231,7 +231,7 @@ function computeLaneStyle(lane: number, laneCount: number): { left: string; widt
 }
 
 // Adds `minutes` to a "HH:mm" string, used only to seed a sensible default
-// end time (start + 45min) when a create dialog first opens.
+// end time (start + 60min) when a create dialog first opens.
 function addMinutesToTimeStr(time: string, minutes: number): string {
   const [h, m] = time.split(":").map(Number);
   const total = h * 60 + m + minutes;
@@ -1848,7 +1848,7 @@ function AppointmentFormDialog({
             therapistId: "",
             date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
             time: preset?.time ?? "10:00",
-            endTime: preset?.time ? addMinutesToTimeStr(preset.time, 45) : "10:45",
+            endTime: preset?.time ? addMinutesToTimeStr(preset.time, 60) : "11:00",
             type: "Sesión",
             notes: "",
           },
@@ -1874,7 +1874,7 @@ function AppointmentFormDialog({
         therapistId: "",
         date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
         time: preset?.time ?? "10:00",
-        endTime: preset?.time ? addMinutesToTimeStr(preset.time, 45) : "10:45",
+        endTime: preset?.time ? addMinutesToTimeStr(preset.time, 60) : "11:00",
         type: "Sesión",
         notes: "",
       });
@@ -2094,7 +2094,7 @@ function ReservationFormDialog({
             title: "",
             date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
             time: preset?.time ?? "10:00",
-            endTime: addMinutesToTimeStr(preset?.time ?? "10:00", 45),
+            endTime: addMinutesToTimeStr(preset?.time ?? "10:00", 60),
           },
   });
 
@@ -2116,7 +2116,7 @@ function ReservationFormDialog({
         title: "",
         date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
         time: preset?.time ?? "10:00",
-        endTime: addMinutesToTimeStr(preset?.time ?? "10:00", 45),
+        endTime: addMinutesToTimeStr(preset?.time ?? "10:00", 60),
       });
     }
   }, [open, mode, reservation?.id, preset?.date, preset?.time]);
