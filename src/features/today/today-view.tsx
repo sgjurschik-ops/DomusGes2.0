@@ -144,6 +144,7 @@ export function TodayView() {
   const addablePatients = (patients ?? [])
     .filter((p) => p.address && !manualStops.some((s) => s.patientId === p.id))
     .filter((p) => !patientSearch || p.fullName.toLowerCase().includes(patientSearch.toLowerCase()));
+  const [showPatientList, setShowPatientList] = useState(false);
 
   function addPatientToRoute(p: { id: string; fullName: string; address: string | null }) {
     if (!p.address) return;
@@ -327,13 +328,18 @@ export function TodayView() {
           {tab === "custom" && (
             <div className="space-y-1.5">
               <div className="relative">
-                <Input value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)} placeholder="Buscar paciente para añadir…" className="h-8 text-sm pr-8" />
+                <Input value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)}
+                  onFocus={() => setShowPatientList(true)}
+                  onBlur={() => setTimeout(() => setShowPatientList(false), 200)}
+                  placeholder="Buscar paciente para añadir…" className="h-8 text-sm pr-8" />
                 <Plus className="w-4 h-4 absolute right-2 top-2 text-muted-foreground pointer-events-none" />
               </div>
-              {patientSearch && addablePatients.length > 0 && (
-                <div className="border rounded-md max-h-32 overflow-y-auto bg-card shadow-sm">
-                  {addablePatients.slice(0, 6).map((p) => (
-                    <button key={p.id} type="button" onClick={() => addPatientToRoute(p)}
+              {showPatientList && addablePatients.length > 0 && (
+                <div className="border rounded-md max-h-40 overflow-y-auto bg-card shadow-sm">
+                  {addablePatients.slice(0, 10).map((p) => (
+                    <button key={p.id} type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => { addPatientToRoute(p); setShowPatientList(false); }}
                       className="w-full text-left px-3 py-1.5 hover:bg-muted text-sm flex items-center justify-between gap-2 border-b last:border-0">
                       <span className="truncate">{p.fullName}</span>
                       <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">{p.address}</span>
@@ -341,7 +347,7 @@ export function TodayView() {
                   ))}
                 </div>
               )}
-              {patientSearch && addablePatients.length === 0 && (
+              {showPatientList && addablePatients.length === 0 && (
                 <p className="text-xs text-muted-foreground italic px-1">No se encontraron pacientes con dirección.</p>
               )}
             </div>
@@ -357,6 +363,18 @@ export function TodayView() {
             </Card>
           ) : (
             <ol className="space-y-1.5">
+              {/* Starting point as first stop */}
+              <li>
+                <Card className="p-2.5 border-primary/30 bg-primary/5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-[11px] shrink-0 bg-[#1a5c58]">●</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Inicio</p>
+                      <p className="text-sm font-medium truncate">{startAddress}</p>
+                    </div>
+                  </div>
+                </Card>
+              </li>
               {activeStops.map((s, idx) => {
                 const legInfo = routeResult?.legs?.[startCoords ? idx : idx - 1];
                 const color = STOP_COLORS[idx % STOP_COLORS.length];
