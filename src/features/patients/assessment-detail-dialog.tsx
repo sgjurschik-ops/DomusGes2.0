@@ -302,7 +302,7 @@ function AssessmentEditForm({
   } = useForm<AssessmentUpdateInput>({
     resolver: zodResolver(assessmentUpdateSchema) as Resolver<AssessmentUpdateInput>,
     defaultValues: {
-      scale: assessment.scale,
+      scale: assessment.scale as AssessmentUpdateInput["scale"],
       score: assessment.score,
       notes: assessment.notes ?? "",
       date: assessment.date.slice(0, 10),
