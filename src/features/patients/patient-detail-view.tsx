@@ -1,6 +1,6 @@
 "use client";
 
-import { usePatient, useVisits, useAssessments, useProfessionals, useCreateAssessment, useDeletePatient, useUpdatePatient } from "@/hooks/api";
+import { usePatient, useVisits, useAssessments, useProfessionals, useCreateAssessment, useDeletePatient, useUpdatePatient, useMe } from "@/hooks/api";
 import { useNav } from "@/store/nav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -54,6 +54,8 @@ export function PatientDetailView() {
   const { data: visits } = useVisits(selectedPatientId ?? undefined);
   const { data: assessments } = useAssessments(selectedPatientId ?? undefined);
   const { data: professionals } = useProfessionals();
+  const { data: me } = useMe();
+  const isAdmin = me?.userRole === "admin";
   const deletePatient = useDeletePatient();
   const updatePatient = useUpdatePatient();
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
@@ -121,9 +123,11 @@ export function PatientDetailView() {
 
               {/* Row 2: Actions + alerts — smaller buttons */}
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Button size="sm" className="h-7 text-xs px-2.5" onClick={() => { useNav.getState().setNewVisitPatient(patient.id); navigate("new-visit"); }} disabled={!professionals?.length}>
-                  <Plus className="w-3.5 h-3.5 mr-1" />Registrar seguimiento
-                </Button>
+                {!isAdmin && (
+                  <Button size="sm" className="h-7 text-xs px-2.5" onClick={() => { useNav.getState().setNewVisitPatient(patient.id); navigate("new-visit"); }} disabled={!professionals?.length}>
+                    <Plus className="w-3.5 h-3.5 mr-1" />Registrar seguimiento
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" onClick={() => setReportDialogOpen(true)}>
                   <FileDown className="w-3.5 h-3.5 mr-1" />Generar informe
                 </Button>
@@ -202,94 +206,87 @@ export function PatientDetailView() {
             </div>
 
             {/* Divider */}
-            <div className="w-px bg-border mx-4 self-stretch hidden lg:block" />
-
-            {/* Right: sticky notes — separated block */}
-            <QuickNotes patientId={patient.id} initial={patient.quickNotes} />
+            {!isAdmin && <div className="w-px bg-border mx-4 self-stretch hidden lg:block" />}
+            {!isAdmin && <QuickNotes patientId={patient.id} initial={patient.quickNotes} />}
           </div>
         </CardContent>
       </Card>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+        <TabsList className={`grid w-full max-w-2xl ${isAdmin ? "grid-cols-1 max-w-xs" : "grid-cols-5"}`}>
           <TabsTrigger value="overview">Resumen</TabsTrigger>
-          <TabsTrigger value="visits">Seguimientos ({visits?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="occupational-profile">Perfil ocupacional</TabsTrigger>
-          <TabsTrigger value="assessments">Valoración</TabsTrigger>
-          <TabsTrigger value="progress">Evolución</TabsTrigger>
+          {!isAdmin && <TabsTrigger value="visits">Seguimientos ({visits?.length ?? 0})</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="occupational-profile">Perfil ocupacional</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="assessments">Valoración</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="progress">Evolución</TabsTrigger>}
         </TabsList>
 
         {/* Overview */}
         <TabsContent value="overview" className="mt-4 space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <KpiChip
-              icon={Calendar}
-              color="blue"
-              label="Última visita"
-              value={visits && visits.length > 0 ? formatDate(visits[0].date) : "Sin visitas"}
-            />
-            <KpiChip
-              icon={ClipboardList}
-              color="green"
-              label="Seguimientos"
-              value={`${patient.totalVisits}`}
-            />
-            <KpiChip
-              icon={Activity}
-              color="purple"
-              label="Última evaluación"
-              value={assessments && assessments.length > 0 ? `${assessments[0].scale} · ${assessments[0].score}` : "Sin registrar"}
-            />
-            <KpiChip
-              icon={ListChecks}
-              color="yellow"
-              label="Perfil ocupacional"
-              value={profileCompletion ? `${profileCompletion.filled}/${profileCompletion.total} campos` : "—"}
-            />
-          </div>
+          {!isAdmin && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <KpiChip icon={Calendar} color="blue" label="Última visita"
+                value={visits && visits.length > 0 ? formatDate(visits[0].date) : "Sin visitas"} />
+              <KpiChip icon={ClipboardList} color="green" label="Seguimientos"
+                value={`${patient.totalVisits}`} />
+              <KpiChip icon={Activity} color="purple" label="Última evaluación"
+                value={assessments && assessments.length > 0 ? `${assessments[0].scale} · ${assessments[0].score}` : "Sin registrar"} />
+              <KpiChip icon={ListChecks} color="yellow" label="Perfil ocupacional"
+                value={profileCompletion ? `${profileCompletion.filled}/${profileCompletion.total} campos` : "—"} />
+            </div>
+          )}
 
-          <div className="grid lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Último seguimiento</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {visits && visits.length > 0 ? (
-                  <div>
-                    <p className="text-sm font-medium mb-0.5">{visits[0].title ?? "Seguimiento"}</p>
-                    <p className="text-xs text-muted-foreground mb-1">
-                      {formatDateTime(visits[0].date)} · {visits[0].durationMin} min · {visits[0].therapistName}
-                    </p>
-                    <p className="text-sm line-clamp-3">{visits[0].notes}</p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Sin seguimientos registrados.</p>
-                )}
-              </CardContent>
+          {isAdmin && (
+            <Card className="p-6 text-center text-sm text-muted-foreground">
+              <p>Como administrador/a, no tienes acceso a la información clínica del paciente.</p>
+              <p className="mt-1">Puedes gestionar citas desde la <button type="button" onClick={() => navigate("calendar")} className="text-primary hover:underline font-medium">Agenda</button>.</p>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Últimas evaluaciones</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {assessments && assessments.length > 0 ? (
-                  <ul className="space-y-1.5">
-                    {assessments.slice(0, 4).map((a) => (
-                      <li key={a.id} className="flex items-center justify-between text-sm">
-                        <span>{a.scale}</span>
-                        <span className="font-mono">{a.score}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Sin evaluaciones registradas.</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          )}
+
+          {!isAdmin && (
+            <div className="grid lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Último seguimiento</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {visits && visits.length > 0 ? (
+                    <div>
+                      <p className="text-sm font-medium mb-0.5">{visits[0].title ?? "Seguimiento"}</p>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        {formatDateTime(visits[0].date)} · {visits[0].durationMin} min · {visits[0].therapistName}
+                      </p>
+                      <p className="text-sm line-clamp-3">{visits[0].notes}</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Sin seguimientos registrados.</p>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Últimas evaluaciones</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {assessments && assessments.length > 0 ? (
+                    <ul className="space-y-1.5">
+                      {assessments.slice(0, 4).map((a) => (
+                        <li key={a.id} className="flex items-center justify-between text-sm">
+                          <span>{a.scale}</span>
+                          <span className="font-mono">{a.score}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Sin evaluaciones registradas.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Patient-reported problems from occupational profile */}
-          {problemsUser && (
+          {!isAdmin && problemsUser && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -304,8 +301,8 @@ export function PatientDetailView() {
           )}
         </TabsContent>
 
-        {/* Visits */}
-        <TabsContent value="visits" className="mt-4 space-y-3">
+        {/* Visits — hidden for admin */}
+        {!isAdmin && <TabsContent value="visits" className="mt-4 space-y-3">
           {!visits || visits.length === 0 ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">
               <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -345,23 +342,23 @@ export function PatientDetailView() {
               </Card>
             ))
           )}
-        </TabsContent>
+        </TabsContent>}
 
-{/* Occupational profile */}
-<TabsContent value="occupational-profile" className="mt-4">
+{/* Occupational profile — hidden for admin */}
+{!isAdmin && <TabsContent value="occupational-profile" className="mt-4">
   <OccupationalProfileTab patientId={patient.id} />
-</TabsContent>
+</TabsContent>}
 
-        {/* Assessments */}
-        <TabsContent value="assessments" className="mt-4 space-y-4">
+        {/* Assessments — hidden for admin */}
+        {!isAdmin && <TabsContent value="assessments" className="mt-4 space-y-4">
           <AssessmentForm
             patientId={patient.id}
             therapistId={patient.therapistIds[0] ?? professionals?.[0]?.id ?? ""}
           />
-        </TabsContent>
+        </TabsContent>}
 
-        {/* Progress */}
-        <TabsContent value="progress" className="mt-4 space-y-4">
+        {/* Progress — hidden for admin */}
+        {!isAdmin && <TabsContent value="progress" className="mt-4 space-y-4">
           <ProgressChart assessments={assessments ?? []} onOpenAssessment={setOpenAssessmentId} />
           {!assessments || assessments.length === 0 ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">
@@ -396,7 +393,7 @@ export function PatientDetailView() {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
+        </TabsContent>}
       </Tabs>
 
       {openAssessmentId && (
