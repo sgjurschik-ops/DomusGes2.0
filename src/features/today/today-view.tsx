@@ -12,6 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { MapPin, Navigation, Clock, Car, Bike, Footprints, ExternalLink, RotateCcw, Plus, X, GripVertical, CalendarDays, Route } from "lucide-react";
+import { AddressSearch } from "@/components/address-search";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -250,10 +251,14 @@ export function TodayView() {
     <div className="space-y-3">
       {/* Controls bar */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-1.5 flex-1 min-w-[200px] max-w-sm">
-          <Navigation className="w-4 h-4 text-muted-foreground shrink-0" />
-          <Input value={startAddress} onChange={(e) => setStartAddress(e.target.value)} placeholder="Punto de partida..." className="h-8 text-sm"
-            onBlur={geocodeAll} onKeyDown={(e) => { if (e.key === "Enter") geocodeAll(); }} />
+        <div className="flex-1 min-w-[200px] max-w-sm">
+          <AddressSearch
+            value={startAddress}
+            onChange={(addr) => setStartAddress(addr)}
+            onCoordsChange={(coords) => { if (coords) setStartCoords(coords); }}
+            placeholder="Punto de partida…"
+            showLocateButton
+          />
         </div>
 
         <div className="flex items-center gap-1 rounded-md border p-0.5">

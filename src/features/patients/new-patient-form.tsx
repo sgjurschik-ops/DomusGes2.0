@@ -10,6 +10,7 @@ import {
   useUpdatePatient,
 } from "@/hooks/api";
 import { useNav } from "@/store/nav";
+import { AddressSearch } from "@/components/address-search";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -163,7 +164,17 @@ export function NewPatientForm({ mode = "create" }: Props) {
               <Input id="phone" placeholder="6XX XXX XXX" {...register("phone")} />
             </Field>
             <Field label="Dirección" error={errors.address?.message} className="sm:col-span-2">
-              <Input id="address" placeholder="Calle, número, piso, ciudad" {...register("address")} />
+              <Controller
+                control={control}
+                name="address"
+                render={({ field }) => (
+                  <AddressSearch
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="Buscar dirección…"
+                  />
+                )}
+              />
             </Field>
           </CardContent>
         </Card>
