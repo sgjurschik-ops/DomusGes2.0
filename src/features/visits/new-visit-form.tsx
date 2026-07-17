@@ -128,6 +128,14 @@ export function NewVisitForm() {
 
   async function onSubmit(values: VisitCreateInput) {
     try {
+      // Update previous visit's tasks with completion status
+      if (previousVisitId && previousTasks.length > 0) {
+        await fetch(`/api/visits/${previousVisitId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tasks: JSON.stringify(previousTasks) }),
+        }).catch(() => {});
+      }
       const v = await create.mutateAsync(values);
       toast({ title: "Seguimiento registrado", description: v.patientName });
       selectPatient(values.patientId);
@@ -140,11 +148,12 @@ export function NewVisitForm() {
   const interventions = watch("interventions");
   const selectedPatientId = watch("patientId");
   const [previousTasks, setPreviousTasks] = useState<{ id: string; text: string; completed: boolean }[]>([]);
+  const [previousVisitId, setPreviousVisitId] = useState<string | null>(null);
   const [taskInput, setTaskInput] = useState("");
 
   // Fetch patient goals and previous tasks when patient changes
   useEffect(() => {
-    if (!selectedPatientId) { setPatientGoals([]); setPreviousTasks([]); return; }
+    if (!selectedPatientId) { setPatientGoals([]); setPreviousTasks([]); setPreviousVisitId(null); return; }
     fetch(`/api/patients/${selectedPatientId}/occupational-profile`)
       .then((r) => r.json())
       .then((data) => {
@@ -152,18 +161,19 @@ export function NewVisitForm() {
         setPatientGoals(goals);
       })
       .catch(() => setPatientGoals([]));
-    // Fetch most recent visit to get pending tasks
     fetch(`/api/visits?patientId=${selectedPatientId}&limit=1`)
       .then((r) => r.json())
       .then((visits: any[]) => {
         if (visits.length > 0 && Array.isArray(visits[0].tasks)) {
           const pending = visits[0].tasks.filter((t: any) => !t.completed);
           setPreviousTasks(pending);
+          setPreviousVisitId(visits[0].id);
         } else {
           setPreviousTasks([]);
+          setPreviousVisitId(null);
         }
       })
-      .catch(() => setPreviousTasks([]));
+      .catch(() => { setPreviousTasks([]); setPreviousVisitId(null); });
   }, [selectedPatientId]);
 
   function togglePreviousTask(id: string) {

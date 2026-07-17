@@ -41,6 +41,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
+  // Support partial update (e.g. just tasks from new-visit-form reviewing previous tasks)
+  if (body.tasks && !body.therapistId) {
+    const tasks = typeof body.tasks === "string" ? body.tasks : JSON.stringify(body.tasks);
+    await db.visit.update({ where: { id }, data: { tasks } });
+    return NextResponse.json({ ok: true });
+  }
+
   const parsed = visitUpdateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
