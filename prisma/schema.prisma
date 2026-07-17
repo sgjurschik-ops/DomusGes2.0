@@ -276,8 +276,10 @@ model OccupationalGoal {
   id                     String   @id @default(cuid())
   occupationalProfileId  String
   text                   String
-  area                   String   // "Social-familiar" | "Laboral y económica" | "Hábitos y rutinas" | "Intereses y motivaciones" | "Datos generales"
+  area                   String   // "Cuidado de sí mismo" | "Productividad" | "Ocio"
+  scope                  String   @default("Con el paciente") // "Con el paciente" | "Con la familia/entorno" | "Coordinación profesional"
   status                 String   @default("En curso") // En curso | Conseguido | Abandonado
+  specificGoals          String   @default("[]") // JSON-encoded { id, text, status }[]
   startDate              DateTime?
   targetDate             DateTime?
   evaluation             String?

@@ -20,6 +20,7 @@ import {
   Target,
   Plus,
   Trash2,
+  X,
   LayoutGrid,
   Pencil,
   Eye,
@@ -89,16 +90,39 @@ const GOAL_SCOPE_COLORS: Record<GoalScope, string> = {
 const GOAL_STATUSES = ["En curso", "Conseguido", "Abandonado"] as const;
 type GoalStatus = typeof GOAL_STATUSES[number];
 
+interface SpecificGoal {
+  id: string;
+  text: string;
+  status: GoalStatus;
+}
+
 interface Goal {
   id?: string;
   text: string;
   area: GoalArea;
   scope: GoalScope;
   status: GoalStatus;
+  specificGoals: SpecificGoal[];
   startDate: string | null;
   targetDate: string | null;
   evaluation: string;
 }
+
+// Predefined general objectives with suggested area
+const PREDEFINED_OBJECTIVES: { text: string; area: GoalArea }[] = [
+  { text: "Mejorar la autonomía en actividades de la vida diaria", area: "Cuidado de sí mismo" },
+  { text: "Incrementar la participación en actividades significativas", area: "Ocio" },
+  { text: "Promover la gestión del hogar de forma independiente", area: "Productividad" },
+  { text: "Fomentar las relaciones sociales y la participación comunitaria", area: "Ocio" },
+  { text: "Mejorar las habilidades de organización y planificación", area: "Productividad" },
+  { text: "Favorecer la gestión emocional y el bienestar", area: "Cuidado de sí mismo" },
+  { text: "Potenciar las habilidades cognitivas funcionales", area: "Cuidado de sí mismo" },
+  { text: "Mejorar la movilidad funcional y el equilibrio", area: "Cuidado de sí mismo" },
+  { text: "Promover hábitos de vida saludables", area: "Cuidado de sí mismo" },
+  { text: "Facilitar la integración laboral o formativa", area: "Productividad" },
+  { text: "Mejorar la coordinación y destreza manual", area: "Cuidado de sí mismo" },
+  { text: "Favorecer la adaptación al entorno y uso de productos de apoyo", area: "Productividad" },
+];
 
 interface FamilyMember {
   name: string;
@@ -210,7 +234,9 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
               id: g.id,
               text: g.text,
               area: g.area,
+              scope: g.scope ?? "Con el paciente",
               status: g.status,
+              specificGoals: (() => { try { return typeof g.specificGoals === "string" ? JSON.parse(g.specificGoals) : (g.specificGoals ?? []); } catch { return []; } })(),
               startDate: g.startDate ? g.startDate.slice(0, 10) : null,
               targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
               evaluation: g.evaluation ?? "",
@@ -258,7 +284,9 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
               id: g.id,
               text: g.text,
               area: g.area,
+              scope: g.scope ?? "Con el paciente",
               status: g.status,
+              specificGoals: (() => { try { return typeof g.specificGoals === "string" ? JSON.parse(g.specificGoals) : (g.specificGoals ?? []); } catch { return []; } })(),
               startDate: g.startDate ? g.startDate.slice(0, 10) : null,
               targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
               evaluation: g.evaluation ?? "",
@@ -292,8 +320,11 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         weeklyRoutine: parseJsonArray<RoutineCell>(saved?.weeklyRoutine),
         goals: Array.isArray(saved?.goals)
           ? saved.goals.map((g: any) => ({
-              id: g.id, text: g.text, area: g.area, status: g.status,
+              id: g.id, text: g.text, area: g.area, scope: g.scope ?? "Con el paciente", status: g.status,
+              specificGoals: (() => { try { return typeof g.specificGoals === "string" ? JSON.parse(g.specificGoals) : (g.specificGoals ?? []); } catch { return []; } })(),
+              startDate: g.startDate ? g.startDate.slice(0, 10) : null,
               targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
+              evaluation: g.evaluation ?? "",
             }))
           : [],
       });
@@ -779,25 +810,63 @@ const GOAL_STATUS_STYLES: Record<GoalStatus, string> = {
 
 function ReadOnlyGoals({ goals }: { goals: Goal[] }) {
   if (goals.length === 0) return <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">Sin objetivos añadidos.</p>;
+
+  const enCurso = goals.filter((g) => g.status === "En curso");
+  const conseguidos = goals.filter((g) => g.status === "Conseguido");
+  const abandonados = goals.filter((g) => g.status === "Abandonado");
+
+  function GoalCard({ g }: { g: Goal }) {
+    const areaColor = GOAL_AREA_COLORS[g.area] ?? "#6b7280";
+    const specifics = g.specificGoals ?? [];
+    return (
+      <div className="rounded-lg border bg-card p-3 space-y-1.5" style={{ borderLeftWidth: "4px", borderLeftColor: areaColor }}>
+        <p className="text-sm font-medium">{g.text}</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px]" style={{ color: areaColor }}>{g.area}</span>
+          {g.scope && g.scope !== "Con el paciente" && (
+            <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ color: GOAL_SCOPE_COLORS[g.scope as GoalScope] ?? "#6b7280", backgroundColor: `${GOAL_SCOPE_COLORS[g.scope as GoalScope] ?? "#6b7280"}18` }}>{g.scope}</span>
+          )}
+        </div>
+        {specifics.length > 0 && (
+          <ul className="space-y-0.5 mt-1">
+            {specifics.map((s) => (
+              <li key={s.id} className={`text-xs flex items-center gap-1.5 ${s.status === "Conseguido" ? "line-through text-muted-foreground" : ""}`}>
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.status === "Conseguido" ? "bg-green-400" : s.status === "Abandonado" ? "bg-zinc-300" : "bg-primary"}`} />
+                {s.text}
+              </li>
+            ))}
+          </ul>
+        )}
+        {g.evaluation && <p className="text-[11px] text-muted-foreground mt-1 italic">{g.evaluation}</p>}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       <p className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Objetivos</p>
-      {goals.map((g, i) => {
-        const areaColor = GOAL_AREA_COLORS[g.area] ?? "#6b7280";
-        return (
-          <div key={i} className="rounded-lg border bg-muted/40 p-3 space-y-1" style={{ borderLeftWidth: "4px", borderLeftColor: areaColor }}>
-            <p className="text-sm font-medium">{g.text || "Sin descripción"}</p>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs" style={{ color: areaColor }}>{g.area}</span>
-              {g.scope && <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: GOAL_SCOPE_COLORS[g.scope as GoalScope] ?? "#6b7280", backgroundColor: `${GOAL_SCOPE_COLORS[g.scope as GoalScope] ?? "#6b7280"}18` }}>{g.scope}</span>}
-              <span className={`text-xs rounded-full px-2 py-0.5 ${GOAL_STATUS_STYLES[g.status]}`}>{g.status}</span>
-              {g.startDate && <span className="text-xs text-muted-foreground">Inicio: {g.startDate}</span>}
-              {g.targetDate && <span className="text-xs text-muted-foreground">Objetivo: {g.targetDate}</span>}
-            </div>
-            {g.evaluation && <p className="text-xs text-muted-foreground mt-1">{g.evaluation}</p>}
-          </div>
-        );
-      })}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-sky-400" /> En curso ({enCurso.length})
+          </p>
+          {enCurso.length === 0 ? <p className="text-xs text-muted-foreground italic">Ninguno.</p> : enCurso.map((g, i) => <GoalCard key={i} g={g} />)}
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-green-600 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-green-400" /> Conseguidos ({conseguidos.length})
+          </p>
+          {conseguidos.length === 0 ? <p className="text-xs text-muted-foreground italic">Ninguno todavía.</p> : conseguidos.map((g, i) => <GoalCard key={i} g={g} />)}
+          {abandonados.length > 0 && (
+            <>
+              <p className="text-xs font-semibold text-zinc-500 flex items-center gap-1.5 mt-3">
+                <span className="w-2 h-2 rounded-full bg-zinc-300" /> Abandonados ({abandonados.length})
+              </p>
+              {abandonados.map((g, i) => <GoalCard key={i} g={g} />)}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -924,15 +993,41 @@ function WorkHistoryEditor({ value, onChange }: { value: WorkHistoryEntry[]; onC
 }
 
 function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goal[]) => void }) {
-  function addRow() {
-    onChange([...value, { text: "", area: "Cuidado de sí mismo", scope: "Con el paciente", status: "En curso", startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "" }]);
+  const [showPicker, setShowPicker] = useState(false);
+  const [specificInput, setSpecificInput] = useState<Record<number, string>>({});
+
+  function addFromPredefined(obj: { text: string; area: GoalArea }) {
+    onChange([...value, { text: obj.text, area: obj.area, scope: "Con el paciente", status: "En curso", specificGoals: [], startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "" }]);
+    setShowPicker(false);
+  }
+  function addCustom() {
+    onChange([...value, { text: "", area: "Cuidado de sí mismo", scope: "Con el paciente", status: "En curso", specificGoals: [], startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "" }]);
   }
   function updateRow(i: number, patch: Partial<Goal>) { onChange(value.map((g, idx) => (idx === i ? { ...g, ...patch } : g))); }
   function removeRow(i: number) {
-    const ok = confirm("¿Seguro que quieres eliminar este objetivo?");
-    if (!ok) return;
+    if (!confirm("¿Seguro que quieres eliminar este objetivo y sus objetivos específicos?")) return;
     onChange(value.filter((_, idx) => idx !== i));
   }
+  function addSpecific(goalIdx: number) {
+    const text = (specificInput[goalIdx] ?? "").trim();
+    if (!text) return;
+    const goal = value[goalIdx];
+    const specifics = [...(goal.specificGoals ?? []), { id: `sg-${Date.now()}`, text, status: "En curso" as GoalStatus }];
+    updateRow(goalIdx, { specificGoals: specifics });
+    setSpecificInput({ ...specificInput, [goalIdx]: "" });
+  }
+  function updateSpecific(goalIdx: number, specificId: string, patch: Partial<SpecificGoal>) {
+    const goal = value[goalIdx];
+    const specifics = (goal.specificGoals ?? []).map((s) => s.id === specificId ? { ...s, ...patch } : s);
+    updateRow(goalIdx, { specificGoals: specifics });
+  }
+  function removeSpecific(goalIdx: number, specificId: string) {
+    const goal = value[goalIdx];
+    updateRow(goalIdx, { specificGoals: (goal.specificGoals ?? []).filter((s) => s.id !== specificId) });
+  }
+
+  // Objectives already added (to filter picker)
+  const usedTexts = new Set(value.map((g) => g.text));
 
   return (
     <div className="space-y-3">
@@ -945,10 +1040,10 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
             <div key={i} className="rounded-lg border overflow-hidden" style={{ borderLeftWidth: "4px", borderLeftColor: areaColor }}>
               <div className="p-3 space-y-3">
                 <div className="flex items-start gap-2">
-                  <div className="flex-1 space-y-2">
-                    <Textarea rows={2} placeholder="Describe el objetivo…" value={goal.text} onChange={(e) => updateRow(i, { text: e.target.value })} />
+                  <div className="flex-1">
+                    <Textarea rows={1} placeholder="Objetivo general…" value={goal.text} onChange={(e) => updateRow(i, { text: e.target.value })} className="text-sm font-medium" />
                   </div>
-                  <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive shrink-0" onClick={() => removeRow(i)} aria-label="Quitar objetivo">
+                  <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive shrink-0" onClick={() => removeRow(i)}>
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
@@ -962,38 +1057,19 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
                     </SelectTrigger>
                     <SelectContent>
                       {GOAL_AREAS.map((a) => (
-                        <SelectItem key={a} value={a}>
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: GOAL_AREA_COLORS[a] }} />
-                            {a}
-                          </div>
-                        </SelectItem>
+                        <SelectItem key={a} value={a}><div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: GOAL_AREA_COLORS[a] }} />{a}</div></SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <Select value={goal.scope ?? "Con el paciente"} onValueChange={(v) => updateRow(i, { scope: v as GoalScope })}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: GOAL_SCOPE_COLORS[goal.scope as GoalScope] ?? "#9CA3AF" }} />
-                        <SelectValue />
-                      </div>
-                    </SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {GOAL_SCOPES.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: GOAL_SCOPE_COLORS[s] }} />
-                            {s}
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {GOAL_SCOPES.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
                     </SelectContent>
                   </Select>
                   <Select value={goal.status} onValueChange={(v) => updateRow(i, { status: v as GoalStatus })}>
                     <SelectTrigger className={`h-8 text-xs ${GOAL_STATUS_STYLES[goal.status]}`}><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {GOAL_STATUSES.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
-                    </SelectContent>
+                    <SelectContent>{GOAL_STATUSES.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent>
                   </Select>
                   <div className="space-y-0.5">
                     <p className="text-[10px] text-muted-foreground">Inicio</p>
@@ -1004,18 +1080,69 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
                     <Input type="date" className="h-8 text-xs" value={goal.targetDate ?? ""} onChange={(e) => updateRow(i, { targetDate: e.target.value || null })} />
                   </div>
                 </div>
+
+                {/* Specific goals / tasks */}
+                <div className="space-y-1.5 pl-3 border-l-2" style={{ borderColor: `${areaColor}40` }}>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Objetivos específicos</p>
+                  {(goal.specificGoals ?? []).map((sg) => (
+                    <div key={sg.id} className="flex items-center gap-2 text-sm">
+                      <button type="button" onClick={() => updateSpecific(i, sg.id, { status: sg.status === "Conseguido" ? "En curso" : "Conseguido" })}
+                        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${sg.status === "Conseguido" ? "bg-green-100 border-green-400 text-green-600" : "border-muted-foreground/30"}`}>
+                        {sg.status === "Conseguido" && <span className="text-[10px]">✓</span>}
+                      </button>
+                      <span className={`flex-1 ${sg.status === "Conseguido" ? "line-through text-muted-foreground" : ""}`}>{sg.text}</span>
+                      <button type="button" onClick={() => removeSpecific(i, sg.id)} className="text-muted-foreground hover:text-destructive">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex gap-1.5">
+                    <Input placeholder="Añadir objetivo específico…" className="h-7 text-xs" value={specificInput[i] ?? ""}
+                      onChange={(e) => setSpecificInput({ ...specificInput, [i]: e.target.value })}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSpecific(i); } }} />
+                    <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => addSpecific(i)} disabled={!(specificInput[i] ?? "").trim()}>
+                      <Plus className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Evaluación de la consecución</Label>
-                  <Textarea rows={2} placeholder="Valoración del progreso hacia este objetivo..." value={goal.evaluation ?? ""} onChange={(e) => updateRow(i, { evaluation: e.target.value })} className={!goal.evaluation ? "border-dashed border-muted-foreground/40" : ""} />
+                  <Label className="text-[10px] text-muted-foreground">Evaluación</Label>
+                  <Textarea rows={2} placeholder="Valoración del progreso…" value={goal.evaluation ?? ""} onChange={(e) => updateRow(i, { evaluation: e.target.value })} className={!goal.evaluation ? "border-dashed border-muted-foreground/40" : ""} />
                 </div>
               </div>
             </div>
           );
         })}
       </div>
-      <Button type="button" variant="outline" size="sm" onClick={addRow}>
-        <Plus className="w-3.5 h-3.5 mr-1.5" /> Añadir objetivo
-      </Button>
+
+      {/* Add objective buttons */}
+      <div className="flex gap-2 flex-wrap">
+        <Button type="button" variant="outline" size="sm" onClick={() => setShowPicker(!showPicker)}>
+          <Plus className="w-3.5 h-3.5 mr-1.5" /> Añadir objetivo predefinido
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={addCustom}>
+          <Plus className="w-3.5 h-3.5 mr-1.5" /> Objetivo personalizado
+        </Button>
+      </div>
+
+      {/* Predefined objective picker */}
+      {showPicker && (
+        <div className="border rounded-md p-3 space-y-1.5 bg-muted/30">
+          <p className="text-xs font-semibold text-muted-foreground mb-2">Selecciona un objetivo general:</p>
+          {PREDEFINED_OBJECTIVES.filter((o) => !usedTexts.has(o.text)).map((obj) => (
+            <button key={obj.text} type="button" onClick={() => addFromPredefined(obj)}
+              className="w-full text-left px-3 py-2 rounded-md hover:bg-muted text-sm flex items-center gap-2 border border-transparent hover:border-border transition-colors">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: GOAL_AREA_COLORS[obj.area] }} />
+              <span className="flex-1">{obj.text}</span>
+              <span className="text-[10px] text-muted-foreground">{obj.area}</span>
+            </button>
+          ))}
+          {PREDEFINED_OBJECTIVES.filter((o) => !usedTexts.has(o.text)).length === 0 && (
+            <p className="text-xs text-muted-foreground italic">Todos los objetivos predefinidos ya están añadidos.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
