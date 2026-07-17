@@ -46,6 +46,7 @@ import {
 } from "recharts";
 import { toast } from "@/hooks/use-toast";
 import { OccupationalProfileTab, getProfileCompletion } from "./occupational-profile-tab";
+import { ClinicalNotes } from "@/components/clinical-notes";
 import { Mic, MicOff } from "lucide-react";
 
 export function PatientDetailView() {
@@ -256,7 +257,7 @@ export function PatientDetailView() {
                       <p className="text-xs text-muted-foreground mb-1">
                         {formatDateTime(visits[0].date)} · {visits[0].durationMin} min · {visits[0].therapistName}
                       </p>
-                      <div className="text-sm line-clamp-3 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: visits[0].notes }} />
+                      <ClinicalNotes html={visits[0].notes} lineClamp={3} />
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">Sin seguimientos registrados.</p>
@@ -284,6 +285,33 @@ export function PatientDetailView() {
               </Card>
             </div>
           )}
+
+          {/* Pending tasks from last visit */}
+          {!isAdmin && visits && visits.length > 0 && (() => {
+            const lastTasks = (visits[0].tasks ?? []).filter((t: any) => !t.completed);
+            if (lastTasks.length === 0) return null;
+            return (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <ClipboardList className="w-4 h-4 text-primary" />
+                    Tareas pendientes
+                  </CardTitle>
+                  <CardDescription className="text-xs">Del último seguimiento ({visits[0].title ?? "Sin título"})</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-1">
+                    {lastTasks.map((task: any) => (
+                      <li key={task.id} className="flex items-center gap-2 text-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                        {task.text}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Patient-reported problems from occupational profile */}
           {!isAdmin && problemsUser && (

@@ -103,6 +103,7 @@ export interface VisitDTO {
   notes: string;
   interventions: string[];
   goalIds: string[];
+  tasks: { id: string; text: string; completed: boolean }[];
   score: number | null;
   createdAt: string;
 }

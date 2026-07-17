@@ -153,6 +153,7 @@ export const visitCreateSchema = z.object({
   notes: z.string().min(1, "Las notas clínicas son obligatorias"),
   interventions: z.array(z.string()).default([]),
   goalIds: z.array(z.string()).default([]),
+  tasks: z.array(z.object({ id: z.string(), text: z.string(), completed: z.boolean() })).default([]),
 });
 export type VisitCreateInput = z.infer<typeof visitCreateSchema>;
 
@@ -165,6 +166,7 @@ export const visitUpdateSchema = z.object({
   notes: z.string().min(1, "Las notas clínicas son obligatorias"),
   interventions: z.array(z.string()).default([]),
   goalIds: z.array(z.string()).default([]),
+  tasks: z.array(z.object({ id: z.string(), text: z.string(), completed: z.boolean() })).default([]),
 });
 export type VisitUpdateInput = z.infer<typeof visitUpdateSchema>;
 

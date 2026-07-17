@@ -280,6 +280,7 @@ export function mapVisit(v: VisitWithRels) {
     notes: v.notes,
     interventions: JSON.parse(v.interventions || "[]") as string[],
     goalIds: JSON.parse(v.goalIds || "[]") as string[],
+    tasks: JSON.parse(v.tasks || "[]") as { id: string; text: string; completed: boolean }[],
     score: v.score,
     createdAt: v.createdAt.toISOString(),
   };

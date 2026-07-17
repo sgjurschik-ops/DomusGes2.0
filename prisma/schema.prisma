@@ -78,6 +78,7 @@ model Visit {
   notes         String
   interventions String   @default("[]") // JSON-encoded string[]
   goalIds       String   @default("[]") // JSON-encoded string[] — IDs of OccupationalGoal worked on
+  tasks         String   @default("[]") // JSON-encoded Task[] — { id, text, completed }[]
   score         Int?     // 0-10 subjective progress
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

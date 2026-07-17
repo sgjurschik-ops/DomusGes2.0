@@ -139,10 +139,12 @@ export function NewVisitForm() {
 
   const interventions = watch("interventions");
   const selectedPatientId = watch("patientId");
+  const [previousTasks, setPreviousTasks] = useState<{ id: string; text: string; completed: boolean }[]>([]);
+  const [taskInput, setTaskInput] = useState("");
 
-  // Fetch patient goals when patient changes
+  // Fetch patient goals and previous tasks when patient changes
   useEffect(() => {
-    if (!selectedPatientId) { setPatientGoals([]); return; }
+    if (!selectedPatientId) { setPatientGoals([]); setPreviousTasks([]); return; }
     fetch(`/api/patients/${selectedPatientId}/occupational-profile`)
       .then((r) => r.json())
       .then((data) => {
@@ -150,7 +152,36 @@ export function NewVisitForm() {
         setPatientGoals(goals);
       })
       .catch(() => setPatientGoals([]));
+    // Fetch most recent visit to get pending tasks
+    fetch(`/api/visits?patientId=${selectedPatientId}&limit=1`)
+      .then((r) => r.json())
+      .then((visits: any[]) => {
+        if (visits.length > 0 && Array.isArray(visits[0].tasks)) {
+          const pending = visits[0].tasks.filter((t: any) => !t.completed);
+          setPreviousTasks(pending);
+        } else {
+          setPreviousTasks([]);
+        }
+      })
+      .catch(() => setPreviousTasks([]));
   }, [selectedPatientId]);
+
+  function togglePreviousTask(id: string) {
+    setPreviousTasks((prev) => prev.map((t) => t.id === id ? { ...t, completed: !t.completed } : t));
+  }
+
+  function addTask() {
+    const t = taskInput.trim();
+    if (!t) return;
+    const current = watch("tasks") ?? [];
+    setValue("tasks", [...current, { id: `task-${Date.now()}`, text: t, completed: false }]);
+    setTaskInput("");
+  }
+
+  function removeTask(id: string) {
+    const current = watch("tasks") ?? [];
+    setValue("tasks", current.filter((t: any) => t.id !== id));
+  }
 
   function addIntervention() {
     const t = interventionInput.trim();
@@ -329,6 +360,48 @@ export function NewVisitForm() {
                 />
               </div>
             )}
+
+            {/* Previous session tasks — review */}
+            {previousTasks.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs">Tareas de la sesión anterior</Label>
+                <div className="space-y-1">
+                  {previousTasks.map((task) => (
+                    <label key={task.id}
+                      className={`flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer transition-colors ${task.completed ? "bg-green-50 border-green-200" : "hover:bg-muted"}`}>
+                      <input type="checkbox" checked={task.completed} onChange={() => togglePreviousTask(task.id)} className="mt-0" />
+                      <span className={`text-sm ${task.completed ? "line-through text-muted-foreground" : ""}`}>{task.text}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground italic">Marca las tareas que el paciente ha completado.</p>
+              </div>
+            )}
+
+            {/* New tasks for next session */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tareas para la próxima sesión</Label>
+              <div className="flex gap-2">
+                <Input placeholder="Ej. Practicar poner la lavadora solo" value={taskInput}
+                  onChange={(e) => setTaskInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTask(); } }} />
+                <Button type="button" variant="outline" size="sm" onClick={addTask} disabled={!taskInput.trim()}>
+                  <Plus className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              <Controller control={control} name="tasks" render={({ field }) => (
+                <div className="space-y-1">
+                  {(field.value ?? []).map((task: { id: string; text: string }) => (
+                    <div key={task.id} className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
+                      <span className="flex-1">{task.text}</span>
+                      <button type="button" onClick={() => removeTask(task.id)} className="text-muted-foreground hover:text-destructive">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )} />
+            </div>
 
             <div className="space-y-1.5">
               <Label className="text-xs">Intervenciones realizadas</Label>
