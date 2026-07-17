@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
       title: d.title,
       notes: d.notes,
       interventions: JSON.stringify(d.interventions),
+      goalIds: JSON.stringify(d.goalIds ?? []),
     },
     include: {
       patient: { select: { firstName: true, lastName: true } },

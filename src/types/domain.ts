@@ -102,6 +102,7 @@ export interface VisitDTO {
   title: string | null; // Null for visits created before this field existed
   notes: string;
   interventions: string[];
+  goalIds: string[];
   score: number | null;
   createdAt: string;
 }

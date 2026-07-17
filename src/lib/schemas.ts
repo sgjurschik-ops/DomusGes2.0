@@ -152,6 +152,7 @@ export const visitCreateSchema = z.object({
   title: z.string().min(1, "El título es obligatorio"),
   notes: z.string().min(1, "Las notas clínicas son obligatorias"),
   interventions: z.array(z.string()).default([]),
+  goalIds: z.array(z.string()).default([]),
 });
 export type VisitCreateInput = z.infer<typeof visitCreateSchema>;
 
@@ -163,6 +164,7 @@ export const visitUpdateSchema = z.object({
   title: z.string().min(1, "El título es obligatorio"),
   notes: z.string().min(1, "Las notas clínicas son obligatorias"),
   interventions: z.array(z.string()).default([]),
+  goalIds: z.array(z.string()).default([]),
 });
 export type VisitUpdateInput = z.infer<typeof visitUpdateSchema>;
 

@@ -4,6 +4,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCreateVisit, usePatients, useProfessionals } from "@/hooks/api";
 import { useNav } from "@/store/nav";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +18,6 @@ import {
 import { ArrowLeft, Save, X, Plus, FileText, Bookmark } from "lucide-react";
 import { visitCreateSchema, type VisitCreateInput } from "@/lib/schemas";
 import { toast } from "@/hooks/use-toast";
-import { useState } from "react";
 
 import { z } from "zod";
 
@@ -72,6 +72,21 @@ export function NewVisitForm() {
   const { back, newVisitPatientId, selectPatient, navigate } = useNav();
   const [interventionInput, setInterventionInput] = useState("");
   const [customTemplates, setCustomTemplates] = useState<VisitTemplate[]>(loadCustomTemplates);
+  const [patientGoals, setPatientGoals] = useState<{ id: string; text: string; area: string; status: string }[]>([]);
+
+  const selectedPatientId = watch("patientId");
+
+  // Fetch patient goals when patient changes
+  useEffect(() => {
+    if (!selectedPatientId) { setPatientGoals([]); return; }
+    fetch(`/api/patients/${selectedPatientId}/occupational-profile`)
+      .then((r) => r.json())
+      .then((data) => {
+        const goals = (data?.goals ?? []).filter((g: any) => g.status === "En curso");
+        setPatientGoals(goals);
+      })
+      .catch(() => setPatientGoals([]));
+  }, [selectedPatientId]);
 
   const allTemplates = [...PREDEFINED_TEMPLATES, ...customTemplates];
 
@@ -285,6 +300,36 @@ export function NewVisitForm() {
               />
               {errors.notes && <p className="text-xs text-destructive">{errors.notes.message}</p>}
             </div>
+
+            {/* Goals worked on this session */}
+            {patientGoals.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs">Objetivos trabajados en esta sesión</Label>
+                <Controller control={control} name="goalIds"
+                  render={({ field }) => (
+                    <div className="grid sm:grid-cols-2 gap-1.5">
+                      {patientGoals.map((goal) => {
+                        const checked = (field.value ?? []).includes(goal.id);
+                        return (
+                          <label key={goal.id}
+                            className={`flex items-start gap-2 rounded-md border px-3 py-2 cursor-pointer transition-colors ${checked ? "bg-primary/5 border-primary/30" : "hover:bg-muted"}`}>
+                            <input type="checkbox" checked={checked} className="mt-0.5"
+                              onChange={() => {
+                                const current = field.value ?? [];
+                                field.onChange(checked ? current.filter((id: string) => id !== goal.id) : [...current, goal.id]);
+                              }} />
+                            <div className="min-w-0">
+                              <p className="text-sm leading-tight">{goal.text}</p>
+                              <p className="text-[10px] text-muted-foreground">{goal.area}</p>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                />
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <Label className="text-xs">Intervenciones realizadas</Label>

@@ -279,6 +279,7 @@ export function mapVisit(v: VisitWithRels) {
     title: v.title,
     notes: v.notes,
     interventions: JSON.parse(v.interventions || "[]") as string[],
+    goalIds: JSON.parse(v.goalIds || "[]") as string[],
     score: v.score,
     createdAt: v.createdAt.toISOString(),
   };
@@ -360,4 +361,19 @@ export function mapReservationCategory(c: { id: string; professionalId: string; 
     name: c.name,
     color: c.color,
   };
+}
+
+// ─── Safe partial update ─────────────────────────────────────────────────────
+// Filters out undefined values from an object so that Prisma's `update` or
+// `upsert` only touches fields explicitly sent by the client.  This prevents
+// the class of bugs where a partial request body (e.g. saving just quickNotes)
+// accidentally sets every other field to null.
+//
+// Usage:  db.patient.update({ where: { id }, data: safePartial(body) })
+export function safePartial<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) result[key] = value;
+  }
+  return result as Partial<T>;
 }
