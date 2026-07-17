@@ -303,7 +303,7 @@ export function PatientDetailView() {
                   <ul className="space-y-1">
                     {lastTasks.map((task: any) => (
                       <li key={task.id} className="flex items-center gap-2 text-sm">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                        <span className="w-4 h-4 rounded border border-muted-foreground/30 flex items-center justify-center shrink-0" />
                         {task.text}
                       </li>
                     ))}
@@ -337,34 +337,31 @@ export function PatientDetailView() {
               No hay seguimientos registrados todavía.
             </Card>
           ) : (
-            visits.map((v) => (
-              <Card
-                key={v.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setOpenVisitId(v.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setOpenVisitId(v.id);
-                  }
-                }}
-                className="cursor-pointer transition-colors hover:bg-muted/50"
-              >
+            visits.map((v, idx) => (
+              <Card key={v.id} className="overflow-hidden" style={{ borderLeftWidth: "4px", borderLeftColor: idx === 0 ? "var(--chip-blue-text)" : "var(--border)" }}>
                 <CardContent className="p-4">
-                  <div className="mb-2">
-                    <p className="text-sm font-semibold">{v.title ?? "Seguimiento"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDateTime(v.date)} · {v.durationMin} min · {v.therapistName}
-                    </p>
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div>
+                      <p className="text-sm font-semibold">{v.title ?? "Seguimiento"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateTime(v.date)} · {v.durationMin} min · {v.therapistName}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpenVisitId(v.id)}>
+                        <Pencil className="w-3 h-3 mr-1" /> Editar
+                      </Button>
+                    </div>
                   </div>
-                  <ClinicalNotes html={v.notes} lineClamp={4} />
+                  <div className="rounded-md bg-muted/40 px-3 py-2 mb-2">
+                    <ClinicalNotes html={v.notes} />
+                  </div>
                   {(v.tasks ?? []).length > 0 && (
                     <div className="mt-2 space-y-0.5">
                       <p className="text-[10px] font-semibold text-muted-foreground uppercase">Tareas</p>
                       {v.tasks.map((t) => (
                         <div key={t.id} className={`text-xs flex items-center gap-1.5 ${t.completed ? "line-through text-muted-foreground" : ""}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.completed ? "bg-green-400" : "bg-primary"}`} />
+                          <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${t.completed ? "bg-green-100 border-green-400 text-green-600" : "border-muted-foreground/30"}`}>{t.completed && <span className="text-[10px]">✓</span>}</span>
                           {t.text}
                         </div>
                       ))}

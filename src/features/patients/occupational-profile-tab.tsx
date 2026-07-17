@@ -632,14 +632,14 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         onSave={() => saveSection("goals")} saving={saving}>
         {isEditing("goals") ? (
           <>
-            <Field label="Qué le gustaría conseguir o mejorar">
+            <Field label="Plan de terapia ocupacional">
               <RichTextarea rows={3} value={profile.desiredImprovements ?? ""} onChange={(v) => update("desiredImprovements", v)} />
             </Field>
             <GoalsEditor value={profile.goals ?? []} onChange={(goals) => update("goals", goals)} />
           </>
         ) : (
           <>
-            <ReadOnlyHtml label="Qué le gustaría conseguir" value={profile.desiredImprovements} placeholder="Sin completar." />
+            <ReadOnlyHtml label="Plan de terapia ocupacional" value={profile.desiredImprovements} placeholder="Sin completar." />
             <ReadOnlyGoals goals={profile.goals ?? []} />
           </>
         )}
@@ -836,7 +836,9 @@ function ReadOnlyGoals({ goals }: { goals: Goal[] }) {
           <ul className="space-y-0.5 mt-1">
             {specifics.map((s) => (
               <li key={s.id} className={`text-xs flex items-center gap-1.5 ${s.status === "Conseguido" ? "line-through text-muted-foreground" : ""}`}>
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.status === "Conseguido" ? "bg-green-400" : s.status === "Abandonado" ? "bg-zinc-300" : "bg-primary"}`} />
+                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${s.status === "Conseguido" ? "bg-green-100 border-green-400 text-green-600" : s.status === "Abandonado" ? "bg-zinc-100 border-zinc-300" : "border-muted-foreground/30"}`}>
+                  {s.status === "Conseguido" && <span className="text-[10px]">✓</span>}
+                </span>
                 {s.text}
               </li>
             ))}
