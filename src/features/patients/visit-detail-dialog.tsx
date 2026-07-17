@@ -176,8 +176,16 @@ function VisitEditForm({
   onSaved: () => void;
 }) {
   const update = useUpdateVisit();
+  const deleteVisit = useDeleteVisit();
   const { data: professionals } = useProfessionals();
   const [interventionInput, setInterventionInput] = useState("");
+
+  async function handleDelete() {
+    if (!confirm("¿Eliminar este seguimiento? Esta acción no se puede deshacer.")) return;
+    await deleteVisit.mutateAsync({ id: visitId, patientId });
+    toast({ title: "Seguimiento eliminado" });
+    onSaved();
+  }
 
   const {
     register,
@@ -196,6 +204,8 @@ function VisitEditForm({
       title: visit.title ?? "",
       notes: /<[a-z][\s\S]*>/i.test(visit.notes) ? visit.notes : visit.notes.replace(/\n/g, "<br>"),
       interventions: visit.interventions,
+      goalIds: visit.goalIds ?? [],
+      tasks: visit.tasks ?? [],
     },
   });
 
@@ -311,15 +321,51 @@ function VisitEditForm({
             ))}
           </div>
         )}
+
+        {/* Tasks editor */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Tareas para la próxima sesión</Label>
+          <Controller control={control} name="tasks" render={({ field }) => (
+            <>
+              <div className="space-y-1">
+                {(field.value ?? []).map((task: { id: string; text: string; completed: boolean }) => (
+                  <div key={task.id} className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
+                    <button type="button" onClick={() => field.onChange((field.value ?? []).map((t: any) => t.id === task.id ? { ...t, completed: !t.completed } : t))}
+                      className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${task.completed ? "bg-green-100 border-green-400 text-green-600" : "border-muted-foreground/30"}`}>
+                      {task.completed && <span className="text-[10px]">✓</span>}
+                    </button>
+                    <span className={`flex-1 ${task.completed ? "line-through text-muted-foreground" : ""}`}>{task.text}</span>
+                    <button type="button" onClick={() => field.onChange((field.value ?? []).filter((t: any) => t.id !== task.id))} className="text-muted-foreground hover:text-destructive">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input placeholder="Añadir tarea…" id="edit-task-input"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const inp = e.currentTarget; const t = inp.value.trim(); if (!t) return; field.onChange([...(field.value ?? []), { id: `task-${Date.now()}`, text: t, completed: false }]); inp.value = ""; } }} />
+                <Button type="button" variant="outline" size="sm" onClick={() => { const inp = document.getElementById("edit-task-input") as HTMLInputElement; const t = inp?.value?.trim(); if (!t) return; field.onChange([...(field.value ?? []), { id: `task-${Date.now()}`, text: t, completed: false }]); inp.value = ""; }}>
+                  <Plus className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </>
+          )} />
+        </div>
       </div>
 
-      <DialogFooter>
-        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-          Cancelar
+      <DialogFooter className="flex-row justify-between sm:justify-between">
+        <Button type="button" variant="destructive" size="sm" onClick={handleDelete} disabled={deleteVisit.isPending}>
+          <Trash2 className="w-3.5 h-3.5 mr-1" />
+          {deleteVisit.isPending ? "Eliminando…" : "Eliminar"}
         </Button>
-        <Button type="submit" size="sm" disabled={update.isPending}>
-          {update.isPending ? "Guardando…" : "Guardar cambios"}
-        </Button>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button type="submit" size="sm" disabled={update.isPending}>
+            {update.isPending ? "Guardando…" : "Guardar cambios"}
+          </Button>
+        </div>
       </DialogFooter>
     </form>
   );
