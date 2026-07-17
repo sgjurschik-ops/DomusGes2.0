@@ -74,9 +74,17 @@ export function getProfileCompletion(profile: Record<string, any>): { filled: nu
 const GOAL_AREAS = ["Cuidado de sí mismo", "Productividad", "Ocio"] as const;
 type GoalArea = typeof GOAL_AREAS[number];
 const GOAL_AREA_COLORS: Record<GoalArea, string> = {
-  "Cuidado de sí mismo": "#14b8a6",
-  "Productividad": "#f59e0b",
+  "Cuidado de sí mismo": "#5DCAA5",
+  "Productividad": "#EF9F27",
   "Ocio": "#8b5cf6",
+};
+
+const GOAL_SCOPES = ["Con el paciente", "Con la familia/entorno", "Coordinación profesional"] as const;
+type GoalScope = typeof GOAL_SCOPES[number];
+const GOAL_SCOPE_COLORS: Record<GoalScope, string> = {
+  "Con el paciente": "#4A6D8C",
+  "Con la familia/entorno": "#8B6F5A",
+  "Coordinación profesional": "#6B5A8C",
 };
 const GOAL_STATUSES = ["En curso", "Conseguido", "Abandonado"] as const;
 type GoalStatus = typeof GOAL_STATUSES[number];
@@ -85,6 +93,7 @@ interface Goal {
   id?: string;
   text: string;
   area: GoalArea;
+  scope: GoalScope;
   status: GoalStatus;
   startDate: string | null;
   targetDate: string | null;
@@ -780,6 +789,7 @@ function ReadOnlyGoals({ goals }: { goals: Goal[] }) {
             <p className="text-sm font-medium">{g.text || "Sin descripción"}</p>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs" style={{ color: areaColor }}>{g.area}</span>
+              {g.scope && <span className="text-xs px-1.5 py-0.5 rounded" style={{ color: GOAL_SCOPE_COLORS[g.scope as GoalScope] ?? "#6b7280", backgroundColor: `${GOAL_SCOPE_COLORS[g.scope as GoalScope] ?? "#6b7280"}18` }}>{g.scope}</span>}
               <span className={`text-xs rounded-full px-2 py-0.5 ${GOAL_STATUS_STYLES[g.status]}`}>{g.status}</span>
               {g.startDate && <span className="text-xs text-muted-foreground">Inicio: {g.startDate}</span>}
               {g.targetDate && <span className="text-xs text-muted-foreground">Objetivo: {g.targetDate}</span>}
@@ -915,7 +925,7 @@ function WorkHistoryEditor({ value, onChange }: { value: WorkHistoryEntry[]; onC
 
 function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goal[]) => void }) {
   function addRow() {
-    onChange([...value, { text: "", area: "Cuidado de sí mismo", status: "En curso", startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "" }]);
+    onChange([...value, { text: "", area: "Cuidado de sí mismo", scope: "Con el paciente", status: "En curso", startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "" }]);
   }
   function updateRow(i: number, patch: Partial<Goal>) { onChange(value.map((g, idx) => (idx === i ? { ...g, ...patch } : g))); }
   function removeRow(i: number) {
@@ -942,7 +952,7 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
-                <div className="grid sm:grid-cols-4 gap-2">
+                <div className="grid sm:grid-cols-5 gap-2">
                   <Select value={goal.area} onValueChange={(v) => updateRow(i, { area: v as GoalArea })}>
                     <SelectTrigger className="h-8 text-xs">
                       <div className="flex items-center gap-1.5">
@@ -956,6 +966,24 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
                           <div className="flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: GOAL_AREA_COLORS[a] }} />
                             {a}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={goal.scope ?? "Con el paciente"} onValueChange={(v) => updateRow(i, { scope: v as GoalScope })}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: GOAL_SCOPE_COLORS[goal.scope as GoalScope] ?? "#9CA3AF" }} />
+                        <SelectValue />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GOAL_SCOPES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: GOAL_SCOPE_COLORS[s] }} />
+                            {s}
                           </div>
                         </SelectItem>
                       ))}
