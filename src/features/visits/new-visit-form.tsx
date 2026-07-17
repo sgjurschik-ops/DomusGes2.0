@@ -131,7 +131,7 @@ export function NewVisitForm() {
       const v = await create.mutateAsync(values);
       toast({ title: "Seguimiento registrado", description: v.patientName });
       selectPatient(values.patientId);
-      navigate("patient-detail");
+      back();
     } catch (e: any) {
       toast({ title: "Error al registrar seguimiento", variant: "destructive" });
     }

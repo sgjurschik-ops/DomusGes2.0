@@ -358,7 +358,18 @@ export function PatientDetailView() {
                       {formatDateTime(v.date)} · {v.durationMin} min · {v.therapistName}
                     </p>
                   </div>
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{v.notes}</p>
+                  <ClinicalNotes html={v.notes} lineClamp={4} />
+                  {(v.tasks ?? []).length > 0 && (
+                    <div className="mt-2 space-y-0.5">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase">Tareas</p>
+                      {v.tasks.map((t) => (
+                        <div key={t.id} className={`text-xs flex items-center gap-1.5 ${t.completed ? "line-through text-muted-foreground" : ""}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.completed ? "bg-green-400" : "bg-primary"}`} />
+                          {t.text}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {v.interventions.length > 0 && (
                     <div className="mt-3 flex items-center gap-1.5 flex-wrap">
                       {v.interventions.map((it, i) => (

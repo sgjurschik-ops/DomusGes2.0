@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit } from "@/lib/server";
+import { requireProfessional, audit, safePartial } from "@/lib/server";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -35,20 +35,12 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   // Only include scalar fields that were explicitly sent (not undefined),
   // so partial saves (e.g. from a single section) don't wipe other sections.
   const { goals, id: _id, patientId: _pid, createdAt: _ca, updatedAt: _ua, ...rawFields } = body;
-  const scalarFields: Record<string, any> = {};
-  for (const [key, value] of Object.entries(rawFields)) {
-    if (value !== undefined) scalarFields[key] = value;
-  }
+  const scalarFields = safePartial(rawFields);
 
   const profile = await db.occupationalProfile.upsert({
     where: { patientId: id },
-    create: {
-      patientId: id,
-      ...scalarFields,
-    },
-    update: {
-      ...scalarFields,
-    },
+    create: { patientId: id, ...scalarFields },
+    update: scalarFields,
   });
 
   if (Array.isArray(goals)) {
@@ -58,8 +50,10 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
         data: goals.map((g: any) => ({
           occupationalProfileId: profile.id,
           text: g.text ?? "",
-          area: g.area ?? "Cuidado de sí mismo",
+          area: g.area ?? "",
+          scope: g.scope ?? "Con el paciente",
           status: g.status ?? "En curso",
+          specificGoals: typeof g.specificGoals === "string" ? g.specificGoals : JSON.stringify(g.specificGoals ?? []),
           startDate: g.startDate ? new Date(g.startDate) : null,
           targetDate: g.targetDate ? new Date(g.targetDate) : null,
           evaluation: g.evaluation ?? "",

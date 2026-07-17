@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RichTextarea } from "@/components/rich-textarea";
+import { ClinicalNotes } from "@/components/clinical-notes";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -117,13 +118,27 @@ function VisitSummary({
       </div>
 
       <div className="rounded-lg border bg-muted/40 px-4 py-3">
-        <div className="text-sm prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: visit.notes }} />
+        <ClinicalNotes html={visit.notes} />
       </div>
 
       {(visit.interventions ?? []).length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {(visit.interventions ?? []).map((it, i) => (
             <Badge key={i} variant="outline" className="text-[11px]">{it}</Badge>
+          ))}
+        </div>
+      )}
+
+      {(visit.tasks ?? []).length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-semibold text-muted-foreground">Tareas asignadas</p>
+          {visit.tasks.map((task) => (
+            <div key={task.id} className={`flex items-center gap-2 text-sm ${task.completed ? "line-through text-muted-foreground" : ""}`}>
+              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${task.completed ? "bg-green-100 border-green-400 text-green-600" : "border-muted-foreground/30"}`}>
+                {task.completed && <span className="text-[10px]">✓</span>}
+              </span>
+              {task.text}
+            </div>
           ))}
         </div>
       )}

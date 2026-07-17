@@ -72,12 +72,13 @@ export function getProfileCompletion(profile: Record<string, any>): { filled: nu
   return countFilled(profile, ALL_PROFILE_FIELDS);
 }
 
-const GOAL_AREAS = ["Cuidado de sí mismo", "Productividad", "Ocio"] as const;
+const GOAL_AREAS = ["Cuidado de sí mismo", "Productividad", "Ocio", ""] as const;
 type GoalArea = typeof GOAL_AREAS[number];
 const GOAL_AREA_COLORS: Record<GoalArea, string> = {
   "Cuidado de sí mismo": "#5DCAA5",
   "Productividad": "#EF9F27",
   "Ocio": "#8b5cf6",
+  "": "#9CA3AF",
 };
 
 const GOAL_SCOPES = ["Con el paciente", "Con la familia/entorno", "Coordinación profesional"] as const;
@@ -259,6 +260,10 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       supportNetwork: JSON.stringify(profile.supportNetwork ?? []),
       workHistory: JSON.stringify(profile.workHistory ?? []),
       weeklyRoutine: JSON.stringify(profile.weeklyRoutine ?? []),
+      goals: (profile.goals ?? []).map((g: Goal) => ({
+        ...g,
+        specificGoals: JSON.stringify(g.specificGoals ?? []),
+      })),
     };
   }
 
@@ -1048,7 +1053,7 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
                   </Button>
                 </div>
                 <div className="grid sm:grid-cols-5 gap-2">
-                  <Select value={goal.area} onValueChange={(v) => updateRow(i, { area: v as GoalArea })}>
+                  <Select value={goal.area || "_none"} onValueChange={(v) => updateRow(i, { area: (v === "_none" ? "" : v) as GoalArea })}>
                     <SelectTrigger className="h-8 text-xs">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: areaColor }} />
@@ -1057,7 +1062,7 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
                     </SelectTrigger>
                     <SelectContent>
                       {GOAL_AREAS.map((a) => (
-                        <SelectItem key={a} value={a}><div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: GOAL_AREA_COLORS[a] }} />{a}</div></SelectItem>
+                        <SelectItem key={a || "_none"} value={a || "_none"}><div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: GOAL_AREA_COLORS[a] }} />{a || "Sin asignar"}</div></SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
