@@ -32,14 +32,12 @@ type Props = {
   visitId: string;
   patientId: string;
   onClose: () => void;
+  initialEdit?: boolean;
 };
 
-// Same pattern as AssessmentDetailDialog: opens read-only, "Editar" switches
-// to the edit form, both inside one dialog so the person never leaves the
-// "Visitas" tab.
-export function VisitDetailDialog({ visitId, patientId, onClose }: Props) {
+export function VisitDetailDialog({ visitId, patientId, onClose, initialEdit = false }: Props) {
   const { data: visit, isLoading } = useVisit(visitId);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(initialEdit);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -196,7 +194,7 @@ function VisitEditForm({
       time: visit.date.slice(11, 16),
       durationMin: visit.durationMin,
       title: visit.title ?? "",
-      notes: visit.notes,
+      notes: /<[a-z][\s\S]*>/i.test(visit.notes) ? visit.notes : visit.notes.replace(/\n/g, "<br>"),
       interventions: visit.interventions,
     },
   });

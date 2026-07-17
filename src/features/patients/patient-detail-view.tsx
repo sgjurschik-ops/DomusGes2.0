@@ -60,7 +60,9 @@ export function PatientDetailView() {
   const deletePatient = useDeletePatient();
   const updatePatient = useUpdatePatient();
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
   const [openVisitId, setOpenVisitId] = useState<string | null>(null);
+  const [openVisitEdit, setOpenVisitEdit] = useState(false);
   const [problemsUser, setProblemsUser] = useState<string>("");
   const [profileCompletion, setProfileCompletion] = useState<{ filled: number; total: number } | null>(null);
 
@@ -213,7 +215,7 @@ export function PatientDetailView() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className={`grid w-full max-w-2xl ${isAdmin ? "grid-cols-1 max-w-xs" : "grid-cols-5"}`}>
           <TabsTrigger value="overview">Resumen</TabsTrigger>
           {!isAdmin && <TabsTrigger value="visits">Seguimientos</TabsTrigger>}
@@ -226,14 +228,22 @@ export function PatientDetailView() {
         <TabsContent value="overview" className="mt-4 space-y-4">
           {!isAdmin && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <KpiChip icon={Calendar} color="blue" label="Última visita"
-                value={visits && visits.length > 0 ? formatDate(visits[0].date) : "Sin visitas"} />
-              <KpiChip icon={ClipboardList} color="green" label="Seguimientos"
-                value={`${patient.totalVisits}`} />
-              <KpiChip icon={Activity} color="purple" label="Última evaluación"
-                value={assessments && assessments.length > 0 ? `${assessments[0].scale} · ${assessments[0].score}` : "Sin registrar"} />
-              <KpiChip icon={ListChecks} color="yellow" label="Perfil ocupacional"
-                value={profileCompletion ? `${profileCompletion.filled}/${profileCompletion.total} campos` : "—"} />
+              <button type="button" onClick={() => setActiveTab("visits")} className="text-left">
+                <KpiChip icon={Calendar} color="blue" label="Última visita"
+                  value={visits && visits.length > 0 ? formatDate(visits[0].date) : "Sin visitas"} />
+              </button>
+              <button type="button" onClick={() => setActiveTab("visits")} className="text-left">
+                <KpiChip icon={ClipboardList} color="green" label="Seguimientos"
+                  value={`${patient.totalVisits}`} />
+              </button>
+              <button type="button" onClick={() => setActiveTab("assessments")} className="text-left">
+                <KpiChip icon={Activity} color="purple" label="Última evaluación"
+                  value={assessments && assessments.length > 0 ? `${assessments[0].scale} · ${assessments[0].score}` : "Sin registrar"} />
+              </button>
+              <button type="button" onClick={() => setActiveTab("occupational-profile")} className="text-left">
+                <KpiChip icon={ListChecks} color="yellow" label="Perfil ocupacional"
+                  value={profileCompletion ? `${profileCompletion.filled}/${profileCompletion.total} campos` : "—"} />
+              </button>
             </div>
           )}
 
@@ -246,22 +256,30 @@ export function PatientDetailView() {
 
           {!isAdmin && (
             <div className="grid lg:grid-cols-2 gap-4">
-              <Card>
+              {/* Pending tasks */}
+              <Card className="border-l-4" style={{ borderLeftColor: "var(--chip-blue-text)" }}>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Último seguimiento</CardTitle>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <ClipboardList className="w-4 h-4 text-primary" />
+                    Tareas pendientes
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {visits && visits.length > 0 ? (
-                    <div>
-                      <p className="text-sm font-medium mb-0.5">{visits[0].title ?? "Seguimiento"}</p>
-                      <p className="text-xs text-muted-foreground mb-1">
-                        {formatDateTime(visits[0].date)} · {visits[0].durationMin} min · {visits[0].therapistName}
-                      </p>
-                      <ClinicalNotes html={visits[0].notes} lineClamp={3} />
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Sin seguimientos registrados.</p>
-                  )}
+                  {(() => {
+                    const lastTasks = visits && visits.length > 0 ? (visits[0].tasks ?? []).filter((t: any) => !t.completed) : [];
+                    return lastTasks.length > 0 ? (
+                      <ul className="space-y-1.5">
+                        {lastTasks.map((task: any) => (
+                          <li key={task.id} className="flex items-center gap-2 text-sm">
+                            <span className="w-4 h-4 rounded border border-muted-foreground/30 flex items-center justify-center shrink-0" />
+                            {task.text}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Sin tareas pendientes.</p>
+                    );
+                  })()}
                 </CardContent>
               </Card>
               <Card>
@@ -286,32 +304,7 @@ export function PatientDetailView() {
             </div>
           )}
 
-          {/* Pending tasks from last visit */}
-          {!isAdmin && visits && visits.length > 0 && (() => {
-            const lastTasks = (visits[0].tasks ?? []).filter((t: any) => !t.completed);
-            if (lastTasks.length === 0) return null;
-            return (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <ClipboardList className="w-4 h-4 text-primary" />
-                    Tareas pendientes
-                  </CardTitle>
-                  <CardDescription className="text-xs">Del último seguimiento ({visits[0].title ?? "Sin título"})</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-1">
-                    {lastTasks.map((task: any) => (
-                      <li key={task.id} className="flex items-center gap-2 text-sm">
-                        <span className="w-4 h-4 rounded border border-muted-foreground/30 flex items-center justify-center shrink-0" />
-                        {task.text}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            );
-          })()}
+          {/* Pending tasks from last visit — old standalone card removed, integrated above */}
 
           {/* Patient-reported problems from occupational profile */}
           {!isAdmin && problemsUser && (
@@ -348,7 +341,7 @@ export function PatientDetailView() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpenVisitId(v.id)}>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { setOpenVisitId(v.id); setOpenVisitEdit(true); }}>
                         <Pencil className="w-3 h-3 mr-1" /> Editar
                       </Button>
                     </div>
@@ -444,7 +437,8 @@ export function PatientDetailView() {
         <VisitDetailDialog
           visitId={openVisitId}
           patientId={patient.id}
-          onClose={() => setOpenVisitId(null)}
+          initialEdit={openVisitEdit}
+          onClose={() => { setOpenVisitId(null); setOpenVisitEdit(false); }}
         />
       )}
 
