@@ -74,20 +74,6 @@ export function NewVisitForm() {
   const [customTemplates, setCustomTemplates] = useState<VisitTemplate[]>(loadCustomTemplates);
   const [patientGoals, setPatientGoals] = useState<{ id: string; text: string; area: string; status: string }[]>([]);
 
-  const selectedPatientId = watch("patientId");
-
-  // Fetch patient goals when patient changes
-  useEffect(() => {
-    if (!selectedPatientId) { setPatientGoals([]); return; }
-    fetch(`/api/patients/${selectedPatientId}/occupational-profile`)
-      .then((r) => r.json())
-      .then((data) => {
-        const goals = (data?.goals ?? []).filter((g: any) => g.status === "En curso");
-        setPatientGoals(goals);
-      })
-      .catch(() => setPatientGoals([]));
-  }, [selectedPatientId]);
-
   const allTemplates = [...PREDEFINED_TEMPLATES, ...customTemplates];
 
   function applyTemplate(tpl: VisitTemplate) {
@@ -152,6 +138,19 @@ export function NewVisitForm() {
   }
 
   const interventions = watch("interventions");
+  const selectedPatientId = watch("patientId");
+
+  // Fetch patient goals when patient changes
+  useEffect(() => {
+    if (!selectedPatientId) { setPatientGoals([]); return; }
+    fetch(`/api/patients/${selectedPatientId}/occupational-profile`)
+      .then((r) => r.json())
+      .then((data) => {
+        const goals = (data?.goals ?? []).filter((g: any) => g.status === "En curso");
+        setPatientGoals(goals);
+      })
+      .catch(() => setPatientGoals([]));
+  }, [selectedPatientId]);
 
   function addIntervention() {
     const t = interventionInput.trim();
