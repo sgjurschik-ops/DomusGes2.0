@@ -58,7 +58,7 @@ export function VisitDetailDialog({ visitId, patientId, onClose, initialEdit = f
             visitId={visitId}
             patientId={patientId}
             visit={visit}
-            onCancel={() => setIsEditing(false)}
+            onCancel={onClose}
             onSaved={onClose}
           />
         ) : (
@@ -255,12 +255,6 @@ function VisitEditForm({
             )}
           />
           {errors.therapistId && <p className="text-xs text-destructive">{errors.therapistId.message}</p>}
-        </div>
-
-        <div className="space-y-1.5 min-w-0">
-          <Label className="text-xs">Duración</Label>
-          <Input type="number" min={15} max={240} step={15} className="px-2" {...register("durationMin")} />
-          {errors.durationMin && <p className="text-xs text-destructive">{errors.durationMin.message}</p>}
         </div>
 
         <div className="space-y-1.5 min-w-0">
