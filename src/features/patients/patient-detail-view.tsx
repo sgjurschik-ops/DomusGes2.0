@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
   DropdownMenu,
@@ -32,13 +32,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { assessmentCreateSchema, type AssessmentCreateInput, ASSESSMENT_SCALES, STRUCTURED_SCALES } from "@/lib/schemas";
-import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
+import { assessmentCreateSchema, type AssessmentCreateInput, ASSESSMENT_SCALES, STRUCTURED_SCALES, QUALITATIVE_SCALES, SCALE_GROUPS } from "@/lib/schemas";
+import { formatScaleScore, isScaleComplete, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { CopmFields, formatCopmScore } from "./copm-fields";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { VisitDetailDialog } from "./visit-detail-dialog";
 import { NewVisitForm } from "@/features/visits/new-visit-form";
+import { EvolutionTable } from "./evolution-table";
 import { PatientReportDialog } from "./patient-report-dialog";
 import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle, FileDown, Activity, ListChecks, StickyNote, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -81,6 +82,7 @@ export function PatientDetailView() {
   }, [selectedPatientId]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [evolutionView, setEvolutionView] = useState<"chart" | "table">("table");
 
   if (!selectedPatientId) {
     return <p className="text-sm text-muted-foreground">Selecciona un paciente.</p>;
@@ -392,7 +394,27 @@ export function PatientDetailView() {
 
         {/* Progress — hidden for admin */}
         {!isAdmin && <TabsContent value="progress" className="mt-4 space-y-4">
-          <ProgressChart assessments={assessments ?? []} onOpenAssessment={setOpenAssessmentId} />
+          <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-md border bg-muted/40 p-0.5">
+              <button type="button"
+                className={`px-3 py-1.5 text-xs rounded-sm transition-colors ${evolutionView === "table" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setEvolutionView("table")}>
+                Tabla evolución
+              </button>
+              <button type="button"
+                className={`px-3 py-1.5 text-xs rounded-sm transition-colors ${evolutionView === "chart" ? "bg-background shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setEvolutionView("chart")}>
+                Por escala
+              </button>
+            </div>
+          </div>
+
+          {evolutionView === "table" ? (
+            <EvolutionTable assessments={assessments ?? []} onOpenAssessment={setOpenAssessmentId} />
+          ) : (
+            <ProgressChart assessments={assessments ?? []} onOpenAssessment={setOpenAssessmentId} />
+          )}
+
           {!assessments || assessments.length === 0 ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">
               Sin evaluaciones registradas todavía.
@@ -668,9 +690,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
   const scale = watch("scale");
   const isCopm = scale === "COPM";
   const isStructured = (STRUCTURED_SCALES as readonly string[]).includes(scale);
-  const structuredItemCount = isStructured
-    ? Object.keys(itemScores).length
-    : 0;
+  const isQualitative = (QUALITATIVE_SCALES as readonly string[]).includes(scale);
 
   // Keep the (hidden, but still registered) `score` field in sync with the
   // computed total as items are answered.
@@ -729,14 +749,27 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
             <Select value={scale} onValueChange={handleScaleChange}>
               <SelectTrigger id="scale"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {ASSESSMENT_SCALES.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                {SCALE_GROUPS.map((group) => (
+                  <SelectGroup key={group.label}>
+                    <SelectLabel className="text-xs text-muted-foreground font-semibold">{group.label}</SelectLabel>
+                    {group.scales.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>
           </div>
           {isStructured ? (
             <input type="hidden" {...register("score")} />
+          ) : isQualitative ? (
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="score" className="text-xs">Observaciones</Label>
+              <Textarea id="score" rows={4}
+                placeholder="Describe los hallazgos de la exploración…"
+                {...register("score")} />
+              {errors.score && <p className="text-xs text-destructive">{errors.score.message}</p>}
+            </div>
           ) : (
             <div className="space-y-1.5">
               <Label htmlFor="score" className="text-xs">Puntuación</Label>
@@ -770,7 +803,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
               size="sm"
               disabled={
                 create.isPending ||
-                (isStructured && !isCopm && structuredItemCount < (STRUCTURED_SCALES as readonly string[]).length)
+                (isStructured && !isCopm && !isScaleComplete(scale, itemScores))
               }
             >
               {create.isPending ? "Guardando…" : "Añadir evaluación"}

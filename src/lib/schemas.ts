@@ -52,6 +52,16 @@ export type StructuredScale = (typeof STRUCTURED_SCALES)[number];
 export const QUALITATIVE_SCALES = ["Monofilamentos", "Esterognosia", "Propiocepción"] as const;
 export type QualitativeScale = (typeof QUALITATIVE_SCALES)[number];
 
+// Groups for UI display (dropdown, evolution table).
+export const SCALE_GROUPS = [
+  { label: "AVD", scales: ["Barthel", "Lawton-Brody", "VAVDI"] },
+  { label: "Desempeño ocupacional", scales: ["COPM"] },
+  { label: "Fuerza", scales: ["JAMAR"] },
+  { label: "Destreza", scales: ["9HPT", "Box and Block", "Minnesota"] },
+  { label: "Sensibilidad", scales: ["Monofilamentos", "Esterognosia", "Propiocepción"] },
+  { label: "Movilidad", scales: ["TUG"] },
+] as const;
+
 export const PROFESSIONAL_COLORS = [
   "#1a5c58", // brand teal
   "#5b3fa0",

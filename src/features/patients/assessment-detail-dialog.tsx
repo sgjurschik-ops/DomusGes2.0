@@ -14,6 +14,7 @@ import {
   ASSESSMENT_SCALES,
   STRUCTURED_SCALES,
   QUALITATIVE_SCALES,
+  SCALE_GROUPS,
 } from "@/lib/schemas";
 import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
@@ -32,7 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Trash2, Pencil, BarChart3 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -355,10 +356,15 @@ function AssessmentEditForm({
         >
           <SelectTrigger id="scale"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {ASSESSMENT_SCALES.map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
-            ))}
-          </SelectContent>
+                {SCALE_GROUPS.map((group) => (
+                  <SelectGroup key={group.label}>
+                    <SelectLabel className="text-xs text-muted-foreground font-semibold">{group.label}</SelectLabel>
+                    {group.scales.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
         </Select>
       </div>
 
