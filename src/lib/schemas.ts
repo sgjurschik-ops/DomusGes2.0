@@ -35,13 +35,22 @@ export const ASSESSMENT_SCALES = [
   "9HPT",
   "Box and Block",
   "TUG",
+  "JAMAR",
+  "Minnesota",
+  "Monofilamentos",
+  "Esterognosia",
+  "Propiocepción",
 ] as const;
 
 // Scales with a structured, item-by-item form (score is computed, not
 // typed in by hand). Any scale not in this list keeps the free-text score
 // field as before.
-export const STRUCTURED_SCALES = ["Barthel", "Lawton-Brody", "VAVDI", "COPM", "9HPT", "Box and Block", "TUG"] as const;
+export const STRUCTURED_SCALES = ["Barthel", "Lawton-Brody", "VAVDI", "COPM", "9HPT", "Box and Block", "TUG", "JAMAR", "Minnesota"] as const;
 export type StructuredScale = (typeof STRUCTURED_SCALES)[number];
+
+// Qualitative scales — observation text only, no numeric score.
+export const QUALITATIVE_SCALES = ["Monofilamentos", "Esterognosia", "Propiocepción"] as const;
+export type QualitativeScale = (typeof QUALITATIVE_SCALES)[number];
 
 export const PROFESSIONAL_COLORS = [
   "#1a5c58", // brand teal

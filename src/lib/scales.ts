@@ -483,7 +483,37 @@ export function computeScaleTotal(scaleId: string, itemScores: Record<string, nu
   // Measurement scales: return dominant hand value as primary
   if (scaleId === "9HPT" || scaleId === "Box and Block") return itemScores["dominant"] ?? 0;
   if (scaleId === "TUG") return itemScores["time"] ?? 0;
+  if (scaleId === "JAMAR") return itemScores["msd_1"] ?? 0;
+  if (scaleId === "Minnesota") return itemScores["p1_msd"] ?? 0;
   return 0;
+}
+
+// Returns true when the user has entered enough data to submit this scale.
+// Used by the form to disable the submit button until mandatory fields are filled.
+export function isScaleComplete(scaleId: string, itemScores: Record<string, number>): boolean {
+  const def = STRUCTURED_SCALE_DEFINITIONS[scaleId];
+  if (def) {
+    // ADL scales: all items must be answered
+    return def.items.every((item) => itemScores[item.id] !== undefined);
+  }
+  // Measurement scales — at least the primary field(s)
+  if (scaleId === "9HPT" || scaleId === "Box and Block") {
+    return itemScores["dominant"] !== undefined;
+  }
+  if (scaleId === "TUG") {
+    return itemScores["time"] !== undefined;
+  }
+  if (scaleId === "JAMAR") {
+    return itemScores["msd_1"] !== undefined || itemScores["msi_1"] !== undefined;
+  }
+  if (scaleId === "Minnesota") {
+    // All 3 trials × 2 sides required
+    for (let i = 1; i <= 3; i++) {
+      if (itemScores[`p${i}_msd`] === undefined || itemScores[`p${i}_msi`] === undefined) return false;
+    }
+    return true;
+  }
+  return true;
 }
 
 export function formatScaleScore(scaleId: string, itemScores: Record<string, number>): string {
@@ -510,6 +540,27 @@ export function formatScaleScore(scaleId: string, itemScores: Record<string, num
     if (time === undefined) return "";
     const aid = itemScores["aid_idx"] !== undefined ? TUG_AIDS[itemScores["aid_idx"]] : "";
     return `${time}s${aid ? ` (${aid})` : ""}`;
+  }
+  if (scaleId === "JAMAR") {
+    const keys = Object.keys(itemScores).filter((k) => k.startsWith("msd_")).sort();
+    const msdVals = keys.map((k) => itemScores[k]).filter((v) => v !== undefined);
+    const msiKeys = Object.keys(itemScores).filter((k) => k.startsWith("msi_")).sort();
+    const msiVals = msiKeys.map((k) => itemScores[k]).filter((v) => v !== undefined);
+    if (msdVals.length === 0 && msiVals.length === 0) return "";
+    const msdStr = msdVals.length > 0 ? `MSD: ${msdVals.join("-")}` : "MSD: —";
+    const msiStr = msiVals.length > 0 ? `MSI: ${msiVals.join("-")}` : "MSI: —";
+    return `${msdStr} / ${msiStr} kg`;
+  }
+  if (scaleId === "Minnesota") {
+    const trials: string[] = [];
+    for (let i = 1; i <= 3; i++) {
+      const msd = itemScores[`p${i}_msd`];
+      const msi = itemScores[`p${i}_msi`];
+      if (msd !== undefined || msi !== undefined) {
+        trials.push(`P${i}: ${msd ?? "—"}″/${msi ?? "—"}″`);
+      }
+    }
+    return trials.length > 0 ? trials.join(" | ") : "";
   }
   return "";
 }

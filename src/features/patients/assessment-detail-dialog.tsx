@@ -13,6 +13,7 @@ import {
   type AssessmentUpdateInput,
   ASSESSMENT_SCALES,
   STRUCTURED_SCALES,
+  QUALITATIVE_SCALES,
 } from "@/lib/schemas";
 import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
@@ -312,6 +313,7 @@ function AssessmentEditForm({
   const scale = watch("scale");
   const isCopm = scale === "COPM";
   const isStructured = (STRUCTURED_SCALES as readonly string[]).includes(scale);
+  const isQualitative = (QUALITATIVE_SCALES as readonly string[]).includes(scale);
 
   useEffect(() => {
     if (isCopm) {
@@ -362,6 +364,14 @@ function AssessmentEditForm({
 
       {isStructured ? (
         <input type="hidden" {...register("score")} />
+      ) : isQualitative ? (
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="score" className="text-xs">Observaciones</Label>
+          <Textarea id="score" rows={4}
+            placeholder="Describe los hallazgos de la exploración…"
+            {...register("score")} />
+          {errors.score && <p className="text-xs text-destructive">{errors.score.message}</p>}
+        </div>
       ) : (
         <div className="space-y-1.5">
           <Label htmlFor="score" className="text-xs">Puntuación</Label>

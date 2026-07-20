@@ -25,7 +25,7 @@ type Props = {
   onChange: (itemScores: Record<string, number>) => void;
 };
 
-const MEASUREMENT_SCALES = ["9HPT", "Box and Block", "TUG"];
+const MEASUREMENT_SCALES = ["9HPT", "Box and Block", "TUG", "JAMAR", "Minnesota"];
 
 // Renders the item-by-item form for a structured scale (Barthel,
 // Lawton-Brody, VAVDI) or a measurement scale (9HPT, Box and Block, TUG),
@@ -229,6 +229,62 @@ function MeasurementScaleFields({ scale, itemScores, onChange }: Props) {
             </Select>
           </div>
         </div>
+        {score && <p className="text-sm font-medium bg-accent/40 rounded-md px-3 py-2">{score}</p>}
+      </div>
+    );
+  }
+
+  if (scale === "JAMAR") {
+    return (
+      <div className="sm:col-span-2 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Dinamometría JAMAR — Evalúa la fuerza de prensión. Registra hasta 3 intentos por mano (kg). Se recomienda registrar al menos 1 intento por lado.
+        </p>
+        {[1, 2, 3].map((attempt) => (
+          <div key={attempt} className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Intento {attempt}</p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">MSD (kg)</Label>
+                <Input type="number" step="0.5" min="0" placeholder="Ej. 35"
+                  value={itemScores[`msd_${attempt}`] ?? ""} onChange={(e) => set(`msd_${attempt}`, e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">MSI (kg)</Label>
+                <Input type="number" step="0.5" min="0" placeholder="Ej. 22"
+                  value={itemScores[`msi_${attempt}`] ?? ""} onChange={(e) => set(`msi_${attempt}`, e.target.value)} />
+              </div>
+            </div>
+          </div>
+        ))}
+        {score && <p className="text-sm font-medium bg-accent/40 rounded-md px-3 py-2">{score}</p>}
+      </div>
+    );
+  }
+
+  if (scale === "Minnesota") {
+    return (
+      <div className="sm:col-span-2 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Minnesota Rate of Manipulation Test — Evalúa la destreza manipulativa. Registra el tiempo (en segundos) de cada prueba por mano.
+        </p>
+        {[1, 2, 3].map((trial) => (
+          <div key={trial} className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Prueba {trial}</p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">MSD (segundos)</Label>
+                <Input type="number" step="0.1" min="0" placeholder='Ej. 19'
+                  value={itemScores[`p${trial}_msd`] ?? ""} onChange={(e) => set(`p${trial}_msd`, e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">MSI (segundos)</Label>
+                <Input type="number" step="0.1" min="0" placeholder='Ej. 23'
+                  value={itemScores[`p${trial}_msi`] ?? ""} onChange={(e) => set(`p${trial}_msi`, e.target.value)} />
+              </div>
+            </div>
+          </div>
+        ))}
         {score && <p className="text-sm font-medium bg-accent/40 rounded-md px-3 py-2">{score}</p>}
       </div>
     );
