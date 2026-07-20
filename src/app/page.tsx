@@ -10,7 +10,6 @@ import { DashboardView } from "@/features/dashboard/dashboard-view";
 import { PatientsListView } from "@/features/patients/patients-list-view";
 import { PatientDetailView } from "@/features/patients/patient-detail-view";
 import { NewPatientForm } from "@/features/patients/new-patient-form";
-import { NewVisitForm } from "@/features/visits/new-visit-form";
 import { CalendarView } from "@/features/calendar/calendar-view";
 import { TeamView } from "@/features/team/team-view";
 import { BillingView } from "@/features/billing/billing-view";
@@ -69,7 +68,6 @@ export default function Home() {
           {view === "patient-detail" && <PatientDetailView />}
           {view === "new-patient" && <NewPatientForm />}
           {view === "edit-patient" && <NewPatientForm mode="edit" />}
-          {view === "new-visit" && <NewVisitForm />}
           {view === "calendar" && <CalendarView />}
           {view === "equipo" && <TeamView />}
           {view === "facturacion" && <BillingView />}

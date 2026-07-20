@@ -38,6 +38,7 @@ import { StructuredScaleFields } from "./structured-scale-fields";
 import { CopmFields, formatCopmScore } from "./copm-fields";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { VisitDetailDialog } from "./visit-detail-dialog";
+import { NewVisitForm } from "@/features/visits/new-visit-form";
 import { PatientReportDialog } from "./patient-report-dialog";
 import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle, FileDown, Activity, ListChecks, StickyNote, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -63,6 +64,7 @@ export function PatientDetailView() {
   const [activeTab, setActiveTab] = useState("overview");
   const [openVisitId, setOpenVisitId] = useState<string | null>(null);
   const [openVisitEdit, setOpenVisitEdit] = useState(false);
+  const [newVisitOpen, setNewVisitOpen] = useState(false);
   const [problemsUser, setProblemsUser] = useState<string>("");
   const [profileCompletion, setProfileCompletion] = useState<{ filled: number; total: number } | null>(null);
 
@@ -127,7 +129,7 @@ export function PatientDetailView() {
               {/* Row 2: Actions + alerts — smaller buttons */}
               <div className="flex items-center gap-1.5 flex-wrap">
                 {!isAdmin && (
-                  <Button size="sm" className="h-7 text-xs px-2.5" onClick={() => { useNav.getState().setNewVisitPatient(patient.id); navigate("new-visit"); }} disabled={!professionals?.length}>
+                  <Button size="sm" className="h-7 text-xs px-2.5" onClick={() => setNewVisitOpen(true)} disabled={!professionals?.length}>
                     <Plus className="w-3.5 h-3.5 mr-1" />Registrar seguimiento
                   </Button>
                 )}
@@ -443,6 +445,14 @@ export function PatientDetailView() {
           onClose={() => { setOpenVisitId(null); setOpenVisitEdit(false); }}
         />
       )}
+
+      <NewVisitForm
+        open={newVisitOpen}
+        patientId={patient.id}
+        patientName={patient.fullName}
+        previousVisit={visits?.[0]}
+        onClose={() => setNewVisitOpen(false)}
+      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

@@ -13,7 +13,6 @@ const VIEW_TITLES: Record<string, string> = {
   today: "Ruta de hoy",
   patients: "Pacientes",
   "patient-detail": "Paciente",
-  "new-visit": "Nuevo seguimiento",
   "new-patient": "Nuevo paciente",
   calendar: "Agenda",
   equipo: "Equipo",

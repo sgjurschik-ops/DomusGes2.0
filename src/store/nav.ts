@@ -11,14 +11,12 @@ import type { View } from "@/types/domain";
 interface NavState {
   view: View;
   selectedPatientId: string | null;
-  newVisitPatientId: string | null;
   sidebarOpen: boolean;
   sidebarCollapsed: boolean;
   calendarSelectedDate: string | null; // ISO yyyy-mm-dd for calendar/today
   // Actions
   navigate: (view: View) => void;
   selectPatient: (patientId: string | null) => void;
-  setNewVisitPatient: (patientId: string | null) => void;
   setSidebarOpen: (open: boolean) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setCalendarSelectedDate: (date: string | null) => void;
@@ -26,7 +24,7 @@ interface NavState {
 }
 
 const VALID_VIEWS: View[] = [
-  "dashboard", "patients", "patient-detail", "new-visit", "new-patient", "edit-patient",
+  "dashboard", "patients", "patient-detail", "new-patient", "edit-patient",
   "equipo", "calendar", "reports", "settings", "today", "admin-users", "facturacion",
 ];
 
@@ -64,7 +62,6 @@ const initial = readHashState();
 export const useNav = create<NavState>((set, get) => ({
   view: initial.view,
   selectedPatientId: initial.selectedPatientId,
-  newVisitPatientId: null,
   sidebarOpen: false,
   sidebarCollapsed: readSidebarCollapsed(),
   calendarSelectedDate: null,
@@ -76,7 +73,6 @@ export const useNav = create<NavState>((set, get) => ({
     set({ selectedPatientId: patientId });
     if (patientId) writeHashState("patient-detail", patientId);
   },
-  setNewVisitPatient: (patientId) => set({ newVisitPatientId: patientId }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSidebarCollapsed: (collapsed) => {
     writeSidebarCollapsed(collapsed);
@@ -85,8 +81,7 @@ export const useNav = create<NavState>((set, get) => ({
   setCalendarSelectedDate: (date) => set({ calendarSelectedDate: date }),
   back: () => {
     const v = get().view;
-    if (v === "new-visit" && get().selectedPatientId) set({ view: "patient-detail" });
-    else if (v === "new-patient" || v === "edit-patient" || v === "patient-detail" || v === "new-visit") {
+    if (v === "new-patient" || v === "edit-patient" || v === "patient-detail") {
       set({ view: "patients" });
       writeHashState("patients", null);
     } else {

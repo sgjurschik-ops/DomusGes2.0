@@ -2,34 +2,40 @@
 
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCreateVisit, usePatients, useProfessionals } from "@/hooks/api";
-import { useNav } from "@/store/nav";
+import { useCreateVisit, useProfessionals } from "@/hooks/api";
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { RichTextarea } from "@/components/rich-textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Save, X, Plus } from "lucide-react";
+import { Save, X, Plus } from "lucide-react";
 import { visitCreateSchema, type VisitCreateInput } from "@/lib/schemas";
+import type { VisitDTO } from "@/types/domain";
 import { toast } from "@/hooks/use-toast";
 
 import { z } from "zod";
 
-export function NewVisitForm() {
+type Props = {
+  open: boolean;
+  patientId: string;
+  patientName: string;
+  /** Most recent visit for this patient, already loaded by the parent (useVisits) — avoids a duplicate fetch. */
+  previousVisit?: VisitDTO;
+  onClose: () => void;
+};
+
+export function NewVisitForm({ open, patientId, patientName, previousVisit, onClose }: Props) {
   const create = useCreateVisit();
-  const { data: patients } = usePatients();
   const { data: professionals } = useProfessionals();
-  const { back, newVisitPatientId, selectPatient, navigate } = useNav();
   const [interventionInput, setInterventionInput] = useState("");
   const [patientGoals, setPatientGoals] = useState<{ id: string; text: string; area: string; status: string }[]>([]);
-
-
 
   const {
     register,
@@ -37,11 +43,12 @@ export function NewVisitForm() {
     control,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<z.input<typeof visitCreateSchema>, any, z.output<typeof visitCreateSchema>>({
     resolver: zodResolver(visitCreateSchema),
     defaultValues: {
-      patientId: newVisitPatientId ?? "",
+      patientId,
       therapistId: "",
       date: new Date().toISOString().slice(0, 10),
       time: (() => {
@@ -54,58 +61,69 @@ export function NewVisitForm() {
       title: "",
       notes: "",
       interventions: [],
+      goalIds: [],
+      tasks: [],
     },
   });
 
-  async function onSubmit(values: VisitCreateInput) {
-    try {
-      // Update previous visit's tasks with completion status
-      if (previousVisitId && previousTasks.length > 0) {
-        await fetch(`/api/visits/${previousVisitId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tasks: JSON.stringify(previousTasks) }),
-        }).catch(() => {});
-      }
-      const v = await create.mutateAsync(values);
-      toast({ title: "Seguimiento registrado", description: v.patientName });
-      selectPatient(values.patientId);
-      back();
-    } catch (e: any) {
-      toast({ title: "Error al registrar seguimiento", variant: "destructive" });
-    }
-  }
-
-  const interventions = watch("interventions");
-  const selectedPatientId = watch("patientId");
+  // Pending tasks from the previous visit, kept in sync with the parent's
+  // already-loaded `visits` query (no separate fetch, no staleness).
   const [previousTasks, setPreviousTasks] = useState<{ id: string; text: string; completed: boolean }[]>([]);
-  const [previousVisitId, setPreviousVisitId] = useState<string | null>(null);
   const [taskInput, setTaskInput] = useState("");
 
-  // Fetch patient goals and previous tasks when patient changes
+  // Reset the form and pull in fresh context each time the panel is opened.
   useEffect(() => {
-    if (!selectedPatientId) { setPatientGoals([]); setPreviousTasks([]); setPreviousVisitId(null); return; }
-    fetch(`/api/patients/${selectedPatientId}/occupational-profile`)
+    if (!open) return;
+    reset({
+      patientId,
+      therapistId: "",
+      date: new Date().toISOString().slice(0, 10),
+      time: (() => {
+        const now = new Date();
+        const m = Math.round(now.getMinutes() / 15) * 15;
+        const h = m === 60 ? now.getHours() + 1 : now.getHours();
+        return `${String(h % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+      })(),
+      durationMin: 60,
+      title: "",
+      notes: "",
+      interventions: [],
+      goalIds: [],
+      tasks: [],
+    });
+    setPreviousTasks((previousVisit?.tasks ?? []).filter((t) => !t.completed));
+    setTaskInput("");
+    setInterventionInput("");
+
+    setPatientGoals([]);
+    fetch(`/api/patients/${patientId}/occupational-profile`)
       .then((r) => r.json())
       .then((data) => {
         const goals = (data?.goals ?? []).filter((g: any) => g.status === "En curso");
         setPatientGoals(goals);
       })
       .catch(() => setPatientGoals([]));
-    fetch(`/api/visits?patientId=${selectedPatientId}&limit=1`)
-      .then((r) => r.json())
-      .then((visits: any[]) => {
-        if (visits.length > 0 && Array.isArray(visits[0].tasks)) {
-          const pending = visits[0].tasks.filter((t: any) => !t.completed);
-          setPreviousTasks(pending);
-          setPreviousVisitId(visits[0].id);
-        } else {
-          setPreviousTasks([]);
-          setPreviousVisitId(null);
-        }
-      })
-      .catch(() => { setPreviousTasks([]); setPreviousVisitId(null); });
-  }, [selectedPatientId]);
+  }, [open, patientId, previousVisit?.id]);
+
+  async function onSubmit(values: VisitCreateInput) {
+    try {
+      // Update previous visit's tasks with completion status marked in this form.
+      if (previousVisit && previousTasks.length > 0) {
+        await fetch(`/api/visits/${previousVisit.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tasks: JSON.stringify(previousTasks) }),
+        }).catch(() => {});
+      }
+      await create.mutateAsync(values);
+      toast({ title: "Seguimiento registrado", description: patientName });
+      onClose();
+    } catch {
+      toast({ title: "Error al registrar seguimiento", variant: "destructive" });
+    }
+  }
+
+  const interventions = watch("interventions");
 
   function togglePreviousTask(id: string) {
     setPreviousTasks((prev) => prev.map((t) => t.id === id ? { ...t, completed: !t.completed } : t));
@@ -135,41 +153,16 @@ export function NewVisitForm() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
-      <button
-        onClick={back}
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="w-4 h-4" /> Volver
-      </button>
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-2xl p-0">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full min-h-0">
+          <SheetHeader>
+            <SheetTitle>Nuevo seguimiento</SheetTitle>
+            <SheetDescription>{patientName}</SheetDescription>
+          </SheetHeader>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Datos del seguimiento</CardTitle>
-            <CardDescription>Registra la sesión realizada.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Compact data row: 2 cols on mobile, 3 on tablet, all 5 in one row from lg up */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-[1.8fr_1.8fr_1fr_1.1fr_0.9fr] gap-3">
-              <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                <Label className="text-xs">Paciente <span className="text-destructive">*</span></Label>
-                <Controller
-                  control={control}
-                  name="patientId"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger><SelectValue placeholder="Selecciona un paciente" /></SelectTrigger>
-                      <SelectContent>
-                        {(patients ?? []).map((p) => (
-                          <SelectItem key={p.id} value={p.id}>{p.fullName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.patientId && <p className="text-xs text-destructive">{errors.patientId.message}</p>}
-              </div>
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5 col-span-2 sm:col-span-1">
                 <Label className="text-xs">Terapeuta <span className="text-destructive">*</span></Label>
                 <Controller
@@ -216,13 +209,9 @@ export function NewVisitForm() {
 
             <div className="h-px bg-border" />
 
-            {/* Title + notes get the visual weight */}
             <div className="space-y-1.5">
               <Label className="text-sm font-semibold">Título del seguimiento <span className="text-destructive">*</span></Label>
-              <Input
-                placeholder="p. ej. Primera valoración, Revisión mensual…"
-                {...register("title")}
-              />
+              <Input placeholder="p. ej. Primera valoración, Revisión mensual…" {...register("title")} />
               {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
             </div>
 
@@ -234,7 +223,7 @@ export function NewVisitForm() {
                 name="notes"
                 render={({ field }) => (
                   <RichTextarea
-                    rows={12}
+                    rows={10}
                     placeholder="Describe la sesión: hallazgos, técnicas aplicadas, respuesta del paciente, plan para el próximo seguimiento…"
                     value={field.value ?? ""}
                     onChange={field.onChange}
@@ -244,13 +233,12 @@ export function NewVisitForm() {
               {errors.notes && <p className="text-xs text-destructive">{errors.notes.message}</p>}
             </div>
 
-            {/* Goals worked on this session */}
             {patientGoals.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-xs">Objetivos trabajados en esta sesión</Label>
                 <Controller control={control} name="goalIds"
                   render={({ field }) => (
-                    <div className="grid sm:grid-cols-2 gap-1.5">
+                    <div className="space-y-1.5">
                       {patientGoals.map((goal) => {
                         const checked = (field.value ?? []).includes(goal.id);
                         return (
@@ -274,7 +262,6 @@ export function NewVisitForm() {
               </div>
             )}
 
-            {/* Previous session tasks — review */}
             {previousTasks.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-xs">Tareas de la sesión anterior</Label>
@@ -291,7 +278,6 @@ export function NewVisitForm() {
               </div>
             )}
 
-            {/* New tasks for next session */}
             <div className="space-y-1.5">
               <Label className="text-xs">Tareas para la próxima sesión</Label>
               <div className="flex gap-2">
@@ -351,17 +337,17 @@ export function NewVisitForm() {
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={back}>Cancelar</Button>
-          <Button type="submit" disabled={create.isPending}>
-            <Save className="w-4 h-4 mr-1.5" />
-            {create.isPending ? "Guardando…" : "Registrar seguimiento"}
-          </Button>
-        </div>
-      </form>
-    </div>
+          <SheetFooter className="flex-row justify-end gap-2 border-t">
+            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="submit" disabled={create.isPending}>
+              <Save className="w-4 h-4 mr-1.5" />
+              {create.isPending ? "Guardando…" : "Registrar seguimiento"}
+            </Button>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
   );
 }
