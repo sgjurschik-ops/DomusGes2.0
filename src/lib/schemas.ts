@@ -178,7 +178,7 @@ export const patientCreateSchema = z.object({
   birthDate: z.string().min(1, "La fecha de nacimiento es obligatoria"),
   specialty: z.enum(SPECIALTIES),
   status: z.enum(PATIENT_STATUSES).default("Activo"),
-  resource: z.enum(RESOURCE_KEYS, { errorMap: () => ({ message: "Selecciona un recurso" }) }),
+  resource: z.enum(RESOURCE_KEYS, { error: "Selecciona un recurso" }),
   phone: z.string().optional().default(""),
   address: z.string().optional().default(""),
   diagnosis: z.string().optional().default(""),
