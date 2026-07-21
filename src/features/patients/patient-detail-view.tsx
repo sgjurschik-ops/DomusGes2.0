@@ -35,7 +35,6 @@ import { formatScaleScore, isScaleComplete, STRUCTURED_SCALE_DEFINITIONS } from 
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { CopmFields, formatCopmScore } from "./copm-fields";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
-import { VisitDetailDialog } from "./visit-detail-dialog";
 import { NewVisitForm } from "@/features/visits/new-visit-form";
 import { EvolutionTable } from "./evolution-table";
 import { PatientReportDialog } from "./patient-report-dialog";
@@ -62,7 +61,6 @@ export function PatientDetailView() {
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [openVisitId, setOpenVisitId] = useState<string | null>(null);
-  const [openVisitEdit, setOpenVisitEdit] = useState(false);
   const [newVisitOpen, setNewVisitOpen] = useState(false);
   const [problemsUser, setProblemsUser] = useState<string>("");
   const [profileCompletion, setProfileCompletion] = useState<{ filled: number; total: number } | null>(null);
@@ -77,7 +75,11 @@ export function PatientDetailView() {
       .then((data) => {
         if (data?.problemsUser) setProblemsUser(data.problemsUser);
         setProfileCompletion(getProfileCompletion(data ?? {}));
-        setPatientGoals((data?.goals ?? []).filter((g: any) => g.status === "En curso"));
+        // Used only to render the "Objetivos" badges on past seguimientos —
+        // must include ALL goals regardless of status, otherwise a goal
+        // that's since moved to "Conseguido" (or any other status) vanishes
+        // from visits that already reference it.
+        setPatientGoals(data?.goals ?? []);
       })
       .catch(() => {});
   }, [selectedPatientId]);
@@ -345,7 +347,7 @@ export function PatientDetailView() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { setOpenVisitId(v.id); setOpenVisitEdit(true); }}>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpenVisitId(v.id)}>
                         <Pencil className="w-3 h-3 mr-1" /> Editar
                       </Button>
                     </div>
@@ -468,21 +470,13 @@ export function PatientDetailView() {
         />
       )}
 
-      {openVisitId && (
-        <VisitDetailDialog
-          visitId={openVisitId}
-          patientId={patient.id}
-          initialEdit={openVisitEdit}
-          onClose={() => { setOpenVisitId(null); setOpenVisitEdit(false); }}
-        />
-      )}
-
       <NewVisitForm
-        open={newVisitOpen}
+        open={newVisitOpen || !!openVisitId}
         patientId={patient.id}
         patientName={patient.fullName}
         previousVisit={visits?.[0]}
-        onClose={() => setNewVisitOpen(false)}
+        editVisit={openVisitId ? visits?.find((v) => v.id === openVisitId) : undefined}
+        onClose={() => { setNewVisitOpen(false); setOpenVisitId(null); }}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

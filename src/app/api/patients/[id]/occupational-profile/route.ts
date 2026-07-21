@@ -44,21 +44,43 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   });
 
   if (Array.isArray(goals)) {
-    await db.occupationalGoal.deleteMany({ where: { occupationalProfileId: profile.id } });
-    if (goals.length > 0) {
-      await db.occupationalGoal.createMany({
-        data: goals.map((g: any) => ({
-          occupationalProfileId: profile.id,
-          text: g.text ?? "",
-          area: g.area ?? "",
-          scope: g.scope ?? "Con el paciente",
-          status: g.status ?? "En curso",
-          specificGoals: typeof g.specificGoals === "string" ? g.specificGoals : JSON.stringify(g.specificGoals ?? []),
-          startDate: g.startDate ? new Date(g.startDate) : null,
-          targetDate: g.targetDate ? new Date(g.targetDate) : null,
-          evaluation: g.evaluation ?? "",
-        })),
-      });
+    // IMPORTANT: goal ids are referenced elsewhere (Visit.goalIds). The
+    // previous implementation deleted every goal and recreated them from
+    // scratch on every save, which handed out a brand-new id to every goal
+    // — even unchanged ones — silently breaking any visit that referenced
+    // the old id. Now we update existing goals in place (keeping their id),
+    // only create genuinely new ones, and only delete ones the person
+    // actually removed.
+    const existing = await db.occupationalGoal.findMany({
+      where: { occupationalProfileId: profile.id },
+      select: { id: true },
+    });
+    const existingIds = new Set(existing.map((g) => g.id));
+    const incomingIds = new Set(
+      goals.filter((g: any) => g.id && existingIds.has(g.id)).map((g: any) => g.id),
+    );
+
+    const toDelete = [...existingIds].filter((gid) => !incomingIds.has(gid));
+    if (toDelete.length > 0) {
+      await db.occupationalGoal.deleteMany({ where: { id: { in: toDelete } } });
+    }
+
+    for (const g of goals) {
+      const data = {
+        text: g.text ?? "",
+        area: g.area ?? "",
+        scope: g.scope ?? "Con el paciente",
+        status: g.status ?? "En curso",
+        specificGoals: typeof g.specificGoals === "string" ? g.specificGoals : JSON.stringify(g.specificGoals ?? []),
+        startDate: g.startDate ? new Date(g.startDate) : null,
+        targetDate: g.targetDate ? new Date(g.targetDate) : null,
+        evaluation: g.evaluation ?? "",
+      };
+      if (g.id && existingIds.has(g.id)) {
+        await db.occupationalGoal.update({ where: { id: g.id }, data });
+      } else {
+        await db.occupationalGoal.create({ data: { occupationalProfileId: profile.id, ...data } });
+      }
     }
   }
 
