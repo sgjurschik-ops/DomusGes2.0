@@ -25,6 +25,17 @@ import { toast } from "@/hooks/use-toast";
 
 import { z } from "zod";
 
+// The previous default used `new Date().toISOString().slice(0, 10)`, which
+// takes the UTC calendar date — while the default `time` below is read from
+// the browser's local wall clock. Near midnight in Madrid (UTC+1/+2) these
+// two can disagree on which day it is, silently pre-filling the wrong date
+// next to a correct-looking time. This reads the date from the same local
+// clock as the time, so both always describe the same instant.
+function todayLocalDateStr(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 type Props = {
   open: boolean;
   patientId: string;
@@ -53,7 +64,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, onCl
     defaultValues: {
       patientId,
       therapistId: me?.id ?? "",
-      date: new Date().toISOString().slice(0, 10),
+      date: todayLocalDateStr(),
       time: (() => {
         const now = new Date();
         const m = Math.round(now.getMinutes() / 15) * 15;
@@ -80,7 +91,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, onCl
     reset({
       patientId,
       therapistId: me?.id ?? "",
-      date: new Date().toISOString().slice(0, 10),
+      date: todayLocalDateStr(),
       time: (() => {
         const now = new Date();
         const m = Math.round(now.getMinutes() / 15) * 15;

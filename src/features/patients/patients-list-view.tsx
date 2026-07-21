@@ -220,9 +220,6 @@ export function PatientsListView() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-muted-foreground truncate mt-0.5">
-                              {p.diagnosis ?? "Sin diagnóstico"}
-                            </p>
                           </div>
                         </div>
                       </td>
@@ -278,9 +275,6 @@ export function PatientsListView() {
                         ))}
                       </div>
                     )}
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {p.diagnosis ?? "Sin diagnóstico"}
-                    </p>
                   </div>
                   <div className="text-right hidden sm:block">
                     <p className="text-[11px] text-muted-foreground uppercase">Próxima cita</p>
