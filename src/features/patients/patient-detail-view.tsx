@@ -778,7 +778,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
                     onClick={() => setActiveCategory(cat.key)}
                     className={cn(
                       "flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors",
-                      isActive ? "bg-primary/10 text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
+                      isActive ? "bg-[#1a5c58]/10 text-[#1a5c58] shadow-sm" : "text-muted-foreground hover:text-foreground",
                     )}
                   >
                     <Icon className="h-3.5 w-3.5" />
@@ -799,7 +799,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
                     onClick={() => handleScaleChange(s as AssessmentCreateInput["scale"])}
                     className={cn(
                       "rounded-md border px-3 py-1.5 text-xs transition-colors",
-                      scale === s ? "border-primary bg-primary/5 font-medium text-primary" : "hover:bg-muted/60",
+                      scale === s ? "border-[#1a5c58] bg-[#1a5c58]/5 font-medium text-[#1a5c58]" : "hover:bg-muted/60",
                     )}
                   >
                     {s}
