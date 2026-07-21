@@ -808,7 +808,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
               )}
             </div>
           </div>
-          {scale === "" ? null : isStructured ? (
+          {(scale as string) === "" ? null : isStructured ? (
             <input type="hidden" {...register("score")} />
           ) : isQualitative ? (
             <div className="space-y-1.5 sm:col-span-2">
@@ -851,7 +851,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
               size="sm"
               disabled={
                 create.isPending ||
-                scale === "" ||
+                (scale as string) === "" ||
                 (isStructured && !isCopm && !isScaleComplete(scale, itemScores))
               }
             >
