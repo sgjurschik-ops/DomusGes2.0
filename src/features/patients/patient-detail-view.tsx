@@ -12,9 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
-  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -32,7 +29,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { assessmentCreateSchema, type AssessmentCreateInput, ASSESSMENT_SCALES, STRUCTURED_SCALES, QUALITATIVE_SCALES, SCALE_GROUPS } from "@/lib/schemas";
+import { assessmentCreateSchema, type AssessmentCreateInput, STRUCTURED_SCALES, QUALITATIVE_SCALES, ASSESSMENT_CATEGORIES } from "@/lib/schemas";
+import { cn } from "@/lib/utils";
 import { formatScaleScore, isScaleComplete, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { CopmFields, formatCopmScore } from "./copm-fields";
@@ -41,7 +39,7 @@ import { VisitDetailDialog } from "./visit-detail-dialog";
 import { NewVisitForm } from "@/features/visits/new-visit-form";
 import { EvolutionTable } from "./evolution-table";
 import { PatientReportDialog } from "./patient-report-dialog";
-import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle, FileDown, Activity, ListChecks, StickyNote, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle, FileDown, Activity, ListChecks, StickyNote, Home, Hand, Fingerprint, BatteryLow, Brain, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Dot,
@@ -674,11 +672,20 @@ function InfoRow({
   );
 }
 
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  avd: Home,
+  destreza: Hand,
+  sensibilidad: Fingerprint,
+  fatiga: BatteryLow,
+  cognitiva: Brain,
+};
+
 function AssessmentForm({ patientId, therapistId }: { patientId: string; therapistId: string }) {
   const create = useCreateAssessment();
   const [itemScores, setItemScores] = useState<Record<string, number>>({});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [copmData, setCopmData] = useState<any>(null);
+  const [activeCategory, setActiveCategory] = useState<string>(ASSESSMENT_CATEGORIES[0].key);
   const {
     register,
     handleSubmit,
@@ -691,7 +698,10 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
     defaultValues: {
       patientId,
       therapistId,
-      scale: "VAVDI",
+      // No scale pre-selected — the professional picks a category, then a
+      // scale, instead of always starting from the (previously hardcoded)
+      // first scale in the list.
+      scale: "" as AssessmentCreateInput["scale"],
       score: "",
       notes: "",
       date: new Date().toISOString().slice(0, 10),
@@ -755,23 +765,50 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
         <form onSubmit={handleSubmit(onSubmit)} className="grid sm:grid-cols-2 gap-3">
           <input type="hidden" {...register("patientId")} />
           <input type="hidden" {...register("therapistId")} />
-          <div className="space-y-1.5">
-            <Label htmlFor="scale" className="text-xs">Escala</Label>
-            <Select value={scale} onValueChange={handleScaleChange}>
-              <SelectTrigger id="scale"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {SCALE_GROUPS.map((group) => (
-                  <SelectGroup key={group.label}>
-                    <SelectLabel className="text-xs text-muted-foreground font-semibold">{group.label}</SelectLabel>
-                    {group.scales.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="space-y-2 sm:col-span-2">
+            <Label className="text-xs">Área</Label>
+            <div className="flex flex-wrap gap-1 rounded-md bg-muted/40 p-1">
+              {ASSESSMENT_CATEGORIES.map((cat) => {
+                const Icon = CATEGORY_ICONS[cat.key];
+                const isActive = activeCategory === cat.key;
+                return (
+                  <button
+                    key={cat.key}
+                    type="button"
+                    onClick={() => setActiveCategory(cat.key)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors",
+                      isActive ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {cat.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {ASSESSMENT_CATEGORIES.find((c) => c.key === activeCategory)?.scales.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic px-1 py-1.5">Próximamente</p>
+              ) : (
+                ASSESSMENT_CATEGORIES.find((c) => c.key === activeCategory)?.scales.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => handleScaleChange(s as AssessmentCreateInput["scale"])}
+                    className={cn(
+                      "rounded-md border px-3 py-1.5 text-xs transition-colors",
+                      scale === s ? "border-primary bg-primary/5 font-medium" : "hover:bg-muted/60",
+                    )}
+                  >
+                    {s}
+                  </button>
+                ))
+              )}
+            </div>
           </div>
-          {isStructured ? (
+          {scale === "" ? null : isStructured ? (
             <input type="hidden" {...register("score")} />
           ) : isQualitative ? (
             <div className="space-y-1.5 sm:col-span-2">
@@ -814,6 +851,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
               size="sm"
               disabled={
                 create.isPending ||
+                scale === "" ||
                 (isStructured && !isCopm && !isScaleComplete(scale, itemScores))
               }
             >

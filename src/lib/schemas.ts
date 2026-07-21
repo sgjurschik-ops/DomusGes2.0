@@ -64,6 +64,18 @@ export const SCALE_GROUPS = [
   { label: "Fatiga", scales: ["MFIS"] },
 ] as const;
 
+// Categories for the assessment-form scale picker (sub-tabs in the
+// "Valoración" tab). Distinct from SCALE_GROUPS above, which drives the
+// (more granular) evolution-table grouping — kept separate so each view
+// can group scales the way that's clearest for its own purpose.
+export const ASSESSMENT_CATEGORIES = [
+  { key: "avd", label: "AVD", scales: ["VAVDI", "Barthel", "Lawton-Brody", "COPM", "TUG"] },
+  { key: "destreza", label: "Destreza", scales: ["9HPT", "Box and Block", "JAMAR", "Minnesota"] },
+  { key: "sensibilidad", label: "Sensibilidad", scales: ["Monofilamentos", "Esterognosia", "Propiocepción"] },
+  { key: "fatiga", label: "Fatiga", scales: ["MFIS"] },
+  { key: "cognitiva", label: "Cognitiva", scales: [] },
+] as const;
+
 export const PROFESSIONAL_COLORS = [
   "#1a5c58", // brand teal
   "#5b3fa0",
