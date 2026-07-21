@@ -69,7 +69,9 @@ export function PatientDetailView() {
   const [problemsUser, setProblemsUser] = useState<string>("");
   const [profileCompletion, setProfileCompletion] = useState<{ filled: number; total: number } | null>(null);
 
-  // Fetch patient-reported problems and profile completion from occupational profile
+  const [patientGoals, setPatientGoals] = useState<{ id: string; text: string; area: string }[]>([]);
+
+  // Fetch patient-reported problems, profile completion, and goals from occupational profile
   useEffect(() => {
     if (!selectedPatientId) return;
     fetch(`/api/patients/${selectedPatientId}/occupational-profile`)
@@ -77,6 +79,7 @@ export function PatientDetailView() {
       .then((data) => {
         if (data?.problemsUser) setProblemsUser(data.problemsUser);
         setProfileCompletion(getProfileCompletion(data ?? {}));
+        setPatientGoals((data?.goals ?? []).filter((g: any) => g.status === "En curso"));
       })
       .catch(() => {});
   }, [selectedPatientId]);
@@ -113,8 +116,8 @@ export function PatientDetailView() {
           <div className="flex gap-0">
             {/* Left: patient info */}
             <div className="flex-1 min-w-0 space-y-2.5">
-              {/* Row 1: Identity */}
-              <div className="flex items-center gap-3">
+              {/* Row 1: Identity + action buttons */}
+              <div className="flex items-start gap-3">
                 <Avatar name={patient.fullName} color={patient.color} size={40} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -126,38 +129,32 @@ export function PatientDetailView() {
                     {patient.age} años · {patient.totalVisits} seguimientos · Inicio {formatDate(patient.startDate)}
                   </p>
                 </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" onClick={() => setReportDialogOpen(true)}>
+                    <FileDown className="w-3.5 h-3.5 mr-1" />Informe
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Más acciones"><MoreVertical className="w-3.5 h-3.5" /></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => navigate("edit-patient")}><Pencil className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
+                      <DropdownMenuItem variant="destructive" onClick={() => setDeleteDialogOpen(true)}><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
-              {/* Row 2: Actions + alerts — smaller buttons */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {!isAdmin && (
-                  <Button size="sm" className="h-7 text-xs px-2.5" onClick={() => setNewVisitOpen(true)} disabled={!professionals?.length}>
-                    <Plus className="w-3.5 h-3.5 mr-1" />Registrar seguimiento
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" onClick={() => setReportDialogOpen(true)}>
-                  <FileDown className="w-3.5 h-3.5 mr-1" />Generar informe
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Más acciones"><MoreVertical className="w-3.5 h-3.5" /></Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => navigate("edit-patient")}><Pencil className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
-                    <DropdownMenuItem variant="destructive" onClick={() => setDeleteDialogOpen(true)}><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                {(patient.alerts ?? []).length > 0 && (
-                  <>
-                    <span className="w-px h-4 bg-border mx-0.5" />
-                    {(patient.alerts ?? []).map((alert) => (
-                      <span key={alert} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium" style={{ backgroundColor: "var(--chip-orange-bg)", color: "var(--chip-orange-text)" }}>
-                        <AlertTriangle className="w-3 h-3" />{alert}
-                      </span>
-                    ))}
-                  </>
-                )}
-              </div>
+              {/* Row 2: Alerts (if any) */}
+              {(patient.alerts ?? []).length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {(patient.alerts ?? []).map((alert) => (
+                    <span key={alert} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium" style={{ backgroundColor: "var(--chip-orange-bg)", color: "var(--chip-orange-text)" }}>
+                      <AlertTriangle className="w-3 h-3" />{alert}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* Row 3: Clinical info */}
               <div className="rounded-md bg-accent/40 px-3 py-2 space-y-0.5">
@@ -328,6 +325,11 @@ export function PatientDetailView() {
 
         {/* Visits — hidden for admin */}
         {!isAdmin && <TabsContent value="visits" className="mt-4 space-y-3">
+          <div className="flex items-center justify-end">
+            <Button size="sm" className="h-8 text-xs px-3" onClick={() => setNewVisitOpen(true)} disabled={!professionals?.length}>
+              <Plus className="w-3.5 h-3.5 mr-1" />Registrar seguimiento
+            </Button>
+          </div>
           {!visits || visits.length === 0 ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">
               <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -353,6 +355,15 @@ export function PatientDetailView() {
                   <div className="rounded-md bg-muted/40 px-3 py-2 mb-2">
                     <ClinicalNotes html={v.notes} />
                   </div>
+                  {(v.goalIds ?? []).length > 0 && patientGoals.length > 0 && (
+                    <div className="mt-2 flex items-start gap-1.5 flex-wrap">
+                      <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mt-0.5">Objetivos:</span>
+                      {v.goalIds.map((gid) => {
+                        const goal = patientGoals.find((g) => g.id === gid);
+                        return goal ? <Badge key={gid} variant="secondary" className="text-[11px] py-0">{goal.text}</Badge> : null;
+                      })}
+                    </div>
+                  )}
                   {(v.tasks ?? []).length > 0 && (
                     <div className="mt-3 rounded-md border bg-accent/30 px-3 py-2 space-y-1.5">
                       <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Tareas para la próxima sesión</p>

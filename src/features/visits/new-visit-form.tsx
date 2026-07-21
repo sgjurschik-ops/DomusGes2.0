@@ -2,7 +2,7 @@
 
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCreateVisit, useProfessionals } from "@/hooks/api";
+import { useCreateVisit, useMe } from "@/hooks/api";
 import { useEffect, useState } from "react";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
@@ -13,9 +13,12 @@ import { Button } from "@/components/ui/button";
 import { RichTextarea } from "@/components/rich-textarea";
 import { Badge } from "@/components/ui/badge";
 import {
+  Popover, PopoverTrigger, PopoverContent,
+} from "@/components/ui/popover";
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Save, X, Plus } from "lucide-react";
+import { Save, X, Plus, Target } from "lucide-react";
 import { visitCreateSchema, type VisitCreateInput } from "@/lib/schemas";
 import type { VisitDTO } from "@/types/domain";
 import { toast } from "@/hooks/use-toast";
@@ -33,7 +36,7 @@ type Props = {
 
 export function NewVisitForm({ open, patientId, patientName, previousVisit, onClose }: Props) {
   const create = useCreateVisit();
-  const { data: professionals } = useProfessionals();
+  const { data: me } = useMe();
   const [interventionInput, setInterventionInput] = useState("");
   const [patientGoals, setPatientGoals] = useState<{ id: string; text: string; area: string; status: string }[]>([]);
 
@@ -49,7 +52,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, onCl
     resolver: zodResolver(visitCreateSchema),
     defaultValues: {
       patientId,
-      therapistId: "",
+      therapistId: me?.id ?? "",
       date: new Date().toISOString().slice(0, 10),
       time: (() => {
         const now = new Date();
@@ -76,7 +79,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, onCl
     if (!open) return;
     reset({
       patientId,
-      therapistId: "",
+      therapistId: me?.id ?? "",
       date: new Date().toISOString().slice(0, 10),
       time: (() => {
         const now = new Date();
@@ -103,7 +106,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, onCl
         setPatientGoals(goals);
       })
       .catch(() => setPatientGoals([]));
-  }, [open, patientId, previousVisit?.id]);
+  }, [open, patientId, previousVisit?.id, me?.id]);
 
   async function onSubmit(values: VisitCreateInput) {
     try {
@@ -162,25 +165,8 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, onCl
           </SheetHeader>
 
           <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="space-y-1.5 col-span-2 sm:col-span-1">
-                <Label className="text-xs">Terapeuta <span className="text-destructive">*</span></Label>
-                <Controller
-                  control={control}
-                  name="therapistId"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger><SelectValue placeholder="Selecciona un terapeuta" /></SelectTrigger>
-                      <SelectContent>
-                        {(professionals ?? []).filter((p) => p.isActive).map((p) => (
-                          <SelectItem key={p.id} value={p.id}>{p.name} · {p.role}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.therapistId && <p className="text-xs text-destructive">{errors.therapistId.message}</p>}
-              </div>
+            <input type="hidden" {...register("therapistId")} />
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5 min-w-0">
                 <Label className="text-xs">Fecha <span className="text-destructive">*</span></Label>
                 <Input type="date" className="px-2" {...register("date")} />
@@ -234,32 +220,60 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, onCl
             </div>
 
             {patientGoals.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-xs">Objetivos trabajados en esta sesión</Label>
-                <Controller control={control} name="goalIds"
-                  render={({ field }) => (
-                    <div className="space-y-1.5">
-                      {patientGoals.map((goal) => {
-                        const checked = (field.value ?? []).includes(goal.id);
-                        return (
-                          <label key={goal.id}
-                            className={`flex items-start gap-2 rounded-md border px-3 py-2 cursor-pointer transition-colors ${checked ? "bg-primary/5 border-primary/30" : "hover:bg-muted"}`}>
-                            <input type="checkbox" checked={checked} className="mt-0.5"
-                              onChange={() => {
-                                const current = field.value ?? [];
-                                field.onChange(checked ? current.filter((id: string) => id !== goal.id) : [...current, goal.id]);
-                              }} />
-                            <div className="min-w-0">
-                              <p className="text-sm leading-tight">{goal.text}</p>
-                              <p className="text-[10px] text-muted-foreground">{goal.area}</p>
-                            </div>
-                          </label>
-                        );
-                      })}
+              <Controller control={control} name="goalIds"
+                render={({ field }) => {
+                  const selected = (field.value ?? []) as string[];
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Objetivos trabajados</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1">
+                              <Target className="w-3.5 h-3.5" />
+                              Seleccionar ({selected.length})
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 max-h-64 overflow-y-auto p-2" align="end">
+                            <p className="text-xs font-medium text-muted-foreground mb-2 px-1">Objetivos en curso</p>
+                            {patientGoals.map((goal) => {
+                              const checked = selected.includes(goal.id);
+                              return (
+                                <label key={goal.id}
+                                  className={`flex items-start gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-colors ${checked ? "bg-primary/5" : "hover:bg-muted"}`}>
+                                  <input type="checkbox" checked={checked} className="mt-0.5"
+                                    onChange={() => {
+                                      field.onChange(checked ? selected.filter((id: string) => id !== goal.id) : [...selected, goal.id]);
+                                    }} />
+                                  <div className="min-w-0">
+                                    <p className="text-sm leading-tight">{goal.text}</p>
+                                    <p className="text-[10px] text-muted-foreground">{goal.area}</p>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      {selected.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {selected.map((gid) => {
+                            const goal = patientGoals.find((g) => g.id === gid);
+                            return goal ? (
+                              <Badge key={gid} variant="secondary" className="text-[11px] gap-1 py-0.5">
+                                {goal.text}
+                                <button type="button" onClick={() => field.onChange(selected.filter((id: string) => id !== gid))} className="hover:text-destructive">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
                     </div>
-                  )}
-                />
-              </div>
+                  );
+                }}
+              />
             )}
 
             {previousTasks.length > 0 && (
