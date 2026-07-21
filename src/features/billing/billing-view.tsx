@@ -89,6 +89,12 @@ export function BillingView() {
         />
       </div>
 
+      {!isLoading && (data?.excludedCount ?? 0) > 0 && (
+        <p className="text-xs text-muted-foreground px-1">
+          No incluye {data!.excludedCount} sesión{data!.excludedCount === 1 ? "" : "es"} de recursos no facturables (p. ej. Asociación EM).
+        </p>
+      )}
+
       {/* By therapist table */}
       <Card>
         <CardHeader className="pb-3">

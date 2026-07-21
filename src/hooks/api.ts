@@ -562,6 +562,7 @@ export interface BillingData {
     amount: number;
     durationMin: number;
   }[];
+  excludedCount: number;
 }
 
 export function useBilling(year?: number, month?: number) {

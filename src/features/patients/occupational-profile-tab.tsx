@@ -201,6 +201,7 @@ const emptyProfile: Profile = {
 export function OccupationalProfileTab({ patientId }: { patientId: string }) {
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [routineEditorOpen, setRoutineEditorOpen] = useState(false);
@@ -221,30 +222,45 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
   useEffect(() => {
     async function loadProfile() {
       setLoading(true);
-      const res = await fetch(`/api/patients/${patientId}/occupational-profile`);
-      const data = await res.json();
-      setProfile({
-        ...emptyProfile,
-        ...(data ?? {}),
-        familyComposition: parseJsonArray<FamilyMember>(data?.familyComposition),
-        supportNetwork: parseJsonArray<SupportContact>(data?.supportNetwork),
-        workHistory: parseJsonArray<WorkHistoryEntry>(data?.workHistory),
-        weeklyRoutine: parseJsonArray<RoutineCell>(data?.weeklyRoutine),
-        goals: Array.isArray(data?.goals)
-          ? data.goals.map((g: any) => ({
-              id: g.id,
-              text: g.text,
-              area: g.area,
-              scope: g.scope ?? "Con el paciente",
-              status: g.status,
-              specificGoals: (() => { try { return typeof g.specificGoals === "string" ? JSON.parse(g.specificGoals) : (g.specificGoals ?? []); } catch { return []; } })(),
-              startDate: g.startDate ? g.startDate.slice(0, 10) : null,
-              targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
-              evaluation: g.evaluation ?? "",
-            }))
-          : [],
-      });
-      setLoading(false);
+      setLoadError(null);
+      try {
+        const res = await fetch(`/api/patients/${patientId}/occupational-profile`);
+        if (!res.ok) {
+          // Surface the real server error instead of failing silently on
+          // res.json() below (e.g. a 500 with an HTML/plain-text body would
+          // otherwise throw a JSON-parse error and leave "loading" stuck
+          // forever, with no clue what went wrong).
+          const text = await res.text().catch(() => "");
+          throw new Error(`(${res.status}) ${text.slice(0, 300)}`);
+        }
+        const data = await res.json();
+        setProfile({
+          ...emptyProfile,
+          ...(data ?? {}),
+          familyComposition: parseJsonArray<FamilyMember>(data?.familyComposition),
+          supportNetwork: parseJsonArray<SupportContact>(data?.supportNetwork),
+          workHistory: parseJsonArray<WorkHistoryEntry>(data?.workHistory),
+          weeklyRoutine: parseJsonArray<RoutineCell>(data?.weeklyRoutine),
+          goals: Array.isArray(data?.goals)
+            ? data.goals.map((g: any) => ({
+                id: g.id,
+                text: g.text,
+                area: g.area,
+                scope: g.scope ?? "Con el paciente",
+                status: g.status,
+                specificGoals: (() => { try { return typeof g.specificGoals === "string" ? JSON.parse(g.specificGoals) : (g.specificGoals ?? []); } catch { return []; } })(),
+                startDate: g.startDate ? g.startDate.slice(0, 10) : null,
+                targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
+                evaluation: g.evaluation ?? "",
+              }))
+            : [],
+        });
+      } catch (e: any) {
+        console.error("Error cargando perfil ocupacional:", e);
+        setLoadError(e?.message ?? "Error desconocido al cargar el perfil ocupacional.");
+      } finally {
+        setLoading(false);
+      }
     }
     loadProfile();
   }, [patientId]);
@@ -344,6 +360,14 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Cargando perfil ocupacional…</p>;
+  }
+
+  if (loadError) {
+    return (
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+        No se ha podido cargar el perfil ocupacional. {loadError}
+      </div>
+    );
   }
 
   return (
@@ -816,18 +840,33 @@ const GOAL_STATUS_STYLES: Record<GoalStatus, string> = {
 function ReadOnlyGoals({ goals }: { goals: Goal[] }) {
   if (goals.length === 0) return <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">Sin objetivos añadidos.</p>;
 
+  // Collect all completed metas across all objectives
+  const completedMetas: { goalIdx: number; goalText: string; meta: SpecificGoal }[] = [];
+  const activeMetas: { goalIdx: number; goalText: string; meta: SpecificGoal }[] = [];
+  goals.forEach((g, idx) => {
+    (g.specificGoals ?? []).forEach((s) => {
+      if (s.status === "Conseguido") completedMetas.push({ goalIdx: idx, goalText: g.text, meta: s });
+      else activeMetas.push({ goalIdx: idx, goalText: g.text, meta: s });
+    });
+  });
+
   const enCurso = goals.filter((g) => g.status === "En curso");
   const conseguidos = goals.filter((g) => g.status === "Conseguido");
   const abandonados = goals.filter((g) => g.status === "Abandonado");
 
-  function GoalCard({ g }: { g: Goal }) {
+  function GoalCard({ g, num, showOnlyActive }: { g: Goal; num: number; showOnlyActive?: boolean }) {
     const areaColor = GOAL_AREA_COLORS[g.area] ?? "#6b7280";
-    const specifics = g.specificGoals ?? [];
+    const specifics = showOnlyActive
+      ? (g.specificGoals ?? []).filter((s) => s.status !== "Conseguido")
+      : (g.specificGoals ?? []);
     return (
       <div className="rounded-lg border bg-card p-3 space-y-1.5" style={{ borderLeftWidth: "4px", borderLeftColor: areaColor }}>
-        <p className="text-sm font-medium">{g.text}</p>
+        <p className="text-sm font-medium">
+          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold mr-1.5" style={{ backgroundColor: `${areaColor}20`, color: areaColor }}>{num}</span>
+          {g.text}
+        </p>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[11px]" style={{ color: areaColor }}>{g.area}</span>
+          <span className="text-[11px]" style={{ color: areaColor }}>{g.area || "Sin asignar"}</span>
           {g.scope && g.scope !== "Con el paciente" && (
             <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ color: GOAL_SCOPE_COLORS[g.scope as GoalScope] ?? "#6b7280", backgroundColor: `${GOAL_SCOPE_COLORS[g.scope as GoalScope] ?? "#6b7280"}18` }}>{g.scope}</span>
           )}
@@ -836,7 +875,7 @@ function ReadOnlyGoals({ goals }: { goals: Goal[] }) {
           <ul className="space-y-0.5 mt-1">
             {specifics.map((s) => (
               <li key={s.id} className={`text-xs flex items-center gap-1.5 ${s.status === "Conseguido" ? "line-through text-muted-foreground" : ""}`}>
-                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${s.status === "Conseguido" ? "bg-green-100 border-green-400 text-green-600" : s.status === "Abandonado" ? "bg-zinc-100 border-zinc-300" : "border-muted-foreground/30"}`}>
+                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${s.status === "Conseguido" ? "bg-green-100 border-green-400 text-green-600" : "border-muted-foreground/30"}`}>
                   {s.status === "Conseguido" && <span className="text-[10px]">✓</span>}
                 </span>
                 {s.text}
@@ -851,25 +890,42 @@ function ReadOnlyGoals({ goals }: { goals: Goal[] }) {
 
   return (
     <div className="space-y-2">
-      <p className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Objetivos</p>
+      <p className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Plan de terapia ocupacional</p>
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-sky-400" /> En curso ({enCurso.length})
           </p>
-          {enCurso.length === 0 ? <p className="text-xs text-muted-foreground italic">Ninguno.</p> : enCurso.map((g, i) => <GoalCard key={i} g={g} />)}
+          {enCurso.length === 0 ? <p className="text-xs text-muted-foreground italic">Ninguno.</p> : enCurso.map((g, i) => <GoalCard key={i} g={g} num={goals.indexOf(g) + 1} showOnlyActive />)}
         </div>
         <div className="space-y-2">
           <p className="text-xs font-semibold text-green-600 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-green-400" /> Conseguidos ({conseguidos.length})
+            <span className="w-2 h-2 rounded-full bg-green-400" /> Conseguidos
           </p>
-          {conseguidos.length === 0 ? <p className="text-xs text-muted-foreground italic">Ninguno todavía.</p> : conseguidos.map((g, i) => <GoalCard key={i} g={g} />)}
+          {conseguidos.map((g, i) => <GoalCard key={`c-${i}`} g={g} num={goals.indexOf(g) + 1} />)}
+          {completedMetas.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] uppercase tracking-wide text-green-600 font-semibold">Metas funcionales conseguidas</p>
+              {completedMetas.map((cm) => (
+                <div key={cm.meta.id} className="flex items-center gap-2 text-xs rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5">
+                  <span className="w-4 h-4 rounded border-2 border-green-400 bg-green-100 text-green-600 flex items-center justify-center shrink-0"><span className="text-[10px] font-bold">✓</span></span>
+                  <div>
+                    <span className="line-through text-muted-foreground">{cm.meta.text}</span>
+                    <span className="text-[10px] text-muted-foreground ml-1.5">({cm.goalText})</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {conseguidos.length === 0 && completedMetas.length === 0 && (
+            <p className="text-xs text-muted-foreground italic">Ninguno todavía.</p>
+          )}
           {abandonados.length > 0 && (
             <>
               <p className="text-xs font-semibold text-zinc-500 flex items-center gap-1.5 mt-3">
                 <span className="w-2 h-2 rounded-full bg-zinc-300" /> Abandonados ({abandonados.length})
               </p>
-              {abandonados.map((g, i) => <GoalCard key={i} g={g} />)}
+              {abandonados.map((g, i) => <GoalCard key={`a-${i}`} g={g} num={goals.indexOf(g) + 1} />)}
             </>
           )}
         </div>
@@ -1012,7 +1068,7 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
   }
   function updateRow(i: number, patch: Partial<Goal>) { onChange(value.map((g, idx) => (idx === i ? { ...g, ...patch } : g))); }
   function removeRow(i: number) {
-    if (!confirm("¿Seguro que quieres eliminar este objetivo y sus objetivos específicos?")) return;
+    if (!confirm("¿Seguro que quieres eliminar este objetivo y sus metas funcionales?")) return;
     onChange(value.filter((_, idx) => idx !== i));
   }
   function addSpecific(goalIdx: number) {
@@ -1038,7 +1094,7 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
 
   return (
     <div className="space-y-3">
-      <Label className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Objetivos</Label>
+      <Label className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Plan de terapia ocupacional</Label>
       {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin objetivos añadidos.</p>}
       <div className="space-y-3">
         {value.map((goal, i) => {
@@ -1047,6 +1103,7 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
             <div key={i} className="rounded-lg border overflow-hidden" style={{ borderLeftWidth: "4px", borderLeftColor: areaColor }}>
               <div className="p-3 space-y-3">
                 <div className="flex items-start gap-2">
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold mt-1.5 shrink-0" style={{ backgroundColor: `${areaColor}20`, color: areaColor }}>{i + 1}</span>
                   <div className="flex-1">
                     <Textarea rows={1} placeholder="Objetivo general…" value={goal.text} onChange={(e) => updateRow(i, { text: e.target.value })} className="text-sm font-medium" />
                   </div>
@@ -1090,7 +1147,7 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
 
                 {/* Specific goals / tasks */}
                 <div className="space-y-1.5 pl-3 border-l-2" style={{ borderColor: `${areaColor}40` }}>
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Objetivos específicos</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Metas funcionales</p>
                   {(goal.specificGoals ?? []).map((sg) => (
                     <div key={sg.id} className="flex items-center gap-2 text-sm">
                       <button type="button" onClick={() => updateSpecific(i, sg.id, { status: sg.status === "Conseguido" ? "En curso" : "Conseguido" })}

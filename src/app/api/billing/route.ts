@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireProfessional } from "@/lib/server";
+import { isBillableResource } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
   const prof = await requireProfessional();
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
   const appointments = await db.appointment.findMany({
     where: { start: { gte: from, lt: to }, status: { not: "cancelada" }, ...therapistFilter },
     include: {
-      patient: { select: { firstName: true, lastName: true, specialty: true } },
+      patient: { select: { firstName: true, lastName: true, specialty: true, resource: true } },
       therapist: { select: { name: true } },
     },
     orderBy: { start: "asc" },
@@ -48,7 +49,14 @@ export async function GET(req: NextRequest) {
     durationMin: number;
   }
 
-  const lines: BillingLine[] = appointments.map((a) => ({
+  // Patients from a non-billable resource (e.g. "Asociación EM") are
+  // scheduled and seen like anyone else, but their sessions must NOT be
+  // counted toward billing. Split them out here instead of at display
+  // time, so the totals/averages below are never computed from them.
+  const billableAppts = appointments.filter((a) => isBillableResource(a.patient.resource));
+  const excludedAppts = appointments.filter((a) => !isBillableResource(a.patient.resource));
+
+  const lines: BillingLine[] = billableAppts.map((a) => ({
     id: a.id,
     date: a.start.toISOString(),
     patientName: `${a.patient.firstName} ${a.patient.lastName}`,
@@ -73,6 +81,10 @@ export async function GET(req: NextRequest) {
     count: lines.length,
     byTherapist: Object.entries(byTherapist).map(([name, v]) => ({ name, ...v })),
     lines,
+    // Sessions that happened but are excluded from billing on purpose
+    // (non-billable resource, e.g. Asociación EM) — shown as an
+    // informational count, not folded into the totals above.
+    excludedCount: excludedAppts.length,
     isFiltered: prof.userRole !== "admin",
     therapistName: prof.userRole !== "admin" ? prof.name : null,
   });

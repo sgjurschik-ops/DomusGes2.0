@@ -43,7 +43,7 @@ import {
 } from "@/hooks/api";
 import { useNav } from "@/store/nav";
 import { toast } from "@/hooks/use-toast";
-import { Avatar } from "@/components/domain";
+import { Avatar, ResourceBadge } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -1918,20 +1918,33 @@ function AppointmentFormDialog({
               <Controller
                 control={control}
                 name="patientId"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger aria-label="Paciente">
-                      <SelectValue placeholder="Selecciona paciente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(patients ?? []).map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.fullName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                render={({ field }) => {
+                  const selectedPatient = (patients ?? []).find((p) => p.id === field.value);
+                  return (
+                    <div className="space-y-1.5">
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger aria-label="Paciente">
+                          <SelectValue placeholder="Selecciona paciente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(patients ?? []).map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              <span className="flex items-center gap-1.5">
+                                {p.fullName}
+                                {p.resource && (
+                                  <span className="text-xs text-muted-foreground">· {p.resource}</span>
+                                )}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedPatient && (
+                        <ResourceBadge resource={selectedPatient.resource} className="text-[11px] py-0" />
+                      )}
+                    </div>
+                  );
+                }}
               />
             </Field>
 
