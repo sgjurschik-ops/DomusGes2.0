@@ -778,7 +778,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
                     onClick={() => setActiveCategory(cat.key)}
                     className={cn(
                       "flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors",
-                      isActive ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+                      isActive ? "bg-primary/10 text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
                     )}
                   >
                     <Icon className="h-3.5 w-3.5" />
@@ -799,7 +799,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
                     onClick={() => handleScaleChange(s as AssessmentCreateInput["scale"])}
                     className={cn(
                       "rounded-md border px-3 py-1.5 text-xs transition-colors",
-                      scale === s ? "border-primary bg-primary/5 font-medium" : "hover:bg-muted/60",
+                      scale === s ? "border-primary bg-primary/5 font-medium text-primary" : "hover:bg-muted/60",
                     )}
                   >
                     {s}
@@ -807,6 +807,11 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
                 ))
               )}
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="date" className="text-xs">Fecha</Label>
+            <Input id="date" type="date" {...register("date")} />
+            {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
           </div>
           {(scale as string) === "" ? null : isStructured ? (
             <input type="hidden" {...register("score")} />
@@ -825,11 +830,6 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
               {errors.score && <p className="text-xs text-destructive">{errors.score.message}</p>}
             </div>
           )}
-          <div className="space-y-1.5">
-            <Label htmlFor="date" className="text-xs">Fecha</Label>
-            <Input id="date" type="date" {...register("date")} />
-            {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
-          </div>
 
           {isCopm ? (
             <CopmFields

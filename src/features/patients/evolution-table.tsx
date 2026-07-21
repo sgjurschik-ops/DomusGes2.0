@@ -1,8 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { SCALE_GROUPS } from "@/lib/schemas";
 import { formatDate } from "@/components/domain";
+
+// Showing every date as its own column makes the table grow wider forever
+// as evaluations pile up. By default we only show the most recent dates
+// and let the professional expand to see the full history — the table
+// stays scrollable (not paginated) once expanded, so nothing is hidden,
+// just collapsed by default.
+const DEFAULT_VISIBLE_DATES = 8;
 
 type Assessment = {
   id: string;
@@ -18,11 +25,16 @@ type Props = {
 };
 
 export function EvolutionTable({ assessments, onOpenAssessment }: Props) {
+  const [showAll, setShowAll] = useState(false);
+
   // Unique dates sorted chronologically (columns)
-  const dates = useMemo(() => {
+  const allDates = useMemo(() => {
     const set = new Set(assessments.map((a) => a.date.slice(0, 10)));
     return [...set].sort();
   }, [assessments]);
+
+  const hasMore = allDates.length > DEFAULT_VISIBLE_DATES;
+  const dates = showAll ? allDates : allDates.slice(-DEFAULT_VISIBLE_DATES);
 
   // Map: scale → date → assessment
   const matrix = useMemo(() => {
@@ -55,8 +67,25 @@ export function EvolutionTable({ assessments, onOpenAssessment }: Props) {
   }
 
   return (
-    <div className="overflow-x-auto border rounded-lg">
-      <table className="w-full text-sm border-collapse" style={{ minWidth: Math.max(500, dates.length * 140 + 160) }}>
+    <div className="space-y-2">
+      {hasMore && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground px-0.5">
+          <span>
+            {showAll
+              ? `Mostrando el historial completo (${allDates.length} fechas)`
+              : `Mostrando las últimas ${DEFAULT_VISIBLE_DATES} fechas de ${allDates.length}`}
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="text-primary hover:underline underline-offset-2 font-medium"
+          >
+            {showAll ? "Ver solo recientes" : "Ver histórico completo"}
+          </button>
+        </div>
+      )}
+      <div className="overflow-x-auto border rounded-lg">
+        <table className="w-full text-sm border-collapse" style={{ minWidth: Math.max(500, dates.length * 140 + 160) }}>
         <thead>
           <tr className="bg-muted/40">
             <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 border-b sticky left-0 bg-muted/40 z-10" style={{ minWidth: 140 }}>
@@ -112,6 +141,7 @@ export function EvolutionTable({ assessments, onOpenAssessment }: Props) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
