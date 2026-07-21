@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
       birthDate: new Date(d.birthDate),
       specialty: d.specialty,
       status: d.status,
+      resource: d.resource,
       phone: d.phone || null,
       address: d.address || null,
       diagnosis: d.diagnosis || null,

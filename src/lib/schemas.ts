@@ -7,6 +7,22 @@ import { z } from "zod";
 
 export const SPECIALTIES = ["Fisioterapia", "Psicología", "T. Ocupacional"] as const;
 export const PATIENT_STATUSES = ["Activo", "En seguimiento", "Alta", "Pausado"] as const;
+
+// Recurso/centro de procedencia del paciente. Extensible a propósito: para
+// añadir un nuevo recurso en el futuro (otra asociación, una residencia…)
+// basta con añadir una línea aquí — nada más del código depende de que
+// solo existan estos dos.
+export const RESOURCE_KEYS = ["Domicilio", "Asociación EM"] as const;
+export const RESOURCES: { key: (typeof RESOURCE_KEYS)[number]; label: string; billable: boolean }[] = [
+  { key: "Domicilio", label: "Domicilio", billable: true },
+  { key: "Asociación EM", label: "Asociación EM", billable: false },
+];
+export function isBillableResource(resource: string | null): boolean {
+  // A patient with no resource assigned yet defaults to billable=true —
+  // safer to flag it for review than to silently exclude it from billing.
+  if (!resource) return true;
+  return RESOURCES.find((r) => r.key === resource)?.billable ?? true;
+}
 export const PROFESSIONAL_ROLES = [
   "Fisioterapeuta",
   "Terapeuta Ocupacional",
@@ -162,6 +178,7 @@ export const patientCreateSchema = z.object({
   birthDate: z.string().min(1, "La fecha de nacimiento es obligatoria"),
   specialty: z.enum(SPECIALTIES),
   status: z.enum(PATIENT_STATUSES).default("Activo"),
+  resource: z.enum(RESOURCE_KEYS, { errorMap: () => ({ message: "Selecciona un recurso" }) }),
   phone: z.string().optional().default(""),
   address: z.string().optional().default(""),
   diagnosis: z.string().optional().default(""),

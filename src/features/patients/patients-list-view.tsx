@@ -11,12 +11,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Avatar, SpecialtyBadge, StatusBadge, formatRelative } from "@/components/domain";
+import { Avatar, SpecialtyBadge, StatusBadge, ResourceBadge, formatRelative } from "@/components/domain";
 import { Search, Plus, Users, AlertTriangle } from "lucide-react";
 import type { Specialty, PatientStatus, PatientDTO } from "@/types/domain";
+import { RESOURCE_KEYS } from "@/lib/schemas";
 
 const SPECIALTY_FILTERS: ("Todas" | Specialty)[] = ["Todas", "Fisioterapia", "Psicología", "T. Ocupacional"];
 const STATUS_FILTERS: ("Todos" | PatientStatus)[] = ["Todos", "Activo", "En seguimiento", "Alta", "Pausado"];
+const RESOURCE_FILTERS: ("Todos" | (typeof RESOURCE_KEYS)[number])[] = ["Todos", ...RESOURCE_KEYS];
 
 type SortKey = "name" | "age" | "lastVisit" | "nextAppt";
 const SORT_LABELS: Record<SortKey, string> = {
@@ -69,6 +71,7 @@ export function PatientsListView() {
   const [q, setQ] = useState("");
   const [specialty, setSpecialty] = useState<"Todas" | Specialty>("Todas");
   const [status, setStatus] = useState<"Todos" | PatientStatus>("Todos");
+  const [resource, setResource] = useState<"Todos" | (typeof RESOURCE_KEYS)[number]>("Todos");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
 
@@ -78,11 +81,12 @@ export function PatientsListView() {
     const base = patients.filter((p) => {
       if (specialty !== "Todas" && p.specialty !== specialty) return false;
       if (status !== "Todos" && p.status !== status) return false;
+      if (resource !== "Todos" && p.resource !== resource) return false;
       if (term && !p.fullName.toLowerCase().includes(term) && !p.diagnosis?.toLowerCase().includes(term)) return false;
       return true;
     });
     return sortPatients(base, sortKey, sortDir);
-  }, [patients, q, specialty, status, sortKey, sortDir]);
+  }, [patients, q, specialty, status, resource, sortKey, sortDir]);
 
   function openPatient(id: string) {
     selectPatient(id);
@@ -123,6 +127,16 @@ export function PatientsListView() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={resource} onValueChange={(v) => setResource(v as typeof resource)}>
+          <SelectTrigger className="w-full sm:w-44" aria-label="Filtrar por recurso">
+            <SelectValue placeholder="Recurso" />
+          </SelectTrigger>
+          <SelectContent>
+            {RESOURCE_FILTERS.map((r) => (
+              <SelectItem key={r} value={r}>{r}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select
           value={sortKey}
           onValueChange={(v) => setSortKey(v as SortKey)}
@@ -159,7 +173,7 @@ export function PatientsListView() {
           <Users className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-sm font-medium text-foreground mb-1">No hay pacientes</p>
           <p className="text-xs text-muted-foreground mb-4">
-            {q || specialty !== "Todas" || status !== "Todos"
+            {q || specialty !== "Todas" || status !== "Todos" || resource !== "Todos"
               ? "Prueba a cambiar los filtros de búsqueda."
               : "Añade tu primer paciente para empezar."}
           </p>
@@ -205,6 +219,7 @@ export function PatientsListView() {
                               <p className="font-medium truncate">{p.fullName}</p>
                               <SpecialtyBadge specialty={p.specialty} />
                               <StatusBadge status={p.status} />
+                              <ResourceBadge resource={p.resource} />
                               {(p.alerts ?? []).slice(0, 2).map((alert) => (
                                 <span
                                   key={alert}
@@ -261,6 +276,7 @@ export function PatientsListView() {
                       <span className="text-xs text-muted-foreground">{p.age} años</span>
                       <SpecialtyBadge specialty={p.specialty} />
                       <StatusBadge status={p.status} />
+                      <ResourceBadge resource={p.resource} />
                     </div>
                     {(p.alerts ?? []).length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">

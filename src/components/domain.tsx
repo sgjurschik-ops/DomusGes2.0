@@ -47,6 +47,40 @@ export function StatusBadge({ status, className }: { status: PatientStatus; clas
   );
 }
 
+const RESOURCE_STYLES: Record<string, string> = {
+  Domicilio: "bg-teal-100 text-teal-900 border-teal-200",
+  "Asociación EM": "bg-fuchsia-100 text-fuchsia-900 border-fuchsia-200",
+};
+
+// `resource` is nullable (patients created before this field existed).
+// Renders a distinct, slightly urgent style when unset so it stands out
+// as something to fill in, rather than looking like a normal badge.
+export function ResourceBadge({ resource, className }: { resource: string | null; className?: string }) {
+  if (!resource) {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-900 border-amber-300",
+          className,
+        )}
+      >
+        Sin recurso asignado
+      </span>
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+        RESOURCE_STYLES[resource] ?? "bg-zinc-100 text-zinc-700 border-zinc-200",
+        className,
+      )}
+    >
+      {resource}
+    </span>
+  );
+}
+
 export function Avatar({
   name,
   color = "#1a5c58",

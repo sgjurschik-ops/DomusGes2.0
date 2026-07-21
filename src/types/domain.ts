@@ -73,6 +73,8 @@ export interface PatientDTO {
   age: number;
   specialty: Specialty;
   status: PatientStatus;
+  // null = todavía no asignado (pacientes creados antes de este campo).
+  resource: string | null;
   phone: string | null;
   address: string | null;
   diagnosis: string | null;

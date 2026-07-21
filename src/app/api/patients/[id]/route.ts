@@ -6,6 +6,7 @@ import {
   canViewPatient,
   canEditPatient,
   audit,
+  safePartial,
   mapPatient,
   getPatientTimelineMap,
 } from "@/lib/server";
@@ -64,28 +65,26 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
   const row = await db.patient.update({
     where: { id },
-    data: {
-      // Only set fields that were explicitly sent in the body — undefined means "don't touch"
-      firstName: body.firstName !== undefined ? body.firstName : undefined,
-      lastName: body.lastName !== undefined ? body.lastName : undefined,
+    data: safePartial({
+      firstName: body.firstName,
+      lastName: body.lastName,
       birthDate: body.birthDate !== undefined ? new Date(body.birthDate) : undefined,
-      specialty: body.specialty !== undefined ? body.specialty : undefined,
-      status: body.status !== undefined ? body.status : undefined,
+      specialty: body.specialty,
+      status: body.status,
+      resource: body.resource !== undefined ? (body.resource || null) : undefined,
       phone: body.phone !== undefined ? (body.phone || null) : undefined,
       address: body.address !== undefined ? (body.address || null) : undefined,
       startDate: body.startDate !== undefined ? new Date(body.startDate) : undefined,
       referentName: body.referentName !== undefined ? (body.referentName || null) : undefined,
       referentPhone: body.referentPhone !== undefined ? (body.referentPhone || null) : undefined,
       therapists: therapistUpdate,
-      // Quick notes (any role can edit)
-      quickNotes: body.quickNotes !== undefined ? body.quickNotes : undefined,
-      // Clinical fields — only non-admin can edit
+      quickNotes: body.quickNotes,
       ...(isAdmin ? {} : {
         diagnosis: body.diagnosis !== undefined ? (body.diagnosis || null) : undefined,
         objective: body.objective !== undefined ? (body.objective || null) : undefined,
         alerts: Array.isArray(body.alerts) ? body.alerts : undefined,
       }),
-    },
+    }),
     include: {
       therapists: { select: { id: true, name: true } },
       _count: { select: { visits: true } },

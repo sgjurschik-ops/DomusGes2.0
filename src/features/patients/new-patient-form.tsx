@@ -26,6 +26,7 @@ import {
   type PatientCreateInput,
   SPECIALTIES,
   PATIENT_STATUSES,
+  RESOURCE_KEYS,
 } from "@/lib/schemas";
 import { toast } from "@/hooks/use-toast";
 import { Avatar } from "@/components/domain";
@@ -60,6 +61,9 @@ export function NewPatientForm({ mode = "create" }: Props) {
       birthDate: "",
       specialty: "T. Ocupacional",
       status: "Activo",
+      // No default on purpose — forces an explicit choice instead of
+      // silently defaulting new patients to "Domicilio".
+      resource: "" as PatientCreateInput["resource"],
       phone: "",
       address: "",
       diagnosis: "",
@@ -81,6 +85,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
       birthDate: patient.birthDate?.slice(0, 10) ?? "",
       specialty: patient.specialty,
       status: patient.status,
+      resource: (patient.resource ?? "") as PatientCreateInput["resource"],
       phone: patient.phone ?? "",
       address: patient.address ?? "",
       diagnosis: patient.diagnosis ?? "",
@@ -194,6 +199,22 @@ export function NewPatientForm({ mode = "create" }: Props) {
                     <SelectContent>
                       {SPECIALTIES.map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label="Recurso" error={errors.resource?.message} required>
+              <Controller
+                control={control}
+                name="resource"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger id="resource"><SelectValue placeholder="Selecciona un recurso" /></SelectTrigger>
+                    <SelectContent>
+                      {RESOURCE_KEYS.map((r) => (
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

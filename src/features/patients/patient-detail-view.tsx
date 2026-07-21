@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, SpecialtyBadge, StatusBadge, formatDate, formatDateTime } from "@/components/domain";
+import { Avatar, SpecialtyBadge, StatusBadge, ResourceBadge, formatDate, formatDateTime } from "@/components/domain";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -29,8 +29,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { assessmentCreateSchema, type AssessmentCreateInput, STRUCTURED_SCALES, QUALITATIVE_SCALES, ASSESSMENT_CATEGORIES } from "@/lib/schemas";
+import { assessmentCreateSchema, type AssessmentCreateInput, STRUCTURED_SCALES, QUALITATIVE_SCALES, ASSESSMENT_CATEGORIES, RESOURCE_KEYS } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { formatScaleScore, isScaleComplete, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { CopmFields, formatCopmScore } from "./copm-fields";
@@ -124,6 +127,7 @@ export function PatientDetailView() {
                     <h2 className="text-lg font-bold leading-tight">{patient.fullName}</h2>
                     <SpecialtyBadge specialty={patient.specialty} />
                     <StatusBadge status={patient.status} />
+                    <ResourceBadge resource={patient.resource} />
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
                     {patient.age} años · {patient.totalVisits} seguimientos · Inicio {formatDate(patient.startDate)}
@@ -227,6 +231,26 @@ export function PatientDetailView() {
 
         {/* Overview */}
         <TabsContent value="overview" className="mt-4 space-y-4">
+          {!patient.resource && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+              <p className="text-sm text-amber-900 flex-1">
+                Este paciente no tiene <strong>recurso</strong> asignado (Domicilio / Asociación EM). Es necesario para saber si sus sesiones se facturan.
+              </p>
+              <Select onValueChange={(v) => updatePatient.mutate(
+                { id: patient.id, data: { resource: v as any } },
+                { onSuccess: () => toast({ title: "Recurso asignado", description: v }) },
+              )}>
+                <SelectTrigger className="w-full sm:w-48 h-8 text-xs bg-background">
+                  <SelectValue placeholder="Asignar recurso" />
+                </SelectTrigger>
+                <SelectContent>
+                  {RESOURCE_KEYS.map((r) => (
+                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {!isAdmin && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <button type="button" onClick={() => setActiveTab("visits")} className="text-left">

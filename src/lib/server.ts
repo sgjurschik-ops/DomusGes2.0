@@ -242,6 +242,7 @@ export function mapPatient(
     age: calcAge(p.birthDate, now),
     specialty: p.specialty,
     status: p.status,
+    resource: p.resource,
     phone: p.phone,
     address: p.address,
     diagnosis: p.diagnosis,

@@ -45,6 +45,12 @@ model Patient {
   birthDate     DateTime
   specialty     String   // Fisioterapia | Psicología | T. Ocupacional
   status        String   @default("Activo") // Activo | En seguimiento | Alta | Pausado
+  // Recurso/centro de procedencia (p. ej. "Domicilio", "Asociación EM").
+  // Nullable a propósito: pacientes existentes se crearon antes de este
+  // campo y no deben quedar rotos — la ficha del paciente avisa si falta
+  // asignarlo. Ver RESOURCES en src/lib/schemas.ts para la lista de
+  // valores válidos y si cada uno es facturable.
+  resource      String?
   phone         String?
   address       String?
   diagnosis     String?
