@@ -40,12 +40,13 @@ export const ASSESSMENT_SCALES = [
   "Monofilamentos",
   "Esterognosia",
   "Propiocepción",
+  "MFIS",
 ] as const;
 
 // Scales with a structured, item-by-item form (score is computed, not
 // typed in by hand). Any scale not in this list keeps the free-text score
 // field as before.
-export const STRUCTURED_SCALES = ["Barthel", "Lawton-Brody", "VAVDI", "COPM", "9HPT", "Box and Block", "TUG", "JAMAR", "Minnesota"] as const;
+export const STRUCTURED_SCALES = ["Barthel", "Lawton-Brody", "VAVDI", "COPM", "9HPT", "Box and Block", "TUG", "JAMAR", "Minnesota", "MFIS"] as const;
 export type StructuredScale = (typeof STRUCTURED_SCALES)[number];
 
 // Qualitative scales — observation text only, no numeric score.
@@ -60,6 +61,7 @@ export const SCALE_GROUPS = [
   { label: "Destreza", scales: ["9HPT", "Box and Block", "Minnesota"] },
   { label: "Sensibilidad", scales: ["Monofilamentos", "Esterognosia", "Propiocepción"] },
   { label: "Movilidad", scales: ["TUG"] },
+  { label: "Fatiga", scales: ["MFIS"] },
 ] as const;
 
 export const PROFESSIONAL_COLORS = [

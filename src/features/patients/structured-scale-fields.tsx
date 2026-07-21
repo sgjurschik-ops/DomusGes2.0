@@ -2,8 +2,9 @@
 
 import {
   STRUCTURED_SCALE_DEFINITIONS,
-  VAVDI_BLOCKS,
+  SCALE_BLOCKS,
   computeScaleTotal,
+  computeScaleSubscales,
   generateAreaSummaryData,
   formatScaleScore,
   TUG_AIDS,
@@ -47,13 +48,15 @@ export function StructuredScaleFields({ scale, itemScores, onChange }: Props) {
   const answeredCount = def.items.filter((i) => itemScores[i.id] !== undefined).length;
   const isComplete = answeredCount === def.items.length;
   const areaSummaryData = isComplete ? generateAreaSummaryData(scale, itemScores) : null;
+  const blocks = SCALE_BLOCKS[scale];
+  const subscaleTotals = computeScaleSubscales(scale, itemScores);
 
   return (
     <div className="sm:col-span-2 space-y-4">
       <p className="text-xs text-muted-foreground">{def.description}</p>
 
-      {scale === "VAVDI" ? (
-        VAVDI_BLOCKS.map((block) => (
+      {blocks ? (
+        blocks.map((block) => (
           <div key={block.title} className="space-y-3">
             <p className="text-xs font-semibold text-foreground">{block.title}</p>
             <div className="space-y-3">
@@ -77,6 +80,17 @@ export function StructuredScaleFields({ scale, itemScores, onChange }: Props) {
               value={itemScores[item.id]}
               onChange={(v) => setItem(item.id, v)}
             />
+          ))}
+        </div>
+      )}
+
+      {subscaleTotals && (
+        <div className="grid sm:grid-cols-3 gap-2">
+          {subscaleTotals.map((s) => (
+            <div key={s.title} className="rounded-lg border px-3 py-2 text-center">
+              <p className="text-xs text-muted-foreground">{s.title}</p>
+              <p className="text-sm font-semibold">{s.total}/{s.maxScore}</p>
+            </div>
           ))}
         </div>
       )}

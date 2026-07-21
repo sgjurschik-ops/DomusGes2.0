@@ -17,7 +17,7 @@ export type ScaleOption = { value: number; label: string; shortLabel: string; de
 export type ScaleItem = { id: string; label: string; options: ScaleOption[] };
 
 export type ScaleDefinition = {
-  id: "Barthel" | "Lawton-Brody" | "VAVDI";
+  id: "Barthel" | "Lawton-Brody" | "VAVDI" | "MFIS";
   name: string;
   description: string;
   items: ScaleItem[];
@@ -31,7 +31,12 @@ export type ScaleDefinition = {
   // the opposite direction — this flag lets trend displays (e.g. the
   // evolution chart) show improvement/decline correctly per scale instead
   // of assuming "higher is always better".
+  // MFIS: higher = MORE fatigue impact (worse), same direction as VAVDI.
   higherIsBetter: boolean;
+  // Optional subscale breakdown (e.g. MFIS: Cognitivo/Físico/Psicosocial).
+  // When present, forms and read-only views show each subscale's live
+  // total alongside the overall score.
+  subscales?: { title: string; itemIds: string[]; maxScore: number }[];
 };
 
 // ─── Barthel (AVD básicas) ───────────────────────────────────────────────────
@@ -471,11 +476,119 @@ export const VAVDI_BLOCKS = [
   { title: "Actividades instrumentales (AVDI)", items: VAVDI_INSTRUMENTAL_ITEMS },
 ];
 
+// ─── MFIS (Escala Modificada de Impacto de Fatiga) ──────────────────────────
+//
+// 21-item self-report scale (physical, cognitive, psychosocial subscales),
+// modified from the Fatigue Impact Scale (Fisk et al.). Each item is scored
+// 0-4 on the same Likert frequency scale. Item numbering below matches the
+// official instrument (item ids are "i1".."i21") so scoring/subscale
+// references stay traceable to the source questionnaire.
+
+const MFIS_LIKERT: ScaleOption[] = [
+  { value: 0, label: "Nunca", shortLabel: "Nunca" },
+  { value: 1, label: "Rara vez", shortLabel: "Rara vez" },
+  { value: 2, label: "A veces", shortLabel: "A veces" },
+  { value: 3, label: "A menudo", shortLabel: "A menudo" },
+  { value: 4, label: "Casi siempre", shortLabel: "Casi siempre" },
+];
+
+function mfisItem(n: number, label: string): ScaleItem {
+  return { id: `i${n}`, label: `${n}. ${label}`, options: MFIS_LIKERT };
+}
+
+const MFIS_COGNITIVE_ITEMS: ScaleItem[] = [
+  mfisItem(1, "He estado menos atento"),
+  mfisItem(2, "He tenido dificultades para prestar atención durante largos periodos de tiempo"),
+  mfisItem(3, "He sido incapaz de pensar con claridad"),
+  mfisItem(5, "He sido olvidadizo y descuidado"),
+  mfisItem(11, "He tenido dificultad para tomar decisiones"),
+  mfisItem(12, "He estado menos motivado para hacer cosas que requerían pensar"),
+  mfisItem(15, "He tenido dificultades para hacer actividades que requerían pensar"),
+  mfisItem(16, "He tenido dificultades para organizar mi pensamiento cuando hago cosas en el trabajo"),
+  mfisItem(18, "Mi pensamiento ha estado retardado"),
+  mfisItem(19, "He tenido problemas de concentración"),
+];
+
+const MFIS_PHYSICAL_ITEMS: ScaleItem[] = [
+  mfisItem(4, "He tenido torpeza y descoordinación"),
+  mfisItem(6, "He tenido que marcarme mi propio ritmo en las actividades físicas"),
+  mfisItem(7, "He estado menos motivado para hacer cualquier actividad que requería esfuerzo físico"),
+  mfisItem(10, "He tenido dificultades para mantener mi esfuerzo físico largos periodos de tiempo"),
+  mfisItem(13, "Mis músculos se han sentido débiles"),
+  mfisItem(14, "Me he sentido físicamente incómodo"),
+  mfisItem(17, "He estado menos capacitado para realizar cosas que requerían un esfuerzo físico"),
+  mfisItem(20, "He limitado mis actividades físicas"),
+  mfisItem(21, "He necesitado descansar más a menudo o durante mayores periodos de tiempo"),
+];
+
+const MFIS_PSYCHOSOCIAL_ITEMS: ScaleItem[] = [
+  mfisItem(8, "He estado menos motivado para participar en actividades sociales"),
+  mfisItem(9, "He estado limitado en mi capacidad para hacer cosas lejos de casa"),
+];
+
+const MFIS_ITEMS: ScaleItem[] = [...MFIS_COGNITIVE_ITEMS, ...MFIS_PHYSICAL_ITEMS, ...MFIS_PSYCHOSOCIAL_ITEMS];
+
+// Validated cut-off: total ≥ 38 distinguishes fatigued vs. non-fatigued.
+function interpretMfis(total: number): string {
+  if (total >= 38) return "Impacto de fatiga clínicamente significativo (punto de corte ≥38)";
+  return "Impacto de fatiga no significativo (por debajo del punto de corte clínico de 38)";
+}
+
+export const MFIS: ScaleDefinition = {
+  id: "MFIS",
+  name: "MFIS",
+  description:
+    "Escala Modificada de Impacto de Fatiga — 21 ítems (0=Nunca a 4=Casi siempre) sobre cómo la fatiga ha afectado al paciente en las últimas 4 semanas, con subescalas Cognitiva, Física y Psicosocial.",
+  items: MFIS_ITEMS,
+  minScore: 0,
+  maxScore: 84,
+  interpret: interpretMfis,
+  higherIsBetter: false,
+  subscales: [
+    { title: "Cognitivo", itemIds: MFIS_COGNITIVE_ITEMS.map((i) => i.id), maxScore: 40 },
+    { title: "Físico", itemIds: MFIS_PHYSICAL_ITEMS.map((i) => i.id), maxScore: 36 },
+    { title: "Psicosocial", itemIds: MFIS_PSYCHOSOCIAL_ITEMS.map((i) => i.id), maxScore: 8 },
+  ],
+};
+
+// MFIS items grouped by subscale, for grouped rendering in the form
+// (same idea as VAVDI_BLOCKS: title + items, no live score shown here —
+// subscale totals are shown separately via computeScaleSubscales).
+export const MFIS_BLOCKS = [
+  { title: "Cognitivo", items: MFIS_COGNITIVE_ITEMS },
+  { title: "Físico", items: MFIS_PHYSICAL_ITEMS },
+  { title: "Psicosocial", items: MFIS_PSYCHOSOCIAL_ITEMS },
+];
+
+// Maps a scale id to its grouped-block layout, if it has one. Used by the
+// form to render clinical sub-groups (with titles) instead of one flat
+// list of items. Add new entries here as more grouped scales are added.
+export const SCALE_BLOCKS: Record<string, { title: string; items: ScaleItem[] }[]> = {
+  VAVDI: VAVDI_BLOCKS,
+  MFIS: MFIS_BLOCKS,
+};
+
 export const STRUCTURED_SCALE_DEFINITIONS: Record<string, ScaleDefinition> = {
   Barthel: BARTHEL,
   "Lawton-Brody": LAWTON_BRODY,
   VAVDI: VAVDI,
+  MFIS: MFIS,
 };
+
+// Computes each subscale's total for scales that define `subscales` (e.g.
+// MFIS). Returns null for scales without a subscale breakdown.
+export function computeScaleSubscales(
+  scaleId: string,
+  itemScores: Record<string, number>,
+): { title: string; total: number; maxScore: number }[] | null {
+  const def = STRUCTURED_SCALE_DEFINITIONS[scaleId];
+  if (!def?.subscales) return null;
+  return def.subscales.map((sub) => ({
+    title: sub.title,
+    total: sub.itemIds.reduce((sum, id) => sum + (itemScores[id] ?? 0), 0),
+    maxScore: sub.maxScore,
+  }));
+}
 
 export function computeScaleTotal(scaleId: string, itemScores: Record<string, number>): number {
   const def = STRUCTURED_SCALE_DEFINITIONS[scaleId];

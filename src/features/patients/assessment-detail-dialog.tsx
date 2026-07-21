@@ -16,7 +16,7 @@ import {
   QUALITATIVE_SCALES,
   SCALE_GROUPS,
 } from "@/lib/schemas";
-import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
+import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS, computeScaleSubscales } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { CopmFields, formatCopmScore, type CopmData } from "./copm-fields";
 import { AreaSummaryView } from "./area-summary-view";
@@ -187,6 +187,9 @@ function AssessmentSummary({
   const remove = useDeleteAssessment();
   const def = STRUCTURED_SCALE_DEFINITIONS[assessment.scale];
   const isCopm = assessment.scale === "COPM";
+  const subscaleTotals = assessment.itemScores
+    ? computeScaleSubscales(assessment.scale, assessment.itemScores)
+    : null;
 
   async function handleDelete() {
     const ok = confirm("¿Seguro que quieres eliminar esta evaluación? Esta acción no se puede deshacer.");
@@ -218,6 +221,16 @@ function AssessmentSummary({
           <div className="rounded-lg border bg-muted/40 px-4 py-3">
             <p className="text-sm font-semibold">{assessment.score}</p>
           </div>
+          {subscaleTotals && (
+            <div className="grid sm:grid-cols-3 gap-2">
+              {subscaleTotals.map((s) => (
+                <div key={s.title} className="rounded-lg border px-3 py-2 text-center">
+                  <p className="text-xs text-muted-foreground">{s.title}</p>
+                  <p className="text-sm font-semibold">{s.total}/{s.maxScore}</p>
+                </div>
+              ))}
+            </div>
+          )}
           <ul className="divide-y divide-border rounded-lg border">
             {def.items.map((item) => {
               const score = assessment.itemScores?.[item.id];
