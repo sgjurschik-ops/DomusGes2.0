@@ -10,6 +10,7 @@ import {
   useUpdatePatient,
 } from "@/hooks/api";
 import { useNav } from "@/store/nav";
+import { useCenter } from "@/store/center";
 import { AddressSearch } from "@/components/address-search";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
   const update = useUpdatePatient();
   const { data: professionals } = useProfessionals();
   const { back, selectPatient, navigate, selectedPatientId } = useNav();
+  const { activeResource } = useCenter();
   const { data: patient, isLoading: isLoadingPatient } = usePatient(
     isEdit ? selectedPatientId : null,
   );
@@ -61,9 +63,10 @@ export function NewPatientForm({ mode = "create" }: Props) {
       birthDate: "",
       specialty: "T. Ocupacional",
       status: "Activo",
-      // No default on purpose — forces an explicit choice instead of
-      // silently defaulting new patients to "Domicilio".
-      resource: "" as PatientCreateInput["resource"],
+      // Pre-seleccionamos el centro en el que se está trabajando ahora
+      // mismo (se puede cambiar igualmente) — sigue sin defaultear a un
+      // valor fijo si por lo que sea no hay centro activo.
+      resource: (activeResource ?? "") as PatientCreateInput["resource"],
       phone: "",
       address: "",
       diagnosis: "",

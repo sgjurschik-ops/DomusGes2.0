@@ -1,10 +1,12 @@
 // /api/dashboard — KPIs for the current professional
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional } from "@/lib/server";
+import { requireProfessional, buildResourceFilter } from "@/lib/server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const prof = await requireProfessional();
+  const resource = new URL(req.url).searchParams.get("resource");
+  const resourceFilter = buildResourceFilter(resource);
   const today = new Date();
   const startOfDay = new Date(today);
   startOfDay.setHours(0, 0, 0, 0);
@@ -17,15 +19,20 @@ export async function GET() {
   endOfWeek.setDate(startOfWeek.getDate() + 6);
   endOfWeek.setHours(23, 59, 59, 999);
 
-  // Scope filters: admin sees everything, others only their own data
+  // Scope filters: admin sees everything, others only their own data —
+  // plus, everyone is scoped to the currently active centro/recurso so
+  // patients from different centers never mix in these counts.
   const isAdmin = prof.userRole === "admin";
-  const apptFilter = isAdmin ? {} : { therapistId: prof.id };
-  const visitFilter = isAdmin ? {} : { therapistId: prof.id };
-  const patientFilter = isAdmin
-    ? {}
-    : prof.userRole === "therapist"
-      ? {} // therapists see all patients in the list anyway
-      : { therapists: { some: { id: prof.id } } }; // guests: only assigned
+  const apptFilter = { ...(isAdmin ? {} : { therapistId: prof.id }), patient: resourceFilter };
+  const visitFilter = { ...(isAdmin ? {} : { therapistId: prof.id }), patient: resourceFilter };
+  const patientFilter = {
+    ...(isAdmin
+      ? {}
+      : prof.userRole === "therapist"
+        ? {} // therapists see all patients in the list anyway
+        : { therapists: { some: { id: prof.id } } }), // guests: only assigned
+    ...resourceFilter,
+  };
 
   const [
     totalPatients,

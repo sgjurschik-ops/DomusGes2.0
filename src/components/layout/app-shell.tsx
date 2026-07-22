@@ -4,9 +4,11 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { signOut } from "next-auth/react";
 import { useCurrentSession } from "@/hooks/api";
 import { useNav } from "@/store/nav";
+import { useCenter } from "@/store/center";
+import { RESOURCES } from "@/lib/schemas";
 import { Sidebar, SidebarToggle } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
-import { Plus, Clock } from "lucide-react";
+import { Plus, Clock, Activity } from "lucide-react";
 
 const VIEW_TITLES: Record<string, string> = {
   dashboard: "Inicio",
@@ -75,6 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { status, isLoading } = useCurrentSession();
   const { view, navigate } = useNav();
   const { showWarning, dismissWarning } = useIdleTimeout();
+  const { activeResource, setActiveResource } = useCenter();
 
   if (isLoading) {
     return (
@@ -86,6 +89,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (status === "unauthenticated") {
     return null;
+  }
+
+  // Right after logging in, ask which center to work in for this session
+  // — everything (pacientes, agenda, inicio) is scoped to it from here on,
+  // instead of mixing patients from different centers together. Can be
+  // changed anytime from the sidebar without needing to log out.
+  if (!activeResource) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="w-full max-w-sm space-y-6 text-center">
+          <div className="w-12 h-12 rounded-xl bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center mx-auto">
+            <Activity className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-lg font-semibold">¿En qué centro vas a trabajar?</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Podrás cambiarlo en cualquier momento desde el menú lateral.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {RESOURCES.map((r) => (
+              <button
+                key={r.key}
+                onClick={() => setActiveResource(r.key)}
+                className="w-full rounded-lg border px-4 py-3 text-sm font-medium text-left hover:border-primary hover:bg-primary/5 transition-colors"
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const title = VIEW_TITLES[view] ?? "DomusGes";

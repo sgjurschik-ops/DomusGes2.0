@@ -5,6 +5,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession, signOut } from "next-auth/react";
+import { useCenter } from "@/store/center";
 
 export class ApiError extends Error {
   status: number;
@@ -84,9 +85,10 @@ export const patientKeys = {
 };
 
 export function usePatients() {
+  const { activeResource } = useCenter();
   return useQuery<PatientDTO[]>({
-    queryKey: patientKeys.all,
-    queryFn: () => fetcher("/api/patients"),
+    queryKey: [...patientKeys.all, activeResource],
+    queryFn: () => fetcher(`/api/patients${activeResource ? `?resource=${encodeURIComponent(activeResource)}` : ""}`),
   });
 }
 
@@ -238,13 +240,15 @@ export function useDeleteAssessment() {
 // ─── Appointments ────────────────────────────────────────────────────────────
 
 export function useAppointments(params?: { from?: string; to?: string; therapistId?: string }) {
+  const { activeResource } = useCenter();
   const qs = new URLSearchParams();
   if (params?.from) qs.set("from", params.from);
   if (params?.to) qs.set("to", params.to);
   if (params?.therapistId) qs.set("therapistId", params.therapistId);
+  if (activeResource) qs.set("resource", activeResource);
   const str = qs.toString();
   return useQuery<AppointmentDTO[]>({
-    queryKey: ["appointments", params ?? {}],
+    queryKey: ["appointments", params ?? {}, activeResource],
     queryFn: () => fetcher(`/api/appointments${str ? `?${str}` : ""}`),
   });
 }
@@ -539,9 +543,10 @@ export interface DashboardData {
 }
 
 export function useDashboard() {
+  const { activeResource } = useCenter();
   return useQuery<DashboardData>({
-    queryKey: ["dashboard"],
-    queryFn: () => fetcher("/api/dashboard"),
+    queryKey: ["dashboard", activeResource],
+    queryFn: () => fetcher(`/api/dashboard${activeResource ? `?resource=${encodeURIComponent(activeResource)}` : ""}`),
   });
 }
 

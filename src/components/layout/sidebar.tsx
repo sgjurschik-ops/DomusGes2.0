@@ -7,12 +7,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNav } from "@/store/nav";
+import { useCenter } from "@/store/center";
+import { RESOURCES } from "@/lib/schemas";
 import { useCurrentSession } from "@/hooks/api";
 import { Avatar } from "@/components/domain";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import type { View } from "@/types/domain";
 import { useEffect } from "react";
+import { ChevronsUpDown, Check } from "lucide-react";
 
 type UserRole = "admin" | "therapist" | "guest";
 
@@ -39,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
 export function Sidebar() {
   const { view, navigate, sidebarOpen, setSidebarOpen, sidebarCollapsed, setSidebarCollapsed } = useNav();
   const { user } = useCurrentSession();
+  const { activeResource, setActiveResource, clearActiveResource } = useCenter();
 
   const userRole: UserRole = (user as { userRole?: UserRole } | undefined)?.userRole ?? (user?.isAdmin ? "admin" : "therapist");
 
@@ -52,7 +57,22 @@ export function Sidebar() {
     return () => window.removeEventListener("keydown", onKey);
   }, [sidebarOpen, setSidebarOpen]);
 
-  const items = NAV_ITEMS.filter((it) => !it.roles || it.roles.includes(userRole));
+  const activeResourceConfig = RESOURCES.find((r) => r.key === activeResource);
+  // "Ruta de hoy" only makes sense for centers with domiciliary visits to
+  // plan a route between — hidden entirely (not just filtered) for centers
+  // like "Asociación EM" where sessions happen in one place.
+  const items = NAV_ITEMS
+    .filter((it) => !it.roles || it.roles.includes(userRole))
+    .filter((it) => it.view !== "today" || (activeResourceConfig?.hasRoutePlanning ?? true));
+
+  // If the active center changes to one without route planning while the
+  // person is looking at "Ruta de hoy", send them somewhere sensible
+  // instead of leaving them on a nav item that just disappeared.
+  useEffect(() => {
+    if (view === "today" && activeResourceConfig && !activeResourceConfig.hasRoutePlanning) {
+      navigate("dashboard");
+    }
+  }, [view, activeResourceConfig, navigate]);
 
   return (
     <>
@@ -125,6 +145,48 @@ export function Sidebar() {
               <ChevronLeft className="w-4 h-4" />
             </button>
           )}
+        </div>
+
+        {/* Centro activo */}
+        <div className={cn("border-b border-sidebar-border p-3", sidebarCollapsed && "lg:px-2")}>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className={cn(
+                  "w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium",
+                  "bg-sidebar-accent/60 text-sidebar-foreground hover:bg-sidebar-accent transition-colors",
+                  sidebarCollapsed && "lg:justify-center lg:px-0",
+                )}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                <span className={cn("flex-1 text-left truncate", sidebarCollapsed && "lg:hidden")}>
+                  {activeResourceConfig?.label ?? "Elegir centro"}
+                </span>
+                <ChevronsUpDown className={cn("w-3.5 h-3.5 text-sidebar-foreground/50 shrink-0", sidebarCollapsed && "lg:hidden")} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-56 p-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-2 py-1">Centro de trabajo</p>
+              {RESOURCES.map((r) => (
+                <button
+                  key={r.key}
+                  onClick={() => setActiveResource(r.key)}
+                  className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted transition-colors"
+                >
+                  {r.label}
+                  {activeResource === r.key && <Check className="w-3.5 h-3.5 text-primary" />}
+                </button>
+              ))}
+              <div className="border-t mt-1 pt-1">
+                <button
+                  onClick={clearActiveResource}
+                  className="w-full text-left rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  Volver a preguntar al entrar
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Nav */}

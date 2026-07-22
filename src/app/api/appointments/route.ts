@@ -1,8 +1,9 @@
 // /api/appointments — list (with filters) & create
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapAppointment, buildMadridDateTime } from "@/lib/server";
+import { requireProfessional, audit, mapAppointment, buildMadridDateTime, buildResourceFilter } from "@/lib/server";
 import { appointmentCreateSchema } from "@/lib/schemas";
+import type { Prisma } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
   const prof = await requireProfessional();
@@ -10,11 +11,11 @@ export async function GET(req: NextRequest) {
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
   const therapistId = url.searchParams.get("therapistId");
+  const resource = url.searchParams.get("resource");
 
-  const where: {
-    start?: { gte?: Date; lte?: Date };
-    therapistId?: string;
-  } = {};
+  const where: Prisma.AppointmentWhereInput = {
+    patient: buildResourceFilter(resource),
+  };
   if (from || to) {
     where.start = {};
     if (from) where.start.gte = new Date(from);

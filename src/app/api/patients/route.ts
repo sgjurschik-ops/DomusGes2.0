@@ -2,16 +2,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapPatient, getPatientTimelineMap } from "@/lib/server";
+import { requireProfessional, audit, mapPatient, getPatientTimelineMap, buildResourceFilter } from "@/lib/server";
 import { patientCreateSchema } from "@/lib/schemas";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const prof = await requireProfessional();
+  const resource = new URL(req.url).searchParams.get("resource");
 
   // Guests only see patients assigned to them
-  const where = prof.userRole === "guest"
-    ? { therapists: { some: { id: prof.id } } }
-    : {};
+  const where = {
+    ...(prof.userRole === "guest" ? { therapists: { some: { id: prof.id } } } : {}),
+    ...buildResourceFilter(resource),
+  };
 
   const rows = await db.patient.findMany({
     where,

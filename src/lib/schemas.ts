@@ -13,9 +13,9 @@ export const PATIENT_STATUSES = ["Activo", "En seguimiento", "Alta", "Pausado"] 
 // basta con añadir una línea aquí — nada más del código depende de que
 // solo existan estos dos.
 export const RESOURCE_KEYS = ["Domicilio", "Asociación EM"] as const;
-export const RESOURCES: { key: (typeof RESOURCE_KEYS)[number]; label: string; billable: boolean }[] = [
-  { key: "Domicilio", label: "Domicilio", billable: true },
-  { key: "Asociación EM", label: "Asociación EM", billable: false },
+export const RESOURCES: { key: (typeof RESOURCE_KEYS)[number]; label: string; billable: boolean; hasRoutePlanning: boolean }[] = [
+  { key: "Domicilio", label: "Domicilio", billable: true, hasRoutePlanning: true },
+  { key: "Asociación EM", label: "Asociación EM", billable: false, hasRoutePlanning: false },
 ];
 export function isBillableResource(resource: string | null): boolean {
   // A patient with no resource assigned yet defaults to billable=true —
@@ -203,6 +203,7 @@ export const visitCreateSchema = z.object({
   notes: z.string().min(1, "Las notas clínicas son obligatorias"),
   interventions: z.array(z.string()).default([]),
   goalIds: z.array(z.string()).default([]),
+  gasScores: z.record(z.string(), z.number().int().min(-2).max(2)).default({}),
   tasks: z.array(z.object({ id: z.string(), text: z.string(), completed: z.boolean() })).default([]),
 });
 export type VisitCreateInput = z.infer<typeof visitCreateSchema>;
@@ -216,6 +217,7 @@ export const visitUpdateSchema = z.object({
   notes: z.string().min(1, "Las notas clínicas son obligatorias"),
   interventions: z.array(z.string()).default([]),
   goalIds: z.array(z.string()).default([]),
+  gasScores: z.record(z.string(), z.number().int().min(-2).max(2)).default({}),
   tasks: z.array(z.object({ id: z.string(), text: z.string(), completed: z.boolean() })).default([]),
 });
 export type VisitUpdateInput = z.infer<typeof visitUpdateSchema>;

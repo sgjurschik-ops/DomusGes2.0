@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { ProfessionalDTO, AreaSummaryData } from "@/types/domain";
 import type { Prisma } from "@prisma/client";
+import { RESOURCES } from "@/lib/schemas";
 
 export type UserRole = "admin" | "therapist" | "guest";
 
@@ -228,6 +229,18 @@ type PatientWithRels = Prisma.PatientGetPayload<{
   };
 }>;
 
+// Shared filter for scoping queries to the professional's currently active
+// "centro" (recurso) — Domicilio / Asociación EM / etc. Patients created
+// before this field existed have resource=null; those count as belonging
+// to the FIRST resource (Domicilio) so they don't just vanish from every
+// view until someone manually assigns them. Passing resource=null/undefined
+// (no center chosen yet, e.g. admin overview) returns no filter at all.
+export function buildResourceFilter(resource: string | null | undefined): Prisma.PatientWhereInput {
+  if (!resource) return {};
+  const isDefaultResource = RESOURCES[0]?.key === resource;
+  return isDefaultResource ? { OR: [{ resource }, { resource: null }] } : { resource };
+}
+
 export function mapPatient(
   p: PatientWithRels,
   extra: { lastVisitDate: Date | null; nextAppointmentDate: Date | null },
@@ -281,6 +294,7 @@ export function mapVisit(v: VisitWithRels) {
     notes: v.notes,
     interventions: JSON.parse(v.interventions || "[]") as string[],
     goalIds: JSON.parse(v.goalIds || "[]") as string[],
+    gasScores: JSON.parse(v.gasScores || "{}") as Record<string, number>,
     tasks: JSON.parse(v.tasks || "[]") as { id: string; text: string; completed: boolean }[],
     score: v.score,
     createdAt: v.createdAt.toISOString(),
