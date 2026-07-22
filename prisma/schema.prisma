@@ -84,6 +84,11 @@ model Visit {
   notes         String
   interventions String   @default("[]") // JSON-encoded string[]
   goalIds       String   @default("[]") // JSON-encoded string[] — IDs of OccupationalGoal worked on
+  // JSON-encoded Record<goalId, -2|-1|0|1|2> — puntuación GAS registrada
+  // en ESTE seguimiento, para los objetivos que usan escala GAS. Junto con
+  // goalIds y la fecha del visit, esto ya da el historial de evolución
+  // (no hace falta una tabla aparte).
+  gasScores     String   @default("{}")
   tasks         String   @default("[]") // JSON-encoded Task[] — { id, text, completed }[]
   score         Int?     // 0-10 subjective progress
   createdAt     DateTime @default(now())
@@ -289,6 +294,12 @@ model OccupationalGoal {
   startDate              DateTime?
   targetDate             DateTime?
   evaluation             String?
+  // GAS (Goal Attainment Scaling), usado sobre todo con pacientes de
+  // recursos como "Asociación EM". JSON-encoded { "-2": string, "-1":
+  // string, "0": string, "1": string, "2": string } — la descripción de
+  // cada uno de los 5 niveles, definida al crear el objetivo. Null/vacío
+  // = este objetivo no usa GAS (se valora solo con el status de siempre).
+  gasLevels              String?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
