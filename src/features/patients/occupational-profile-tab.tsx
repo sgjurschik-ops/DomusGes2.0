@@ -39,7 +39,7 @@ import {
   type RoutineCell,
   WeeklyRoutineEditor,
 } from "./weekly-routine-editor";
-import { useRoutineRecords } from "@/hooks/api";
+import { useRoutineRecords, usePatient } from "@/hooks/api";
 import { RichTextarea } from "@/components/rich-textarea";
 
 type Profile = Record<string, any>;
@@ -107,6 +107,31 @@ interface Goal {
   startDate: string | null;
   targetDate: string | null;
   evaluation: string;
+  // GAS (Goal Attainment Scaling) — null = este objetivo no usa GAS.
+  gasLevels: GasLevels | null;
+}
+
+// The 5 GAS levels, in display order from worst to best.
+const GAS_LEVEL_KEYS = ["-2", "-1", "0", "1", "2"] as const;
+type GasLevels = Record<(typeof GAS_LEVEL_KEYS)[number], string>;
+const GAS_LEVEL_LABELS: Record<(typeof GAS_LEVEL_KEYS)[number], string> = {
+  "-2": "Mucho menos de lo esperado",
+  "-1": "Menos de lo esperado",
+  "0": "Resultado esperado",
+  "1": "Más de lo esperado",
+  "2": "Mucho más de lo esperado",
+};
+function emptyGasLevels(): GasLevels {
+  return { "-2": "", "-1": "", "0": "", "1": "", "2": "" };
+}
+function parseGasLevels(raw: unknown): GasLevels | null {
+  if (!raw || typeof raw !== "string") return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return GAS_LEVEL_KEYS.every((k) => typeof parsed?.[k] === "string") ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 // Predefined general objectives with suggested area
@@ -199,6 +224,11 @@ const emptyProfile: Profile = {
 };
 
 export function OccupationalProfileTab({ patientId }: { patientId: string }) {
+  const { data: patient } = usePatient(patientId);
+  // GAS (Goal Attainment Scaling) se ofrece para pacientes del recurso
+  // "Asociación EM" — es el método de valoración que usan allí, distinto
+  // del simple "En curso/Conseguido" que basta para el resto.
+  const gasEnabled = patient?.resource === "Asociación EM";
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -252,6 +282,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
                 startDate: g.startDate ? g.startDate.slice(0, 10) : null,
                 targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
                 evaluation: g.evaluation ?? "",
+                gasLevels: parseGasLevels(g.gasLevels),
               }))
             : [],
         });
@@ -279,6 +310,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       goals: (profile.goals ?? []).map((g: Goal) => ({
         ...g,
         specificGoals: JSON.stringify(g.specificGoals ?? []),
+        gasLevels: g.gasLevels ? JSON.stringify(g.gasLevels) : null,
       })),
     };
   }
@@ -311,6 +343,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
               startDate: g.startDate ? g.startDate.slice(0, 10) : null,
               targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
               evaluation: g.evaluation ?? "",
+              gasLevels: parseGasLevels(g.gasLevels),
             }))
           : [],
       });
@@ -346,6 +379,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
               startDate: g.startDate ? g.startDate.slice(0, 10) : null,
               targetDate: g.targetDate ? g.targetDate.slice(0, 10) : null,
               evaluation: g.evaluation ?? "",
+              gasLevels: parseGasLevels(g.gasLevels),
             }))
           : [],
       });
@@ -659,7 +693,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
             <Field label="Plan de terapia ocupacional">
               <RichTextarea rows={3} value={profile.desiredImprovements ?? ""} onChange={(v) => update("desiredImprovements", v)} />
             </Field>
-            <GoalsEditor value={profile.goals ?? []} onChange={(goals) => update("goals", goals)} />
+            <GoalsEditor value={profile.goals ?? []} onChange={(goals) => update("goals", goals)} gasEnabled={gasEnabled} />
           </>
         ) : (
           <>
@@ -1055,16 +1089,16 @@ function WorkHistoryEditor({ value, onChange }: { value: WorkHistoryEntry[]; onC
   );
 }
 
-function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goal[]) => void }) {
+function GoalsEditor({ value, onChange, gasEnabled }: { value: Goal[]; onChange: (goals: Goal[]) => void; gasEnabled: boolean }) {
   const [showPicker, setShowPicker] = useState(false);
   const [specificInput, setSpecificInput] = useState<Record<number, string>>({});
 
   function addFromPredefined(obj: { text: string; area: GoalArea }) {
-    onChange([...value, { text: obj.text, area: obj.area, scope: "Con el paciente", status: "En curso", specificGoals: [], startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "" }]);
+    onChange([...value, { text: obj.text, area: obj.area, scope: "Con el paciente", status: "En curso", specificGoals: [], startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "", gasLevels: null }]);
     setShowPicker(false);
   }
   function addCustom() {
-    onChange([...value, { text: "", area: "Cuidado de sí mismo", scope: "Con el paciente", status: "En curso", specificGoals: [], startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "" }]);
+    onChange([...value, { text: "", area: "Cuidado de sí mismo", scope: "Con el paciente", status: "En curso", specificGoals: [], startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "", gasLevels: null }]);
   }
   function updateRow(i: number, patch: Partial<Goal>) { onChange(value.map((g, idx) => (idx === i ? { ...g, ...patch } : g))); }
   function removeRow(i: number) {
@@ -1169,6 +1203,39 @@ function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goa
                     </Button>
                   </div>
                 </div>
+
+                {gasEnabled && (
+                  <div className="space-y-2 rounded-md border border-dashed border-fuchsia-300 bg-fuchsia-50/50 p-2.5">
+                    <label className="flex items-center gap-2 text-xs font-medium text-fuchsia-900 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!goal.gasLevels}
+                        onChange={(e) => updateRow(i, { gasLevels: e.target.checked ? emptyGasLevels() : null })}
+                      />
+                      Puntuar este objetivo con escala GAS (-2 a +2)
+                    </label>
+                    {goal.gasLevels && (
+                      <div className="space-y-1.5 pl-1">
+                        <p className="text-[10px] text-fuchsia-800">
+                          Describe qué significa cada nivel para este objetivo concreto. Se usará para puntuar el progreso en cada seguimiento.
+                        </p>
+                        {GAS_LEVEL_KEYS.map((k) => (
+                          <div key={k} className="flex items-start gap-2">
+                            <span className="mt-1.5 shrink-0 w-8 text-center text-[11px] font-bold text-fuchsia-700">
+                              {k === "0" ? "0" : k.startsWith("-") ? k : `+${k}`}
+                            </span>
+                            <Input
+                              className="h-7 text-xs"
+                              placeholder={GAS_LEVEL_LABELS[k]}
+                              value={goal.gasLevels![k]}
+                              onChange={(e) => updateRow(i, { gasLevels: { ...goal.gasLevels!, [k]: e.target.value } })}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <Label className="text-[10px] text-muted-foreground">Evaluación</Label>

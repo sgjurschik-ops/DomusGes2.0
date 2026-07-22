@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import { SCALE_GROUPS } from "@/lib/schemas";
 import { formatDate } from "@/components/domain";
 
@@ -100,7 +100,7 @@ export function EvolutionTable({ assessments, onOpenAssessment }: Props) {
         </thead>
         <tbody>
           {visibleGroups.map((group) => (
-            <>
+            <Fragment key={group.label}>
               <tr key={`header-${group.label}`} className="bg-muted/20">
                 <td colSpan={dates.length + 1} className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide border-b">
                   {group.label}
@@ -137,7 +137,7 @@ export function EvolutionTable({ assessments, onOpenAssessment }: Props) {
                   })}
                 </tr>
               ))}
-            </>
+            </Fragment>
           ))}
         </tbody>
       </table>

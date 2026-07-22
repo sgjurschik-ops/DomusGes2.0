@@ -43,6 +43,10 @@ function nowRoundedTimeStr(): string {
   return `${String(h % 24).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
+// The 5 GAS levels, worst to best — must match GAS_LEVEL_KEYS in
+// occupational-profile-tab.tsx (where the per-goal descriptions are written).
+const GAS_KEYS = ["-2", "-1", "0", "1", "2"] as const;
+
 type Props = {
   open: boolean;
   patientId: string;
@@ -67,7 +71,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
   const { data: me } = useMe();
   const { data: professionals } = useProfessionals();
   const [interventionInput, setInterventionInput] = useState("");
-  const [patientGoals, setPatientGoals] = useState<{ id: string; text: string; area: string; status: string }[]>([]);
+  const [patientGoals, setPatientGoals] = useState<{ id: string; text: string; area: string; status: string; gasLevels: Record<string, string> | null }[]>([]);
 
   function buildDefaults(): z.input<typeof visitCreateSchema> {
     if (editVisit) {
@@ -81,6 +85,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
         notes: /<[a-z][\s\S]*>/i.test(editVisit.notes) ? editVisit.notes : editVisit.notes.replace(/\n/g, "<br>"),
         interventions: editVisit.interventions,
         goalIds: editVisit.goalIds ?? [],
+        gasScores: editVisit.gasScores ?? {},
         tasks: editVisit.tasks ?? [],
       };
     }
@@ -94,6 +99,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
       notes: "",
       interventions: [],
       goalIds: [],
+      gasScores: {},
       tasks: [],
     };
   }
@@ -130,7 +136,14 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
     fetch(`/api/patients/${patientId}/occupational-profile`)
       .then((r) => r.json())
       .then((data) => {
-        const allGoals = data?.goals ?? [];
+        function withParsedGas(g: any) {
+          let gasLevels: Record<string, string> | null = null;
+          if (typeof g.gasLevels === "string" && g.gasLevels) {
+            try { gasLevels = JSON.parse(g.gasLevels); } catch { gasLevels = null; }
+          }
+          return { id: g.id, text: g.text, area: g.area, status: g.status, gasLevels };
+        }
+        const allGoals = (data?.goals ?? []).map(withParsedGas);
         const inCurso = allGoals.filter((g: any) => g.status === "En curso");
         // If we're editing a visit that references a goal no longer "En
         // curso" (e.g. since marked "Conseguido"), keep it selectable/shown
@@ -363,6 +376,46 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
                             ) : null;
                           })}
                         </div>
+                      )}
+                      {selected.some((gid) => patientGoals.find((g) => g.id === gid)?.gasLevels) && (
+                        <Controller
+                          control={control}
+                          name="gasScores"
+                          render={({ field: gasField }) => {
+                            const scores = (gasField.value ?? {}) as Record<string, number>;
+                            return (
+                              <div className="space-y-2 rounded-md border border-dashed border-fuchsia-300 bg-fuchsia-50/40 p-2.5">
+                                <p className="text-[10px] font-medium text-fuchsia-800">Puntuación GAS de este seguimiento</p>
+                                {selected.map((gid) => {
+                                  const goal = patientGoals.find((g) => g.id === gid);
+                                  if (!goal?.gasLevels) return null;
+                                  const current = scores[gid];
+                                  return (
+                                    <div key={gid} className="space-y-1">
+                                      <p className="text-xs">{goal.text}</p>
+                                      <div className="flex gap-1">
+                                        {GAS_KEYS.map((k) => (
+                                          <button
+                                            key={k}
+                                            type="button"
+                                            title={goal.gasLevels![k]}
+                                            onClick={() => gasField.onChange({ ...scores, [gid]: Number(k) })}
+                                            className={`flex-1 rounded-md border px-1.5 py-1 text-[11px] font-semibold transition-colors ${current === Number(k) ? "border-fuchsia-500 bg-fuchsia-100 text-fuchsia-900" : "hover:bg-muted"}`}
+                                          >
+                                            {k === "0" ? "0" : k.startsWith("-") ? k : `+${k}`}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      {current !== undefined && (
+                                        <p className="text-[10px] text-muted-foreground italic">{goal.gasLevels[String(current)]}</p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          }}
+                        />
                       )}
                     </div>
                   );
