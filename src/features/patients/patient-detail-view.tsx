@@ -48,6 +48,7 @@ import {
 } from "recharts";
 import { toast } from "@/hooks/use-toast";
 import { OccupationalProfileTab, getProfileCompletion } from "./occupational-profile-tab";
+import { InterventionPlanTab } from "./intervention-plan-tab";
 import { ClinicalNotes } from "@/components/clinical-notes";
 import { Mic, MicOff } from "lucide-react";
 
@@ -221,10 +222,11 @@ export function PatientDetailView() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className={`grid w-full max-w-2xl ${isAdmin ? "grid-cols-1 max-w-xs" : "grid-cols-5"}`}>
+        <TabsList className={`grid w-full max-w-3xl ${isAdmin ? "grid-cols-1 max-w-xs" : "grid-cols-6"}`}>
           <TabsTrigger value="overview">Resumen</TabsTrigger>
           {!isAdmin && <TabsTrigger value="visits">Seguimientos</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="occupational-profile">Perfil ocupacional</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="intervention-plan">Plan de intervención</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="assessments">Valoración</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="progress">Evolución</TabsTrigger>}
         </TabsList>
@@ -384,7 +386,18 @@ export function PatientDetailView() {
                       <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mt-0.5">Objetivos:</span>
                       {v.goalIds.map((gid) => {
                         const goal = patientGoals.find((g) => g.id === gid);
-                        return goal ? <Badge key={gid} variant="secondary" className="text-[11px] py-0">{goal.text}</Badge> : null;
+                        if (!goal) return null;
+                        const gasScore = v.gasScores?.[gid];
+                        return (
+                          <Badge key={gid} variant="secondary" className="text-[11px] py-0 gap-1">
+                            {goal.text}
+                            {gasScore !== undefined && (
+                              <span className="font-bold text-fuchsia-700">
+                                GAS {gasScore > 0 ? `+${gasScore}` : gasScore}
+                              </span>
+                            )}
+                          </Badge>
+                        );
                       })}
                     </div>
                   )}
@@ -417,6 +430,10 @@ export function PatientDetailView() {
 {/* Occupational profile — hidden for admin */}
 {!isAdmin && <TabsContent value="occupational-profile" className="mt-4">
   <OccupationalProfileTab patientId={patient.id} />
+</TabsContent>}
+
+{!isAdmin && <TabsContent value="intervention-plan" className="mt-4">
+  <InterventionPlanTab patientId={patient.id} />
 </TabsContent>}
 
         {/* Assessments — hidden for admin */}
