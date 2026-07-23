@@ -839,6 +839,127 @@ function ReadOnlyTable<T>({
   );
 }
 
+const AREA_GROUP_COLORS: Record<string, { border: string; text: string; bg: string }> = {
+  teal: { border: "#5DCAA5", text: "#0F6E56", bg: "#E1F5EE" },
+  amber: { border: "#EF9F27", text: "#854F0B", bg: "#FAEEDA" },
+  violet: { border: "#8b5cf6", text: "#534AB7", bg: "#EEEDFE" },
+};
+
+function AreaBlock({ color, label, desc, value, onChange }: { color: string; label: string; desc: string; value: string; onChange: (v: string) => void }) {
+  const c = AREA_GROUP_COLORS[color] ?? AREA_GROUP_COLORS.teal;
+  return (
+    <div className="rounded-lg pl-3 space-y-1.5" style={{ borderLeft: `4px solid ${c.border}` }}>
+      <p className="inline-block text-xs font-bold px-2 py-0.5 rounded" style={{ color: c.text, backgroundColor: c.bg }}>{label}</p>
+      <p className="text-[11px] text-muted-foreground">{desc}</p>
+      <RichTextarea value={value} onChange={onChange} rows={2} />
+    </div>
+  );
+}
+
+function ReadOnlyHtmlColored({ label, value, color, placeholder = "Sin completar." }: { label: string; value?: string; color: string; placeholder?: string }) {
+  const c = AREA_GROUP_COLORS[color] ?? AREA_GROUP_COLORS.teal;
+  const hasValue = value && value.replace(/<[^>]*>/g, "").trim();
+  return (
+    <div className="rounded-lg pl-3 space-y-1" style={{ borderLeft: `4px solid ${c.border}` }}>
+      <p className="inline-block text-[11px] uppercase tracking-wide font-bold px-2 py-0.5 rounded" style={{ color: c.text, backgroundColor: c.bg }}>{label}</p>
+      {hasValue ? (
+        <div className="text-sm prose prose-sm max-w-none rounded-md px-3 py-2" style={{ backgroundColor: c.bg }} dangerouslySetInnerHTML={{ __html: value! }} />
+      ) : (
+        <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">{placeholder}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── List editors ────────────────────────────────────────────────────────────
+
+function FamilyMembersEditor({ value, onChange }: { value: FamilyMember[]; onChange: (members: FamilyMember[]) => void }) {
+  function addRow() { onChange([...value, { name: "", relationship: "", occupation: "", notes: "" }]); }
+  function updateRow(i: number, patch: Partial<FamilyMember>) { onChange(value.map((m, idx) => (idx === i ? { ...m, ...patch } : m))); }
+  function removeRow(i: number) { onChange(value.filter((_, idx) => idx !== i)); }
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Composición familiar</Label>
+      {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin familiares añadidos.</p>}
+      <div className="space-y-2">
+        {value.map((member, i) => (
+          <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr_1.4fr_auto] gap-2 items-start">
+            <Input placeholder="Nombre" value={member.name} onChange={(e) => updateRow(i, { name: e.target.value })} />
+            <Input placeholder="Relación (ej. Madre)" value={member.relationship} onChange={(e) => updateRow(i, { relationship: e.target.value })} />
+            <Input placeholder="Ocupación" value={member.occupation} onChange={(e) => updateRow(i, { occupation: e.target.value })} />
+            <Input placeholder="Otros (convivencia, apoyo, contacto...)" value={member.notes} onChange={(e) => updateRow(i, { notes: e.target.value })} />
+            <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => removeRow(i)} aria-label="Quitar familiar">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={addRow}>
+        <Plus className="w-3.5 h-3.5 mr-1.5" /> Añadir familiar
+      </Button>
+    </div>
+  );
+}
+
+function SupportNetworkEditor({ value, onChange }: { value: SupportContact[]; onChange: (contacts: SupportContact[]) => void }) {
+  function addRow() { onChange([...value, { name: "", relationship: "", frequency: "", notes: "" }]); }
+  function updateRow(i: number, patch: Partial<SupportContact>) { onChange(value.map((c, idx) => (idx === i ? { ...c, ...patch } : c))); }
+  function removeRow(i: number) { onChange(value.filter((_, idx) => idx !== i)); }
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Red de apoyo / amistades</Label>
+      {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin contactos de apoyo añadidos.</p>}
+      <div className="space-y-2">
+        {value.map((contact, i) => (
+          <div key={i} className="grid grid-cols-[1.2fr_1fr_1fr_1.4fr_auto] gap-2 items-start">
+            <Input placeholder="Nombre" value={contact.name} onChange={(e) => updateRow(i, { name: e.target.value })} />
+            <Input placeholder="Relación (ej. Amigo)" value={contact.relationship} onChange={(e) => updateRow(i, { relationship: e.target.value })} />
+            <Input placeholder="Frecuencia contacto" value={contact.frequency} onChange={(e) => updateRow(i, { frequency: e.target.value })} />
+            <Input placeholder="Otros (vía de contacto, nivel apoyo...)" value={contact.notes} onChange={(e) => updateRow(i, { notes: e.target.value })} />
+            <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => removeRow(i)} aria-label="Quitar contacto">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={addRow}>
+        <Plus className="w-3.5 h-3.5 mr-1.5" /> Añadir contacto
+      </Button>
+    </div>
+  );
+}
+
+function WorkHistoryEditor({ value, onChange }: { value: WorkHistoryEntry[]; onChange: (entries: WorkHistoryEntry[]) => void }) {
+  function addRow() { onChange([...value, { company: "", role: "", year: "", notes: "" }]); }
+  function updateRow(i: number, patch: Partial<WorkHistoryEntry>) { onChange(value.map((w, idx) => (idx === i ? { ...w, ...patch } : w))); }
+  function removeRow(i: number) { onChange(value.filter((_, idx) => idx !== i)); }
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="inline-block text-[11px] uppercase tracking-wide font-bold text-foreground bg-muted px-2 py-0.5 rounded">Trabajos realizados</Label>
+      {value.length === 0 && <p className="text-xs text-muted-foreground italic">Sin trabajos añadidos.</p>}
+      <div className="space-y-2">
+        {value.map((entry, i) => (
+          <div key={i} className="grid grid-cols-[1.3fr_1.3fr_0.7fr_1.4fr_auto] gap-2 items-start">
+            <Input placeholder="Empresa" value={entry.company} onChange={(e) => updateRow(i, { company: e.target.value })} />
+            <Input placeholder="Funciones" value={entry.role} onChange={(e) => updateRow(i, { role: e.target.value })} />
+            <Input placeholder="Año" value={entry.year} onChange={(e) => updateRow(i, { year: e.target.value })} />
+            <Input placeholder="Otros" value={entry.notes} onChange={(e) => updateRow(i, { notes: e.target.value })} />
+            <Button type="button" variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" onClick={() => removeRow(i)} aria-label="Quitar trabajo">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={addRow}>
+        <Plus className="w-3.5 h-3.5 mr-1.5" /> Añadir trabajo
+      </Button>
+    </div>
+  );
+}
+
 // ─── Occupational balance charts ─────────────────────────────────────────────
 function OccupationalBalanceCharts({ cells }: { cells: RoutineCell[] }) {
   const filled = cells.filter((c) => c.category);
