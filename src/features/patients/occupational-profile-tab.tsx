@@ -10,6 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
 import { toast } from "@/hooks/use-toast";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
   Save,
   FileDown,
   ClipboardList,
@@ -24,6 +31,7 @@ import {
   LayoutGrid,
   Pencil,
   Eye,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -39,7 +47,8 @@ import {
   type RoutineCell,
   WeeklyRoutineEditor,
 } from "./weekly-routine-editor";
-import { useRoutineRecords, usePatient } from "@/hooks/api";
+import { useRoutineRecords, usePatient, useGasAssessments, useCreateGasAssessments, useDeleteGasAssessment } from "@/hooks/api";
+import type { GasAssessmentDTO } from "@/hooks/api";
 import { RichTextarea } from "@/components/rich-textarea";
 
 type Profile = Record<string, any>;
@@ -235,6 +244,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
   const [saving, setSaving] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [routineEditorOpen, setRoutineEditorOpen] = useState(false);
+  const [gasSheetOpen, setGasSheetOpen] = useState(false);
   // Per-section editing state
   const [editingSections, setEditingSections] = useState<Record<string, boolean>>({});
 
@@ -701,7 +711,24 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
             <ReadOnlyGoals goals={profile.goals ?? []} />
           </>
         )}
+        {gasEnabled && (profile.goals ?? []).some((g: Goal) => !!g.gasLevels) && (
+          <div className="pt-2">
+            <Button variant="outline" size="sm" onClick={() => setGasSheetOpen(true)}>
+              <ClipboardCheck className="w-4 h-4 mr-1.5" />
+              Valorar objetivos (GAS formal)
+            </Button>
+          </div>
+        )}
       </Section>
+
+      {gasSheetOpen && (
+        <GasAssessmentSheet
+          patientId={patientId}
+          goals={(profile.goals ?? []).filter((g: Goal) => !!g.gasLevels)}
+          open={gasSheetOpen}
+          onOpenChange={setGasSheetOpen}
+        />
+      )}
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={generateReport} disabled={generatingReport || saving}>
@@ -1275,6 +1302,216 @@ function GoalsEditor({ value, onChange, gasEnabled }: { value: Goal[]; onChange:
         </div>
       )}
     </div>
+  );
+}
+
+// ─── GAS formal assessment sheet ─────────────────────────────────────────────
+
+const GAS_SCORE_LABELS: Record<number, string> = {
+  "-2": "Mucho menos de lo esperado",
+  "-1": "Menos de lo esperado",
+  "0": "Resultado esperado",
+  "1": "Más de lo esperado",
+  "2": "Mucho más de lo esperado",
+};
+const GAS_SCORE_COLORS: Record<number, string> = {
+  "-2": "#dc2626",
+  "-1": "#f97316",
+  "0": "#6b7280",
+  "1": "#22c55e",
+  "2": "#059669",
+};
+
+function GasAssessmentSheet({
+  patientId,
+  goals,
+  open,
+  onOpenChange,
+}: {
+  patientId: string;
+  goals: Goal[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { data: assessments, isLoading } = useGasAssessments(patientId);
+  const createMut = useCreateGasAssessments(patientId);
+  const deleteMut = useDeleteGasAssessment(patientId);
+
+  // New assessment form state
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [scores, setScores] = useState<Record<string, number>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+
+  function updateScore(goalId: string, score: number) {
+    setScores((prev) => ({ ...prev, [goalId]: score }));
+  }
+  function updateNote(goalId: string, note: string) {
+    setNotes((prev) => ({ ...prev, [goalId]: note }));
+  }
+
+  async function handleSave() {
+    const entries = goals
+      .filter((g) => g.id && scores[g.id!] !== undefined)
+      .map((g) => ({
+        goalId: g.id!,
+        score: scores[g.id!],
+        notes: notes[g.id!]?.trim() || undefined,
+      }));
+    if (entries.length === 0) return;
+
+    try {
+      await createMut.mutateAsync({ date, entries });
+      // Reset form
+      setScores({});
+      setNotes({});
+      toast({ title: "Valoración GAS guardada", description: `${entries.length} objetivo${entries.length > 1 ? "s" : ""} valorado${entries.length > 1 ? "s" : ""}.` });
+    } catch {
+      toast({ title: "Error", description: "No se ha podido guardar la valoración GAS.", variant: "destructive" });
+    }
+  }
+
+  async function handleDelete(assessmentId: string) {
+    if (!confirm("¿Eliminar esta valoración?")) return;
+    try {
+      await deleteMut.mutateAsync(assessmentId);
+    } catch {
+      toast({ title: "Error", description: "No se ha podido eliminar la valoración.", variant: "destructive" });
+    }
+  }
+
+  // Group existing assessments by goalId
+  const byGoal: Record<string, GasAssessmentDTO[]> = {};
+  for (const a of assessments ?? []) {
+    (byGoal[a.goalId] ??= []).push(a);
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Valoración formal GAS</SheetTitle>
+          <SheetDescription>
+            Valoraciones periódicas (cada 6 meses / 1 año) de los objetivos con escala GAS. Separadas de la puntuación por seguimiento.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="space-y-6 mt-4">
+          {/* ─── New assessment form ─── */}
+          <div className="rounded-lg border bg-fuchsia-50/50 border-fuchsia-200 p-4 space-y-4">
+            <p className="text-sm font-semibold text-fuchsia-900">Nueva valoración</p>
+            <div className="space-y-1">
+              <Label className="text-xs text-fuchsia-800">Fecha de valoración</Label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-48" />
+            </div>
+
+            <div className="space-y-3">
+              {goals.map((goal) => {
+                const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
+                const goalId = goal.id;
+                if (!goalId) return null;
+                return (
+                  <div key={goalId} className="rounded-md border bg-white p-3 space-y-2" style={{ borderLeftWidth: "3px", borderLeftColor: areaColor }}>
+                    <p className="text-sm font-medium">{goal.text}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {([-2, -1, 0, 1, 2] as const).map((s) => {
+                        const selected = scores[goalId] === s;
+                        const desc = goal.gasLevels?.[String(s) as keyof GasLevels] ?? "";
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => updateScore(goalId, s)}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                              selected
+                                ? "text-white border-transparent"
+                                : "bg-white text-foreground border-border hover:bg-muted"
+                            }`}
+                            style={selected ? { backgroundColor: GAS_SCORE_COLORS[s] } : undefined}
+                            title={desc || GAS_SCORE_LABELS[s]}
+                          >
+                            {s > 0 ? `+${s}` : s}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {scores[goalId] !== undefined && goal.gasLevels && (
+                      <p className="text-[11px] text-muted-foreground italic">
+                        {goal.gasLevels[String(scores[goalId]) as keyof GasLevels] || GAS_SCORE_LABELS[scores[goalId]]}
+                      </p>
+                    )}
+                    <Textarea
+                      rows={1}
+                      placeholder="Nota opcional…"
+                      className="text-xs"
+                      value={notes[goalId] ?? ""}
+                      onChange={(e) => updateNote(goalId, e.target.value)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={createMut.isPending || Object.keys(scores).length === 0}
+              >
+                <Save className="w-3.5 h-3.5 mr-1.5" />
+                {createMut.isPending ? "Guardando…" : "Guardar valoración"}
+              </Button>
+            </div>
+          </div>
+
+          {/* ─── History per goal ─── */}
+          <div className="space-y-4">
+            <p className="text-sm font-semibold">Historial de valoraciones</p>
+            {isLoading && <p className="text-xs text-muted-foreground">Cargando…</p>}
+            {!isLoading && (assessments ?? []).length === 0 && (
+              <p className="text-xs text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">
+                Aún no hay valoraciones formales registradas.
+              </p>
+            )}
+            {goals.map((goal) => {
+              const goalId = goal.id;
+              if (!goalId) return null;
+              const history = byGoal[goalId] ?? [];
+              if (history.length === 0) return null;
+              const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
+              return (
+                <div key={goalId} className="rounded-md border p-3 space-y-2" style={{ borderLeftWidth: "3px", borderLeftColor: areaColor }}>
+                  <p className="text-sm font-medium">{goal.text}</p>
+                  <div className="space-y-1.5">
+                    {history.map((a) => (
+                      <div key={a.id} className="flex items-center gap-2 text-xs rounded-md bg-muted/40 px-2.5 py-1.5 group">
+                        <span className="text-muted-foreground tabular-nums shrink-0">
+                          {new Date(a.date).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                        </span>
+                        <span
+                          className="font-bold px-1.5 py-0.5 rounded text-white text-[11px] shrink-0"
+                          style={{ backgroundColor: GAS_SCORE_COLORS[a.score] ?? "#6b7280" }}
+                        >
+                          {a.score > 0 ? `+${a.score}` : a.score}
+                        </span>
+                        {a.notes && <span className="text-muted-foreground italic flex-1 truncate">{a.notes}</span>}
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(a.id)}
+                          className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                          title="Eliminar valoración"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

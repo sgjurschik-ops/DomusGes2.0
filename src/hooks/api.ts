@@ -579,3 +579,47 @@ export function useBilling(year?: number, month?: number) {
     queryFn: () => fetcher(`/api/billing?${qs.toString()}`),
   });
 }
+
+// ─── GAS formal assessments ─────────────────────────────────────────────────
+
+export interface GasAssessmentDTO {
+  id: string;
+  goalId: string;
+  date: string; // ISO
+  score: number; // -2 | -1 | 0 | 1 | 2
+  notes: string | null;
+  createdAt: string;
+}
+
+export function useGasAssessments(patientId: string) {
+  return useQuery<GasAssessmentDTO[]>({
+    queryKey: ["gas-assessments", patientId],
+    queryFn: () => fetcher(`/api/patients/${patientId}/gas-assessments`),
+    enabled: !!patientId,
+  });
+}
+
+export function useCreateGasAssessments(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { date: string; entries: { goalId: string; score: number; notes?: string }[] }) =>
+      fetcher(`/api/patients/${patientId}/gas-assessments`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["gas-assessments", patientId] });
+    },
+  });
+}
+
+export function useDeleteGasAssessment(patientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (assessmentId: string) =>
+      fetcher(`/api/patients/${patientId}/gas-assessments/${assessmentId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["gas-assessments", patientId] });
+    },
+  });
+}

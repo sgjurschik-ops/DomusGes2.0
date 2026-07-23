@@ -304,6 +304,24 @@ model OccupationalGoal {
   updatedAt              DateTime @updatedAt
 
   occupationalProfile    OccupationalProfile @relation(fields: [occupationalProfileId], references: [id], onDelete: Cascade)
+  gasAssessments         GasAssessment[]
 
   @@index([occupationalProfileId])
+}
+
+// Valoraciones GAS formales (periódicas, cada 6 meses / 1 año).
+// Separadas de la puntuación por seguimiento (Visit.gasScores), que es el
+// registro sesión a sesión. Cada registro aquí es una valoración formal
+// con fecha, puntuación y nota opcional.
+model GasAssessment {
+  id        String   @id @default(cuid())
+  goalId    String
+  date      DateTime
+  score     Int      // -2 | -1 | 0 | 1 | 2
+  notes     String?
+  createdAt DateTime @default(now())
+
+  goal      OccupationalGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, date])
 }
