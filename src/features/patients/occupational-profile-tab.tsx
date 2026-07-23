@@ -319,7 +319,10 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       goals: (profile.goals ?? []).map((g: Goal) => ({
         ...g,
         specificGoals: JSON.stringify(g.specificGoals ?? []),
-        gasLevels: g.gasLevels ? JSON.stringify(g.gasLevels) : null,
+        // Pacientes Asociación EM → todos los objetivos usan GAS automáticamente
+        gasLevels: gasEnabled
+          ? JSON.stringify(g.gasLevels ?? emptyGasLevels())
+          : g.gasLevels ? JSON.stringify(g.gasLevels) : null,
       })),
     };
   }
@@ -696,13 +699,19 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
       <Section title="Objetivos y planificación" description="Objetivos ocupacionales con seguimiento temporal." icon={Target} color="blue" profile={profile}
         fields={["desiredImprovements"]}
         editing={isEditing("goals")} onToggleEdit={() => toggleEditing("goals")}
-        onSave={() => saveSection("goals")} saving={saving}>
+        onSave={() => saveSection("goals")} saving={saving}
+        extraActions={gasEnabled && (profile.goals ?? []).length > 0 ? (
+          <Button type="button" variant="outline" size="sm" className="h-7 px-3 text-xs mr-auto" onClick={() => setGasSheetOpen(true)}>
+            <ClipboardCheck className="w-3.5 h-3.5 mr-1" />
+            Valorar objetivos (GAS)
+          </Button>
+        ) : undefined}>
         {isEditing("goals") ? (
           <>
             <Field label="Plan de terapia ocupacional">
               <RichTextarea rows={3} value={profile.desiredImprovements ?? ""} onChange={(v) => update("desiredImprovements", v)} />
             </Field>
-            <GoalsEditor value={profile.goals ?? []} onChange={(goals) => update("goals", goals)} gasEnabled={gasEnabled} />
+            <GoalsEditor value={profile.goals ?? []} onChange={(goals) => update("goals", goals)} />
           </>
         ) : (
           <>
@@ -710,20 +719,12 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
             <ReadOnlyGoals goals={profile.goals ?? []} />
           </>
         )}
-        {gasEnabled && (profile.goals ?? []).some((g: Goal) => !!g.gasLevels) && (
-          <div className="pt-2">
-            <Button variant="outline" size="sm" onClick={() => setGasSheetOpen(true)}>
-              <ClipboardCheck className="w-4 h-4 mr-1.5" />
-              Valorar objetivos (GAS)
-            </Button>
-          </div>
-        )}
       </Section>
 
       {gasSheetOpen && (
         <GasAssessmentSheet
           patientId={patientId}
-          goals={(profile.goals ?? []).filter((g: Goal) => !!g.gasLevels)}
+          goals={(profile.goals ?? []).filter((g: Goal) => g.id)}
           open={gasSheetOpen}
           onOpenChange={setGasSheetOpen}
         />
@@ -756,11 +757,12 @@ const CHIP_VARS: Record<ChipColor, { bg: string; text: string }> = {
 };
 
 function Section({
-  title, description, icon: Icon, color = "blue", defaultOpen = false, profile, fields, children, editing, onToggleEdit, onSave, saving,
+  title, description, icon: Icon, color = "blue", defaultOpen = false, profile, fields, children, editing, onToggleEdit, onSave, saving, extraActions,
 }: {
   title: string; description?: string; icon?: LucideIcon; color?: ChipColor; defaultOpen?: boolean;
   profile: Profile; fields: string[]; children: React.ReactNode;
   editing?: boolean; onToggleEdit?: () => void; onSave?: () => void; saving?: boolean;
+  extraActions?: React.ReactNode;
 }) {
   const { filled, total } = countFilled(profile, fields);
   const isComplete = filled === total;
@@ -794,6 +796,7 @@ function Section({
         {children}
         {onToggleEdit && (
           <div className="flex justify-end gap-2 pt-2">
+            {extraActions}
             {editing && onSave && (
               <Button type="button" variant="default" size="sm" className="h-7 px-3 text-xs" disabled={saving} onClick={onSave}>
                 <Save className="w-3.5 h-3.5 mr-1" />
@@ -1115,7 +1118,7 @@ function WorkHistoryEditor({ value, onChange }: { value: WorkHistoryEntry[]; onC
   );
 }
 
-function GoalsEditor({ value, onChange, gasEnabled }: { value: Goal[]; onChange: (goals: Goal[]) => void; gasEnabled: boolean }) {
+function GoalsEditor({ value, onChange }: { value: Goal[]; onChange: (goals: Goal[]) => void }) {
   const [showPicker, setShowPicker] = useState(false);
   const [specificInput, setSpecificInput] = useState<Record<number, string>>({});
 
@@ -1229,19 +1232,6 @@ function GoalsEditor({ value, onChange, gasEnabled }: { value: Goal[]; onChange:
                     </Button>
                   </div>
                 </div>
-
-                {gasEnabled && (
-                  <div className="rounded-md border border-dashed border-fuchsia-300 bg-fuchsia-50/50 p-2.5">
-                    <label className="flex items-center gap-2 text-xs font-medium text-fuchsia-900 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={!!goal.gasLevels}
-                        onChange={(e) => updateRow(i, { gasLevels: e.target.checked ? emptyGasLevels() : null })}
-                      />
-                      Valorar según escala GAS (-2 a +2)
-                    </label>
-                  </div>
-                )}
 
                 <div className="space-y-1">
                   <Label className="text-[10px] text-muted-foreground">Evaluación</Label>
@@ -1381,13 +1371,17 @@ function GasAssessmentSheet({
             </div>
 
             <div className="space-y-3">
-              {goals.map((goal) => {
+              {goals.map((goal, idx) => {
                 const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
                 const goalId = goal.id;
                 if (!goalId) return null;
                 return (
                   <div key={goalId} className="rounded-md border bg-white p-3 space-y-2" style={{ borderLeftWidth: "3px", borderLeftColor: areaColor }}>
-                    <p className="text-sm font-medium">{goal.text}</p>
+                    <p className="text-sm font-medium">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold mr-1.5" style={{ backgroundColor: `${areaColor}20`, color: areaColor }}>{idx + 1}</span>
+                      {goal.text}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">{goal.area || "Sin área"}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {([-2, -1, 0, 1, 2] as const).map((s) => {
                         const selected = scores[goalId] === s;
@@ -1410,9 +1404,9 @@ function GasAssessmentSheet({
                         );
                       })}
                     </div>
-                    {scores[goalId] !== undefined && goal.gasLevels && (
+                    {scores[goalId] !== undefined && (
                       <p className="text-[11px] text-muted-foreground italic">
-                        {goal.gasLevels[String(scores[goalId]) as keyof GasLevels] || GAS_SCORE_LABELS[scores[goalId]]}
+                        {(goal.gasLevels?.[String(scores[goalId]) as keyof GasLevels]) || GAS_SCORE_LABELS[scores[goalId]]}
                       </p>
                     )}
                     <Textarea
@@ -1448,7 +1442,7 @@ function GasAssessmentSheet({
                 Aún no hay valoraciones formales registradas.
               </p>
             )}
-            {goals.map((goal) => {
+            {goals.map((goal, idx) => {
               const goalId = goal.id;
               if (!goalId) return null;
               const history = byGoal[goalId] ?? [];
@@ -1456,7 +1450,10 @@ function GasAssessmentSheet({
               const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
               return (
                 <div key={goalId} className="rounded-md border p-3 space-y-2" style={{ borderLeftWidth: "3px", borderLeftColor: areaColor }}>
-                  <p className="text-sm font-medium">{goal.text}</p>
+                  <p className="text-sm font-medium">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold mr-1.5" style={{ backgroundColor: `${areaColor}20`, color: areaColor }}>{idx + 1}</span>
+                    {goal.text}
+                  </p>
                   <div className="space-y-1.5">
                     {history.map((a) => (
                       <div key={a.id} className="flex items-center gap-2 text-xs rounded-md bg-muted/40 px-2.5 py-1.5 group">
