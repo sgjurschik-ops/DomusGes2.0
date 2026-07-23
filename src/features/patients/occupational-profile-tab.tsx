@@ -14,7 +14,6 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
 } from "@/components/ui/sheet";
 import {
   Save,
@@ -715,7 +714,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
           <div className="pt-2">
             <Button variant="outline" size="sm" onClick={() => setGasSheetOpen(true)}>
               <ClipboardCheck className="w-4 h-4 mr-1.5" />
-              Valorar objetivos (GAS formal)
+              Valorar objetivos (GAS)
             </Button>
           </div>
         )}
@@ -1232,35 +1231,15 @@ function GoalsEditor({ value, onChange, gasEnabled }: { value: Goal[]; onChange:
                 </div>
 
                 {gasEnabled && (
-                  <div className="space-y-2 rounded-md border border-dashed border-fuchsia-300 bg-fuchsia-50/50 p-2.5">
+                  <div className="rounded-md border border-dashed border-fuchsia-300 bg-fuchsia-50/50 p-2.5">
                     <label className="flex items-center gap-2 text-xs font-medium text-fuchsia-900 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={!!goal.gasLevels}
                         onChange={(e) => updateRow(i, { gasLevels: e.target.checked ? emptyGasLevels() : null })}
                       />
-                      Puntuar este objetivo con escala GAS (-2 a +2)
+                      Valorar según escala GAS (-2 a +2)
                     </label>
-                    {goal.gasLevels && (
-                      <div className="space-y-1.5 pl-1">
-                        <p className="text-[10px] text-fuchsia-800">
-                          Describe qué significa cada nivel para este objetivo concreto. Se usará para puntuar el progreso en cada seguimiento.
-                        </p>
-                        {GAS_LEVEL_KEYS.map((k) => (
-                          <div key={k} className="flex items-start gap-2">
-                            <span className="mt-1.5 shrink-0 w-8 text-center text-[11px] font-bold text-fuchsia-700">
-                              {k === "0" ? "0" : k.startsWith("-") ? k : `+${k}`}
-                            </span>
-                            <Input
-                              className="h-7 text-xs"
-                              placeholder={GAS_LEVEL_LABELS[k]}
-                              value={goal.gasLevels![k]}
-                              onChange={(e) => updateRow(i, { gasLevels: { ...goal.gasLevels!, [k]: e.target.value } })}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -1390,9 +1369,6 @@ function GasAssessmentSheet({
       <SheetContent className="sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Valoración formal GAS</SheetTitle>
-          <SheetDescription>
-            Valoraciones periódicas (cada 6 meses / 1 año) de los objetivos con escala GAS. Separadas de la puntuación por seguimiento.
-          </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-6 mt-4">
