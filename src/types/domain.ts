@@ -104,6 +104,8 @@ export interface VisitDTO {
   notes: string;
   interventions: string[];
   goalIds: string[];
+  // Puntuación GAS (-2 a +2) registrada en ESTE seguimiento, por objetivo.
+  gasScores: Record<string, number>;
   tasks: { id: string; text: string; completed: boolean }[];
   score: number | null;
   createdAt: string;
