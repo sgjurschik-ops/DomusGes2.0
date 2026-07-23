@@ -68,6 +68,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       notes: d.notes,
       interventions: JSON.stringify(d.interventions),
       goalIds: JSON.stringify(d.goalIds ?? []),
+      gasScores: JSON.stringify(d.gasScores ?? {}),
       tasks: JSON.stringify(d.tasks ?? []),
     },
     include: {
