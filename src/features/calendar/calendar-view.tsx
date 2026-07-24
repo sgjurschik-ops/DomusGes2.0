@@ -2032,7 +2032,7 @@ function AppointmentFormDialog({
                     value={field.value}
                     onChange={(v) => {
                       field.onChange(v);
-                      setValue("endTime", addMinutesToTimeStr(v, 60));
+                      setValue("endTime", addMinutesToTimeStr(v, defaultDur));
                     }}
                     ariaLabel="Hora inicio"
                   />
