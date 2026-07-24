@@ -222,13 +222,13 @@ export function PatientDetailView() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className={`grid w-full max-w-3xl ${isAdmin ? "grid-cols-1 max-w-xs" : "grid-cols-6"}`}>
-          <TabsTrigger value="overview">Resumen</TabsTrigger>
-          {!isAdmin && <TabsTrigger value="visits">Seguimientos</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="occupational-profile">Perfil ocupacional</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="intervention-plan">Plan de intervención</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="assessments">Valoración</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="progress">Evolución</TabsTrigger>}
+        <TabsList className={`inline-flex w-full max-w-4xl gap-1.5 overflow-x-auto ${isAdmin ? "max-w-xs" : ""}`}>
+          <TabsTrigger value="overview" className="shrink-0">Resumen</TabsTrigger>
+          {!isAdmin && <TabsTrigger value="visits" className="shrink-0">Seguimientos</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="occupational-profile" className="shrink-0">Perfil ocupacional</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="intervention-plan" className="shrink-0">Plan de intervención</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="assessments" className="shrink-0">Valoración</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="progress" className="shrink-0">Evolución</TabsTrigger>}
         </TabsList>
 
         {/* Overview */}
