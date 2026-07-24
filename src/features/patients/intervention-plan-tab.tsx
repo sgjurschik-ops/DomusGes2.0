@@ -12,7 +12,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import {
-  Save, Plus, Trash2, X, ClipboardCheck, Pencil, Eye, ChevronDown, ChevronUp,
+  Save, Plus, Trash2, X, ClipboardCheck, Pencil, Eye, ChevronDown, ChevronUp, FileDown,
 } from "lucide-react";
 import { usePatient, useGasAssessments, useCreateGasAssessments, useDeleteGasAssessment } from "@/hooks/api";
 import type { GasAssessmentDTO } from "@/hooks/api";
@@ -110,6 +110,50 @@ const PREDEFINED_OBJECTIVES: { text: string; area: GoalArea }[] = [
   { text: "Favorecer la adaptación al entorno y uso de productos de apoyo", area: "Productividad" },
 ];
 
+// Plantillas específicas para Asociación EM con niveles GAS pre-rellenados
+const EM_PREDEFINED_OBJECTIVES: { text: string; area: GoalArea; gasLevels: GasLevels }[] = [
+  {
+    text: "Mantener la destreza manual funcional",
+    area: "Cuidado de sí mismo",
+    gasLevels: { "-2": "Pérdida significativa de destreza que impide AVD básicas", "-1": "Disminución leve de destreza respecto al nivel inicial", "0": "Mantiene el nivel de destreza actual", "1": "Mejora leve en velocidad o precisión manipulativa", "2": "Mejora significativa que permite nuevas actividades" },
+  },
+  {
+    text: "Gestionar la fatiga en actividades de la vida diaria",
+    area: "Cuidado de sí mismo",
+    gasLevels: { "-2": "La fatiga impide realizar AVD básicas de forma autónoma", "-1": "Aumento de la fatiga que reduce la participación en alguna AVD", "0": "Mantiene las estrategias de gestión de la fatiga actuales", "1": "Aplica nuevas estrategias que aumentan su participación", "2": "Gestiona la fatiga de forma autónoma y amplía actividades" },
+  },
+  {
+    text: "Mejorar la autonomía en el autocuidado",
+    area: "Cuidado de sí mismo",
+    gasLevels: { "-2": "Necesita ayuda total en más de 2 actividades de autocuidado", "-1": "Ha perdido autonomía en alguna actividad de autocuidado", "0": "Mantiene el nivel actual de autonomía", "1": "Recupera autonomía en al menos una actividad", "2": "Realiza de forma independiente todas las actividades de autocuidado" },
+  },
+  {
+    text: "Mejorar el equilibrio y la movilidad funcional",
+    area: "Cuidado de sí mismo",
+    gasLevels: { "-2": "Aumento significativo de caídas o necesidad de ayuda para deambular", "-1": "Ligero empeoramiento del equilibrio o la marcha", "0": "Mantiene el nivel de equilibrio y movilidad actual", "1": "Mejora en equilibrio estático o dinámico medible en escalas", "2": "Mejora significativa: reduce ayudas técnicas o amplia distancias" },
+  },
+  {
+    text: "Favorecer la participación social y comunitaria",
+    area: "Ocio",
+    gasLevels: { "-2": "Aislamiento social completo, no sale del domicilio", "-1": "Reducción de actividades sociales respecto al nivel previo", "0": "Mantiene la frecuencia actual de participación social", "1": "Incorpora al menos una actividad social nueva", "2": "Participación social activa y autónoma en la comunidad" },
+  },
+  {
+    text: "Mejorar las funciones cognitivas aplicadas a la vida diaria",
+    area: "Cuidado de sí mismo",
+    gasLevels: { "-2": "Deterioro cognitivo que impide la planificación de actividades cotidianas", "-1": "Olvidos o dificultades atencionales que afectan a alguna actividad", "0": "Mantiene el rendimiento cognitivo funcional actual", "1": "Aplica estrategias compensatorias que mejoran su organización", "2": "Mejora cognitiva funcional que permite mayor independencia" },
+  },
+  {
+    text: "Adaptar el entorno domiciliario a las necesidades funcionales",
+    area: "Productividad",
+    gasLevels: { "-2": "El entorno supone un riesgo de seguridad evidente", "-1": "Existen barreras identificadas pero sin resolver", "0": "Se han implementado las adaptaciones prioritarias", "1": "El entorno está adaptado y el usuario lo utiliza correctamente", "2": "Entorno óptimo: adaptaciones integradas, sin barreras" },
+  },
+  {
+    text: "Mantener o mejorar la capacidad de gestión del hogar",
+    area: "Productividad",
+    gasLevels: { "-2": "Incapaz de realizar tareas domésticas básicas sin ayuda", "-1": "Ha dejado de realizar alguna tarea que antes hacía", "0": "Mantiene el nivel actual de gestión doméstica", "1": "Recupera alguna tarea doméstica o la realiza con menos ayuda", "2": "Gestiona el hogar de forma independiente con estrategias compensatorias" },
+  },
+];
+
 // ─── Main tab component ──────────────────────────────────────────────────────
 
 export function InterventionPlanTab({ patientId }: { patientId: string }) {
@@ -121,6 +165,7 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [gasSheetOpen, setGasSheetOpen] = useState(false);
+  const [gasReportOpen, setGasReportOpen] = useState(false);
 
   // State
   const [desiredImprovements, setDesiredImprovements] = useState("");
@@ -232,8 +277,8 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
     setGoals((prev) => prev.filter((_, idx) => idx !== i));
     setEditingGoalIdx(null);
   }
-  function addFromPredefined(obj: { text: string; area: GoalArea }) {
-    const newGoals = [...goals, { text: obj.text, area: obj.area, scope: "Con el paciente" as GoalScope, status: "En curso" as GoalStatus, specificGoals: [], startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "", gasLevels: null }];
+  function addFromPredefined(obj: { text: string; area: GoalArea; gasLevels?: GasLevels | null }) {
+    const newGoals = [...goals, { text: obj.text, area: obj.area, scope: "Con el paciente" as GoalScope, status: "En curso" as GoalStatus, specificGoals: [], startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "", gasLevels: obj.gasLevels ?? null }];
     setGoals(newGoals);
     setEditingGoalIdx(newGoals.length - 1);
     setShowPicker(false);
@@ -264,10 +309,16 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
         <h3 className="text-sm font-semibold">Plan de intervención</h3>
         <div className="flex gap-2">
           {gasEnabled && goals.filter((g) => g.id).length > 0 && (
-            <Button type="button" variant="outline" size="sm" className="h-7 px-3 text-xs" onClick={() => setGasSheetOpen(true)}>
-              <ClipboardCheck className="w-3.5 h-3.5 mr-1" />
-              Valorar objetivos (GAS)
-            </Button>
+            <>
+              <Button type="button" variant="outline" size="sm" className="h-7 px-3 text-xs" onClick={() => setGasReportOpen(true)}>
+                <FileDown className="w-3.5 h-3.5 mr-1" />
+                Informe GAS
+              </Button>
+              <Button type="button" variant="outline" size="sm" className="h-7 px-3 text-xs" onClick={() => setGasSheetOpen(true)}>
+                <ClipboardCheck className="w-3.5 h-3.5 mr-1" />
+                Valorar objetivos (GAS)
+              </Button>
+            </>
           )}
           {hasEdits && (
             <Button type="button" variant="default" size="sm" className="h-7 px-3 text-xs" disabled={saving} onClick={saveAll}>
@@ -457,7 +508,24 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
         {/* Predefined picker */}
         {showPicker && (
           <div className="border rounded-md p-3 space-y-1.5 bg-muted/30">
-            <p className="text-xs font-semibold text-muted-foreground mb-2">Selecciona un objetivo general:</p>
+            {gasEnabled && (
+              <>
+                <p className="text-xs font-semibold text-fuchsia-700 mb-2">Objetivos específicos EM (con escala GAS):</p>
+                {EM_PREDEFINED_OBJECTIVES.filter((o) => !usedTexts.has(o.text)).map((obj) => (
+                  <button key={obj.text} type="button" onClick={() => addFromPredefined(obj)}
+                    className="w-full text-left px-3 py-2 rounded-md hover:bg-fuchsia-50 text-sm flex items-center gap-2 border border-transparent hover:border-fuchsia-200 transition-colors">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: GOAL_AREA_COLORS[obj.area] }} />
+                    <span className="flex-1">{obj.text}</span>
+                    <span className="text-[10px] text-fuchsia-600 font-medium shrink-0">GAS</span>
+                  </button>
+                ))}
+                {EM_PREDEFINED_OBJECTIVES.filter((o) => !usedTexts.has(o.text)).length === 0 && (
+                  <p className="text-xs text-muted-foreground italic">Todos los objetivos EM ya están añadidos.</p>
+                )}
+                <hr className="my-2 border-border" />
+              </>
+            )}
+            <p className="text-xs font-semibold text-muted-foreground mb-2">Objetivos generales:</p>
             {PREDEFINED_OBJECTIVES.filter((o) => !usedTexts.has(o.text)).map((obj) => (
               <button key={obj.text} type="button" onClick={() => addFromPredefined(obj)}
                 className="w-full text-left px-3 py-2 rounded-md hover:bg-muted text-sm flex items-center gap-2 border border-transparent hover:border-border transition-colors">
@@ -467,7 +535,7 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
               </button>
             ))}
             {PREDEFINED_OBJECTIVES.filter((o) => !usedTexts.has(o.text)).length === 0 && (
-              <p className="text-xs text-muted-foreground italic">Todos los objetivos predefinidos ya están añadidos.</p>
+              <p className="text-xs text-muted-foreground italic">Todos los objetivos generales ya están añadidos.</p>
             )}
           </div>
         )}
@@ -475,12 +543,10 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
 
       {/* ─── GAS Sheet ─── */}
       {gasSheetOpen && (
-        <GasAssessmentSheet
-          patientId={patientId}
-          goals={goals.filter((g) => g.id)}
-          open={gasSheetOpen}
-          onOpenChange={setGasSheetOpen}
-        />
+        <GasAssessmentSheet patientId={patientId} goals={goals.filter((g) => g.id)} open={gasSheetOpen} onOpenChange={setGasSheetOpen} />
+      )}
+      {gasReportOpen && (
+        <GasReportSheet patient={patient} goals={goals.filter((g) => g.id)} assessments={gasAssessments ?? []} open={gasReportOpen} onOpenChange={setGasReportOpen} />
       )}
     </div>
   );
@@ -654,6 +720,180 @@ function GasAssessmentSheet({
               );
             })}
           </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+// ─── GAS Report Sheet (printable summary) ────────────────────────────────────
+
+function GasReportSheet({
+  patient,
+  goals,
+  assessments,
+  open,
+  onOpenChange,
+}: {
+  patient: any;
+  goals: Goal[];
+  assessments: GasAssessmentDTO[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const byGoal: Record<string, GasAssessmentDTO[]> = {};
+  for (const a of assessments) {
+    (byGoal[a.goalId] ??= []).push(a);
+  }
+
+  // Get unique dates sorted
+  const allDates = [...new Set(assessments.map((a) => a.date.slice(0, 10)))].sort();
+
+  function handlePrint() {
+    const el = document.getElementById("gas-report-content");
+    if (!el) return;
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Informe GAS — ${patient?.firstName ?? ""} ${patient?.lastName ?? ""}</title>
+<style>
+body{font-family:system-ui,sans-serif;padding:32px;color:#333;font-size:13px;max-width:800px;margin:0 auto}
+h1{font-size:18px;color:#1a5c58;margin-bottom:4px}
+h2{font-size:14px;color:#1a5c58;margin-top:20px;margin-bottom:8px;border-bottom:1px solid #ddd;padding-bottom:4px}
+.subtitle{color:#666;font-size:12px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:12px}
+th,td{border:1px solid #ddd;padding:6px 8px;text-align:center}
+th{background:#f5f5f5;font-weight:600}
+td.goal{text-align:left;font-weight:500}
+.score{font-weight:bold;padding:2px 6px;border-radius:4px;color:white;font-size:11px}
+.s-2{background:#dc2626}.s-1{background:#f97316}.s0{background:#6b7280}.s1{background:#22c55e}.s2{background:#059669}
+.note{font-style:italic;color:#666;font-size:11px;margin-top:2px}
+.footer{margin-top:24px;padding-top:12px;border-top:1px solid #ddd;font-size:11px;color:#999;text-align:center}
+@media print{body{padding:16px}button{display:none!important}}
+</style></head><body>${el.innerHTML}
+<div class="footer">DomusGes · Informe GAS · ${new Date().toLocaleDateString("es-ES")}</div>
+</body></html>`);
+    w.document.close();
+    w.print();
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="sm:max-w-2xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Informe de valoración GAS</SheetTitle>
+        </SheetHeader>
+
+        <div className="mt-3 mb-2 flex justify-end">
+          <Button size="sm" variant="outline" onClick={handlePrint}>
+            <FileDown className="w-3.5 h-3.5 mr-1.5" />
+            Imprimir / PDF
+          </Button>
+        </div>
+
+        <div id="gas-report-content" className="space-y-4">
+          <div>
+            <h1 style={{ fontSize: "18px", color: "#1a5c58", marginBottom: "4px" }}>
+              Informe de evolución GAS
+            </h1>
+            <p className="text-xs text-muted-foreground">
+              {patient?.firstName} {patient?.lastName} · {patient?.resource ?? ""} · Generado el {new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" })}
+            </p>
+          </div>
+
+          {assessments.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic py-4">No hay valoraciones GAS registradas para generar el informe.</p>
+          ) : (
+            <>
+              {/* Summary table */}
+              <div>
+                <h2 style={{ fontSize: "14px", color: "#1a5c58", marginTop: "16px", marginBottom: "8px", borderBottom: "1px solid #ddd", paddingBottom: "4px" }}>Resumen de puntuaciones</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse" style={{ borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        <th className="text-left border border-border bg-muted/50 px-2 py-1.5 font-semibold" style={{ minWidth: "200px" }}>Objetivo</th>
+                        {allDates.map((d) => (
+                          <th key={d} className="border border-border bg-muted/50 px-2 py-1.5 font-semibold text-center" style={{ minWidth: "70px" }}>
+                            {new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "2-digit" })}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {goals.map((goal, idx) => {
+                        const history = goal.id ? (byGoal[goal.id] ?? []) : [];
+                        const scoreByDate: Record<string, GasAssessmentDTO> = {};
+                        for (const a of history) scoreByDate[a.date.slice(0, 10)] = a;
+                        const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
+                        return (
+                          <tr key={goal.id ?? idx}>
+                            <td className="text-left border border-border px-2 py-1.5 font-medium" style={{ borderLeft: `3px solid ${areaColor}` }}>
+                              {idx + 1}. {goal.text}
+                            </td>
+                            {allDates.map((d) => {
+                              const a = scoreByDate[d];
+                              if (!a) return <td key={d} className="border border-border px-2 py-1 text-center text-muted-foreground">—</td>;
+                              return (
+                                <td key={d} className="border border-border px-2 py-1 text-center">
+                                  <span className="inline-block font-bold px-1.5 py-0.5 rounded text-white text-[11px]" style={{ backgroundColor: GAS_SCORE_COLORS[a.score] ?? "#6b7280" }}>
+                                    {a.score > 0 ? `+${a.score}` : a.score}
+                                  </span>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Detail per goal */}
+              <div>
+                <h2 style={{ fontSize: "14px", color: "#1a5c58", marginTop: "16px", marginBottom: "8px", borderBottom: "1px solid #ddd", paddingBottom: "4px" }}>Detalle por objetivo</h2>
+                {goals.map((goal, idx) => {
+                  const history = goal.id ? (byGoal[goal.id] ?? []) : [];
+                  if (history.length === 0) return null;
+                  const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
+                  const latest = history[history.length - 1];
+                  const first = history[0];
+                  const trend = latest && first && history.length > 1
+                    ? latest.score > first.score ? "↑ Mejora" : latest.score < first.score ? "↓ Empeoramiento" : "→ Estable"
+                    : null;
+                  return (
+                    <div key={goal.id} className="rounded-md border p-3 space-y-2 mb-3" style={{ borderLeftWidth: "3px", borderLeftColor: areaColor }}>
+                      <p className="text-sm font-medium">{idx + 1}. {goal.text}</p>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>{goal.area}</span>
+                        <span>·</span>
+                        <span>{history.length} valoración{history.length > 1 ? "es" : ""}</span>
+                        {trend && (
+                          <>
+                            <span>·</span>
+                            <span className={trend.startsWith("↑") ? "text-green-600 font-medium" : trend.startsWith("↓") ? "text-red-600 font-medium" : ""}>{trend}</span>
+                          </>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        {history.map((a) => (
+                          <div key={a.id} className="flex items-start gap-2 text-xs">
+                            <span className="text-muted-foreground tabular-nums shrink-0 w-20">
+                              {new Date(a.date).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                            </span>
+                            <span className="font-bold px-1.5 py-0.5 rounded text-white text-[10px] shrink-0" style={{ backgroundColor: GAS_SCORE_COLORS[a.score] ?? "#6b7280" }}>
+                              {a.score > 0 ? `+${a.score}` : a.score}
+                            </span>
+                            <span className="text-muted-foreground">{GAS_SCORE_LABELS[a.score]}</span>
+                            {a.notes && <span className="text-muted-foreground italic ml-1">— {a.notes}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       </SheetContent>
     </Sheet>
