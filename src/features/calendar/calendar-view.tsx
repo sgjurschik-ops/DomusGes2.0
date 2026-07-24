@@ -42,6 +42,7 @@ import {
   useMe,
 } from "@/hooks/api";
 import { useNav } from "@/store/nav";
+import { useCenter } from "@/store/center";
 import { toast } from "@/hooks/use-toast";
 import { Avatar, ResourceBadge } from "@/components/domain";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,8 @@ import {
   type SlotReservationUpdateInput,
   APPOINTMENT_TYPES,
   APPOINTMENT_STATUSES,
+  RESOURCES,
+  getResourceConfig,
 } from "@/lib/schemas";
 import type { AppointmentDTO, AppointmentStatus, SlotReservationDTO, ReservationCategoryDTO } from "@/types/domain";
 
@@ -352,6 +355,8 @@ export function CalendarView() {
 
   const { data: me } = useMe();
   const isAdmin = me?.userRole === "admin";
+  const { activeResource } = useCenter();
+  const activeResourceConfig = RESOURCES.find((r) => r.key === activeResource);
   const { data: professionals } = useProfessionals();
   const moveAppt = useMoveAppointment();
   const moveReservation = useMoveReservation();
@@ -599,6 +604,16 @@ export function CalendarView() {
               </Select>
             )}
           </div>
+        </div>
+
+        {/* Resource color legend */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          {RESOURCES.map((r) => (
+            <span key={r.key} className="inline-flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+              {r.label}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -904,7 +919,7 @@ function MonthView({
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ backgroundColor: a.patientColor }}
+                          style={{ backgroundColor: getResourceConfig(a.patientResource)?.color ?? a.patientColor }}
                         />
                         <span className={`font-semibold shrink-0 ${a.status === "cancelada" ? "line-through" : ""}`}>
                           {format(new Date(a.start), "HH:mm")}
@@ -1481,7 +1496,7 @@ function DayColumn({
                   left: laneStyle.left,
                   width: laneStyle.width,
                   zIndex: 6 + lane,
-                  borderLeft: `3px solid ${a.patientColor}`,
+                  borderLeft: `3px solid ${getResourceConfig(a.patientResource)?.color ?? a.patientColor}`,
                 }}
                 aria-label={`Cita de ${a.patientName} ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}, ${APPOINTMENT_STATUS_LABELS[a.status]}`}
               >
@@ -1501,7 +1516,7 @@ function DayColumn({
                   <p className={`text-[11px] font-medium leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
                     {a.patientName}
                   </p>
-                  {!compact && <p className="text-[11px] opacity-80 truncate">{a.type}</p>}
+                  {!compact && <p className="text-[11px] opacity-80 truncate">{a.type}{a.patientResource ? ` · ${a.patientResource}` : ""}</p>}
                 </div>
                 <ResizeHandle
                   position="bottom"
@@ -1623,7 +1638,15 @@ function AppointmentDetailDialogInner({
             <Avatar name={appt.patientName} color={appt.patientColor} size={36} />
             <div>
               <div className="text-base">{appt.patientName}</div>
-              <div className="text-xs text-muted-foreground font-normal">{appt.type}</div>
+              <div className="text-xs text-muted-foreground font-normal flex items-center gap-1.5">
+                {appt.type}
+                {appt.patientResource && (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getResourceConfig(appt.patientResource)?.color ?? "#888" }} />
+                    {appt.patientResource}
+                  </span>
+                )}
+              </div>
             </div>
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -1815,6 +1838,9 @@ function AppointmentFormDialog({
   const { data: me } = useMe();
   const isAdmin = me?.userRole === "admin";
   const { data: professionals } = useProfessionals();
+  const { activeResource } = useCenter();
+  const centerCfg = RESOURCES.find((r) => r.key === activeResource);
+  const defaultDur = centerCfg?.defaultDurationMin ?? 60;
 
   const schema = mode === "edit" ? appointmentUpdateSchema : appointmentCreateSchema;
 
@@ -1848,7 +1874,7 @@ function AppointmentFormDialog({
             therapistId: "",
             date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
             time: preset?.time ?? "10:00",
-            endTime: preset?.time ? addMinutesToTimeStr(preset.time, 60) : "11:00",
+            endTime: preset?.time ? addMinutesToTimeStr(preset.time, defaultDur) : addMinutesToTimeStr("10:00", defaultDur),
             type: "Sesión",
             notes: "",
           },
@@ -1874,7 +1900,7 @@ function AppointmentFormDialog({
         therapistId: "",
         date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
         time: preset?.time ?? "10:00",
-        endTime: preset?.time ? addMinutesToTimeStr(preset.time, 60) : "11:00",
+        endTime: preset?.time ? addMinutesToTimeStr(preset.time, defaultDur) : addMinutesToTimeStr("10:00", defaultDur),
         type: "Sesión",
         notes: "",
       });

@@ -13,15 +13,31 @@ export const PATIENT_STATUSES = ["Activo", "En seguimiento", "Alta", "Pausado"] 
 // basta con añadir una línea aquí — nada más del código depende de que
 // solo existan estos dos.
 export const RESOURCE_KEYS = ["Domicilio", "Asociación EM"] as const;
-export const RESOURCES: { key: (typeof RESOURCE_KEYS)[number]; label: string; billable: boolean; hasRoutePlanning: boolean }[] = [
-  { key: "Domicilio", label: "Domicilio", billable: true, hasRoutePlanning: true },
-  { key: "Asociación EM", label: "Asociación EM", billable: false, hasRoutePlanning: false },
+export interface ResourceConfig {
+  key: (typeof RESOURCE_KEYS)[number];
+  label: string;
+  billable: boolean;
+  hasRoutePlanning: boolean;
+  /** Color identificativo del centro en la agenda. */
+  color: string;
+  /** Duración por defecto (en minutos) de las citas de este centro. */
+  defaultDurationMin: number;
+  /** Tipos de cita disponibles para este centro (si difieren de los globales). */
+  appointmentTypes: readonly string[];
+}
+export const RESOURCES: ResourceConfig[] = [
+  { key: "Domicilio", label: "Domicilio", billable: true, hasRoutePlanning: true, color: "#2563eb", defaultDurationMin: 60, appointmentTypes: APPOINTMENT_TYPES },
+  { key: "Asociación EM", label: "Asociación EM", billable: false, hasRoutePlanning: false, color: "#7c3aed", defaultDurationMin: 45, appointmentTypes: APPOINTMENT_TYPES },
 ];
 export function isBillableResource(resource: string | null): boolean {
   // A patient with no resource assigned yet defaults to billable=true —
   // safer to flag it for review than to silently exclude it from billing.
   if (!resource) return true;
   return RESOURCES.find((r) => r.key === resource)?.billable ?? true;
+}
+export function getResourceConfig(resource: string | null): ResourceConfig | undefined {
+  if (!resource) return undefined;
+  return RESOURCES.find((r) => r.key === resource);
 }
 export const PROFESSIONAL_ROLES = [
   "Fisioterapeuta",

@@ -326,7 +326,7 @@ export function mapAssessment(a: AssessmentWithRels) {
 
 type AppointmentWithRels = Prisma.AppointmentGetPayload<{
   include: {
-    patient: { select: { firstName: true; lastName: true; color: true; address: true } };
+    patient: { select: { firstName: true; lastName: true; color: true; address: true; resource: true } };
     therapist: { select: { name: true } };
   };
 }>;
@@ -337,6 +337,7 @@ export function mapAppointment(a: AppointmentWithRels) {
     patientId: a.patientId,
     patientName: `${a.patient.firstName} ${a.patient.lastName}`,
     patientColor: a.patient.color,
+    patientResource: a.patient.resource,
     patientAddress: a.patient.address,
     therapistId: a.therapistId,
     therapistName: a.therapist.name,

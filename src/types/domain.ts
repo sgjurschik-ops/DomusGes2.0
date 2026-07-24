@@ -139,6 +139,7 @@ export interface AppointmentDTO {
   patientId: string;
   patientName: string;
   patientColor: string;
+  patientResource: string | null;
   patientAddress: string | null;
   therapistId: string;
   therapistName: string;

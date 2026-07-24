@@ -27,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       where: { id },
       data: { status: parsed.data.status },
       include: {
-        patient: { select: { firstName: true, lastName: true, color: true, address: true } },
+        patient: { select: { firstName: true, lastName: true, color: true, address: true, resource: true } },
         therapist: { select: { name: true } },
       },
     });
@@ -49,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       ...(parsed.data.durationMin !== undefined ? { durationMin: parsed.data.durationMin } : {}),
     },
     include: {
-      patient: { select: { firstName: true, lastName: true, color: true, address: true } },
+      patient: { select: { firstName: true, lastName: true, color: true, address: true, resource: true } },
       therapist: { select: { name: true } },
     },
   });
@@ -81,7 +81,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
       notes: d.notes || null,
     },
     include: {
-      patient: { select: { firstName: true, lastName: true, color: true, address: true } },
+      patient: { select: { firstName: true, lastName: true, color: true, address: true, resource: true } },
       therapist: { select: { name: true } },
     },
   });

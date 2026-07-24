@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   const rows = await db.appointment.findMany({
     where,
     include: {
-      patient: { select: { firstName: true, lastName: true, color: true, address: true } },
+      patient: { select: { firstName: true, lastName: true, color: true, address: true, resource: true } },
       therapist: { select: { name: true } },
     },
     orderBy: { start: "asc" },
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       notes: d.notes || null,
     },
     include: {
-      patient: { select: { firstName: true, lastName: true, color: true, address: true } },
+      patient: { select: { firstName: true, lastName: true, color: true, address: true, resource: true } },
       therapist: { select: { name: true } },
     },
   });
