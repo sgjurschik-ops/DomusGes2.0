@@ -52,6 +52,21 @@ import { InterventionPlanTab } from "./intervention-plan-tab";
 import { ClinicalNotes } from "@/components/clinical-notes";
 import { Mic, MicOff } from "lucide-react";
 
+/** Reduce a full Nominatim address to "Calle Nº, Ciudad" for display. */
+function shortenAddress(full: string): string {
+  const parts = full.split(",").map((p) => p.trim());
+  if (parts.length <= 2) return full;
+  // Nominatim format: number, street, barrio, zona, city, comarca, region, CP, country
+  // We want: street number, city  (e.g. "Calle Estafeta 25, Pamplona")
+  const num = parts[0];
+  const street = parts[1] ?? "";
+  // City is usually index 4 or 3 depending on depth
+  const city = parts[4] ?? parts[3] ?? parts[2] ?? "";
+  const isNum = /^\d/.test(num);
+  if (isNum && street) return `${street} ${num}, ${city}`;
+  return `${parts[0]}, ${city}`;
+}
+
 export function PatientDetailView() {
   const { selectedPatientId, navigate, back } = useNav();
   const { data: patient, isLoading } = usePatient(selectedPatientId);
@@ -180,10 +195,10 @@ export function PatientDetailView() {
                   <span className="text-muted-foreground">Teléfono:</span>
                   <span className="font-medium">{patient.phone ?? "—"}</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
+                <div className="flex items-start gap-1.5">
+                  <MapPin className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
                   <span className="text-muted-foreground">Dirección:</span>
-                  <span className="font-medium">{patient.address ?? "—"}</span>
+                  <span className="font-medium">{patient.address ? shortenAddress(patient.address) : "—"}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <User2 className="w-3 h-3 text-muted-foreground shrink-0" />
