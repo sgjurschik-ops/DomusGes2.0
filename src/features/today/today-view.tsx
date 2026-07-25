@@ -262,7 +262,7 @@ export function TodayView() {
       const popupEl = document.createElement("div");
       popupEl.innerHTML = `<p style="font-weight:600;font-size:13px;margin:0 0 2px;">${stop.name}</p><p style="font-size:11px;color:#6b7280;margin:0 0 4px;">${stop.address}</p>${legInfo ? `<p style="font-size:11px;color:#4A6D8C;margin:0;">${legInfo.km} km · ${legInfo.minutes} min</p>` : ""}`;
       const btn = document.createElement("button");
-      btn.textContent = "Ver paciente";
+      btn.textContent = "Ver usuario/a";
       btn.style.cssText = "margin-top:6px;padding:3px 10px;font-size:11px;background:#1a5c58;color:white;border:none;border-radius:6px;cursor:pointer;";
       const activeStop = activeStops.find((s) => s.id === stop.id);
       if (activeStop) btn.onclick = () => { selectPatient(activeStop.patientId); navigate("patient-detail"); };
@@ -367,7 +367,7 @@ export function TodayView() {
                 <Input value={patientSearch} onChange={(e) => setPatientSearch(e.target.value)}
                   onFocus={() => setShowPatientList(true)}
                   onBlur={() => setTimeout(() => setShowPatientList(false), 200)}
-                  placeholder="Buscar paciente para añadir…" className="h-8 text-sm pr-8" />
+                  placeholder="Buscar usuario/a para añadir…" className="h-8 text-sm pr-8" />
                 <Plus className="w-4 h-4 absolute right-2 top-2 text-muted-foreground pointer-events-none" />
               </div>
               {showPatientList && addablePatients.length > 0 && (
@@ -384,7 +384,7 @@ export function TodayView() {
                 </div>
               )}
               {showPatientList && addablePatients.length === 0 && (
-                <p className="text-xs text-muted-foreground italic px-1">No se encontraron pacientes con dirección.</p>
+                <p className="text-xs text-muted-foreground italic px-1">No se encontraron usuarios/as con dirección.</p>
               )}
             </div>
           )}
@@ -395,7 +395,7 @@ export function TodayView() {
           ) : activeStops.length === 0 ? (
             <Card className="p-6 text-center text-sm text-muted-foreground">
               <MapPin className="w-7 h-7 mx-auto mb-2 opacity-50" />
-              {tab === "today" ? "No hay citas programadas para hoy." : "Añade pacientes para crear tu ruta."}
+              {tab === "today" ? "No hay citas programadas para hoy." : "Añade usuarios/as para crear tu ruta."}
             </Card>
           ) : (
             <ol className="space-y-1.5">
@@ -462,7 +462,7 @@ export function TodayView() {
             <div className="text-xs text-orange-700 bg-orange-50 rounded-md px-3 py-2">
               <p className="font-medium">Dirección no encontrada:</p>
               {failedAddresses.map((name) => <p key={name} className="text-orange-600">· {name}</p>)}
-              <p className="mt-1 text-orange-500 italic">Revisa la dirección en la ficha del paciente.</p>
+              <p className="mt-1 text-orange-500 italic">Revisa la dirección en la ficha del/de la usuario/a.</p>
             </div>
           )}
         </div>

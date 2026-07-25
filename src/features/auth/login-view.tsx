@@ -53,7 +53,7 @@ export function LoginView() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">DomusGes</h1>
-            <p className="text-xs text-muted-foreground">Seguimiento de pacientes</p>
+            <p className="text-xs text-muted-foreground">Seguimiento de usuarios/as</p>
           </div>
         </div>
 

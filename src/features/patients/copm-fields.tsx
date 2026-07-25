@@ -343,7 +343,7 @@ function StepOneTwo({
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Identifique los problemas de desempeño ocupacional del paciente en cada área.
+        Identifique los problemas de desempeño ocupacional del/de la usuario/a en cada área.
         Califique la importancia de cada problema del 1 al 10.
       </p>
 

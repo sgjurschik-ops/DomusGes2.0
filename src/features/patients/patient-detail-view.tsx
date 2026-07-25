@@ -107,7 +107,7 @@ export function PatientDetailView() {
   const [evolutionView, setEvolutionView] = useState<"chart" | "table">("table");
 
   if (!selectedPatientId) {
-    return <p className="text-sm text-muted-foreground">Selecciona un paciente.</p>;
+    return <p className="text-sm text-muted-foreground">Selecciona un/a usuario/a.</p>;
   }
 
   if (isLoading || !patient) {
@@ -251,7 +251,7 @@ export function PatientDetailView() {
           {!patient.resource && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
               <p className="text-sm text-amber-900 flex-1">
-                Este paciente no tiene <strong>recurso</strong> asignado (Domicilio / Asociación EM). Es necesario para saber si sus sesiones se facturan.
+                Este/a usuario/a no tiene <strong>recurso</strong> asignado (Domicilio / Asociación EM). Es necesario para saber si sus sesiones se facturan.
               </p>
               <Select onValueChange={(v) => updatePatient.mutate(
                 { id: patient.id, data: { resource: v as any } },
@@ -291,7 +291,7 @@ export function PatientDetailView() {
 
           {isAdmin && (
             <Card className="p-6 text-center text-sm text-muted-foreground">
-              <p>Como administrador/a, no tienes acceso a la información clínica del paciente.</p>
+              <p>Como administrador/a, no tienes acceso a la información clínica del/de la usuario/a.</p>
               <p className="mt-1">Puedes gestionar citas desde la <button type="button" onClick={() => navigate("calendar")} className="text-primary hover:underline font-medium">Agenda</button>.</p>
             </Card>
           )}
@@ -354,7 +354,7 @@ export function PatientDetailView() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  Problemas detectados por el/la paciente
+                  Problemas detectados por el/la usuario/a
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -560,14 +560,14 @@ export function PatientDetailView() {
                 try {
                   await deletePatient.mutateAsync(patient.id);
                   toast({
-                    title: "Paciente eliminado",
+                    title: "Usuario/a eliminado/a",
                     description: `${patient.fullName} ha sido eliminado.`,
                   });
                   navigate("patients");
                 } catch {
                   toast({
                     title: "Error",
-                    description: "No se ha podido eliminar el paciente.",
+                    description: "No se ha podido eliminar el/la usuario/a.",
                     variant: "destructive",
                   });
                 }

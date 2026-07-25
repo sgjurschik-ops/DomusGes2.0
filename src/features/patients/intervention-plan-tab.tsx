@@ -32,6 +32,12 @@ const GOAL_AREA_COLORS: Record<GoalArea, string> = {
 
 const GOAL_SCOPES = ["Con el paciente", "Con la familia/entorno", "Coordinación profesional"] as const;
 type GoalScope = typeof GOAL_SCOPES[number];
+/** Display labels — the stored DB value stays "Con el paciente" for backward compat. */
+const SCOPE_DISPLAY: Record<GoalScope, string> = {
+  "Con el paciente": "Con el/la usuario/a",
+  "Con la familia/entorno": "Con la familia/entorno",
+  "Coordinación profesional": "Coordinación profesional",
+};
 const GOAL_SCOPE_COLORS: Record<GoalScope, string> = {
   "Con el paciente": "#4A6D8C",
   "Con la familia/entorno": "#8B6F5A",
@@ -392,7 +398,7 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
                       </Select>
                       <Select value={goal.scope ?? "Con el paciente"} onValueChange={(v) => updateGoal(i, { scope: v as GoalScope })}>
                         <SelectTrigger className="h-7 text-xs w-auto min-w-[140px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>{GOAL_SCOPES.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent>
+                        <SelectContent>{GOAL_SCOPES.map((s) => (<SelectItem key={s} value={s}>{SCOPE_DISPLAY[s]}</SelectItem>))}</SelectContent>
                       </Select>
                       <Select value={goal.status} onValueChange={(v) => updateGoal(i, { status: v as GoalStatus })}>
                         <SelectTrigger className={`h-7 text-xs w-auto min-w-[100px] ${GOAL_STATUS_STYLES[goal.status]}`}><SelectValue /></SelectTrigger>
@@ -403,7 +409,7 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
                     <>
                       <span className="text-[11px]" style={{ color: areaColor }}>{goal.area || "Sin asignar"}</span>
                       {goal.scope && goal.scope !== "Con el paciente" && (
-                        <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ color: GOAL_SCOPE_COLORS[goal.scope as GoalScope] ?? "#6b7280", backgroundColor: `${GOAL_SCOPE_COLORS[goal.scope as GoalScope] ?? "#6b7280"}18` }}>{goal.scope}</span>
+                        <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ color: GOAL_SCOPE_COLORS[goal.scope as GoalScope] ?? "#6b7280", backgroundColor: `${GOAL_SCOPE_COLORS[goal.scope as GoalScope] ?? "#6b7280"}18` }}>{SCOPE_DISPLAY[goal.scope as GoalScope] ?? goal.scope}</span>
                       )}
                       <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${GOAL_STATUS_STYLES[goal.status]}`}>{goal.status}</span>
                     </>

@@ -16,7 +16,7 @@ import { toast } from "@/hooks/use-toast";
 import { FileText, Download } from "lucide-react";
 
 const SECTION_OPTIONS: { key: "summary" | "visits" | "assessments"; label: string }[] = [
-  { key: "summary", label: "Resumen y datos del paciente" },
+  { key: "summary", label: "Resumen y datos del/de la usuario/a" },
   { key: "visits", label: "Historial de seguimientos" },
   { key: "assessments", label: "Evaluaciones y escalas" },
 ];

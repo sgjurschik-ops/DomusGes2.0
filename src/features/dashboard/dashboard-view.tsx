@@ -47,7 +47,7 @@ export function DashboardView() {
       {/* KPI cards */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          label="Pacientes activos"
+          label="Usuarios/as activos/as"
           value={isLoading ? null : data?.totals.activePatients ?? null}
           total={isLoading ? null : data?.totals.patients ?? null}
           icon={Users}
@@ -133,7 +133,7 @@ export function DashboardView() {
               <TrendingUp className="w-4 h-4 text-primary" />
               Por especialidad
             </CardTitle>
-            <CardDescription className="text-xs">Distribución de pacientes</CardDescription>
+            <CardDescription className="text-xs">Distribución de usuarios/as</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading || !data ? (
@@ -169,7 +169,7 @@ export function DashboardView() {
       {/* Status distribution */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Estado de pacientes</CardTitle>
+          <CardTitle className="text-base">Estado de usuarios/as</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading || !data ? (

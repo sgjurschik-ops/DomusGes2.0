@@ -111,19 +111,19 @@ export function NewPatientForm({ mode = "create" }: Props) {
           data: values,
         });
 
-        toast({ title: "Paciente actualizado", description: updated.fullName });
+        toast({ title: "Usuario/a actualizado/a", description: updated.fullName });
         selectPatient(updated.id);
         navigate("patient-detail");
         return;
       }
 
       const created = await create.mutateAsync(values);
-      toast({ title: "Paciente creado", description: created.fullName });
+      toast({ title: "Usuario/a creado/a", description: created.fullName });
       selectPatient(created.id);
       navigate("patient-detail");
     } catch (e: any) {
       toast({
-        title: isEdit ? "Error al actualizar paciente" : "Error al crear paciente",
+        title: isEdit ? "Error al actualizar usuario/a" : "Error al crear usuario/a",
         description: e?.body?.error === "VALIDATION" ? "Revisa los campos." : "Inténtalo de nuevo.",
         variant: "destructive",
       });
@@ -135,7 +135,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
   const isPending = create.isPending || update.isPending;
 
   if (isEdit && isLoadingPatient) {
-    return <p className="text-sm text-muted-foreground">Cargando datos del paciente…</p>;
+    return <p className="text-sm text-muted-foreground">Cargando datos del/de la usuario/a…</p>;
   }
 
   return (
@@ -152,10 +152,10 @@ export function NewPatientForm({ mode = "create" }: Props) {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-3">
               <Avatar name={`${firstName} ${lastName}`} size={32} />
-              {isEdit ? "Editar paciente" : "Datos personales"}
+              {isEdit ? "Editar usuario/a" : "Datos personales"}
             </CardTitle>
             <CardDescription>
-              {isEdit ? "Modifica los datos registrados del paciente." : "Información básica del paciente."}
+              {isEdit ? "Modifica los datos registrados del/de la usuario/a." : "Información básica del/de la usuario/a."}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid sm:grid-cols-2 gap-4">
@@ -314,7 +314,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
           <Button type="button" variant="outline" onClick={back}>Cancelar</Button>
           <Button type="submit" disabled={isPending}>
             <Save className="w-4 h-4 mr-1.5" />
-            {isPending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear paciente"}
+            {isPending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear usuario/a"}
           </Button>
         </div>
       </form>

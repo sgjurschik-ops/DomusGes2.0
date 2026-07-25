@@ -1689,7 +1689,7 @@ function AppointmentDetailDialogInner({
               navigate("patient-detail");
             }}
           >
-            Ver paciente
+            Ver usuario/a
           </Button>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
@@ -1949,8 +1949,8 @@ function AppointmentFormDialog({
                   return (
                     <div className="space-y-1.5">
                       <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger aria-label="Paciente">
-                          <SelectValue placeholder="Selecciona paciente" />
+                        <SelectTrigger aria-label="Usuario/a">
+                          <SelectValue placeholder="Selecciona usuario/a" />
                         </SelectTrigger>
                         <SelectContent>
                           {(patients ?? []).map((p) => (

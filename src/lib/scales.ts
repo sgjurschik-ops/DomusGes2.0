@@ -538,7 +538,7 @@ export const MFIS: ScaleDefinition = {
   id: "MFIS",
   name: "MFIS",
   description:
-    "Escala Modificada de Impacto de Fatiga — 21 ítems (0=Nunca a 4=Casi siempre) sobre cómo la fatiga ha afectado al paciente en las últimas 4 semanas, con subescalas Cognitiva, Física y Psicosocial.",
+    "Escala Modificada de Impacto de Fatiga — 21 ítems (0=Nunca a 4=Casi siempre) sobre cómo la fatiga ha afectado al/a la usuario/a en las últimas 4 semanas, con subescalas Cognitiva, Física y Psicosocial.",
   items: MFIS_ITEMS,
   minScore: 0,
   maxScore: 84,

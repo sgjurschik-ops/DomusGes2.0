@@ -165,7 +165,7 @@ export function BillingView() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Fecha</TableHead>
-                  <TableHead>Paciente</TableHead>
+                  <TableHead>Usuario/a</TableHead>
                   <TableHead>Especialidad</TableHead>
                   <TableHead>Terapeuta</TableHead>
                   <TableHead>Tipo</TableHead>

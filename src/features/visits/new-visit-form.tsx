@@ -315,7 +315,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
                 render={({ field }) => (
                   <RichTextarea
                     rows={10}
-                    placeholder="Describe la sesión: hallazgos, técnicas aplicadas, respuesta del paciente, plan para el próximo seguimiento…"
+                    placeholder="Describe la sesión: hallazgos, técnicas aplicadas, respuesta del/de la usuario/a, plan para el próximo seguimiento…"
                     value={field.value ?? ""}
                     onChange={field.onChange}
                   />
@@ -435,7 +435,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
                     </label>
                   ))}
                 </div>
-                <p className="text-[10px] text-muted-foreground italic">Marca las tareas que el paciente ha completado.</p>
+                <p className="text-[10px] text-muted-foreground italic">Marca las tareas que el/la usuario/a ha completado.</p>
               </div>
             )}
 

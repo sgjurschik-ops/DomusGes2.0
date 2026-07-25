@@ -13,9 +13,9 @@ import { Plus, Clock, Activity } from "lucide-react";
 const VIEW_TITLES: Record<string, string> = {
   dashboard: "Inicio",
   today: "Ruta de hoy",
-  patients: "Pacientes",
-  "patient-detail": "Paciente",
-  "new-patient": "Nuevo paciente",
+  patients: "Usuarios/as",
+  "patient-detail": "Usuario/a",
+  "new-patient": "Nuevo/a usuario/a",
   calendar: "Agenda",
   equipo: "Equipo",
   reports: "Informes",
@@ -137,7 +137,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <h1 className="text-lg font-semibold text-foreground flex-1 truncate">{title}</h1>
             {showNewPatient && (
               <Button size="sm" onClick={() => navigate("new-patient")}>
-                <Plus className="w-4 h-4 mr-1" /> Nuevo paciente
+                <Plus className="w-4 h-4 mr-1" /> Nuevo/a usuario/a
               </Button>
             )}
           </div>

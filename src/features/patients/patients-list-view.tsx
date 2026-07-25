@@ -104,7 +104,7 @@ export function PatientsListView() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="pl-9"
-            aria-label="Buscar pacientes"
+            aria-label="Buscar usuarios/as"
           />
         </div>
         <Select value={specialty} onValueChange={(v) => setSpecialty(v as typeof specialty)}>
@@ -171,14 +171,14 @@ export function PatientsListView() {
       ) : filtered.length === 0 ? (
         <Card className="p-12 text-center">
           <Users className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-sm font-medium text-foreground mb-1">No hay pacientes</p>
+          <p className="text-sm font-medium text-foreground mb-1">No hay usuarios/as</p>
           <p className="text-xs text-muted-foreground mb-4">
             {q || specialty !== "Todas" || status !== "Todos" || resource !== "Todos"
               ? "Prueba a cambiar los filtros de búsqueda."
-              : "Añade tu primer paciente para empezar."}
+              : "Añade tu primer usuario/a para empezar."}
           </p>
           <Button size="sm" onClick={() => navigate("new-patient")}>
-            <Plus className="w-4 h-4 mr-1.5" /> Nuevo paciente
+            <Plus className="w-4 h-4 mr-1.5" /> Nuevo/a usuario/a
           </Button>
         </Card>
       ) : (
@@ -188,7 +188,7 @@ export function PatientsListView() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                  <th className="text-left font-medium px-4 py-2.5">Paciente</th>
+                  <th className="text-left font-medium px-4 py-2.5">Usuario/a</th>
                   <th className="text-left font-medium px-4 py-2.5 w-20">Edad</th>
                   <th className="text-left font-medium px-4 py-2.5 w-40">Última visita</th>
                   <th className="text-left font-medium px-4 py-2.5 w-40">Próxima cita</th>

@@ -8,7 +8,7 @@ import { z } from "zod";
 export const SPECIALTIES = ["Fisioterapia", "Psicología", "T. Ocupacional"] as const;
 export const PATIENT_STATUSES = ["Activo", "En seguimiento", "Alta", "Pausado"] as const;
 
-// Recurso/centro de procedencia del paciente. Extensible a propósito: para
+// Recurso/centro de procedencia del/de la usuario/a. Extensible a propósito: para
 // añadir un nuevo recurso en el futuro (otra asociación, una residencia…)
 // basta con añadir una línea aquí — nada más del código depende de que
 // solo existan estos dos.

@@ -10,10 +10,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "DomusGes — Seguimiento de pacientes",
+  title: "DomusGes — Seguimiento de usuarios/as",
   description:
-    "Aplicación de seguimiento de pacientes para terapia ocupacional, fisioterapia y psicología domiciliaria.",
-  keywords: ["DomusGes", "terapia ocupacional", "fisioterapia", "psicología", "seguimiento pacientes"],
+    "Aplicación de seguimiento de usuarios/as para terapia ocupacional, fisioterapia y psicología domiciliaria.",
+  keywords: ["DomusGes", "terapia ocupacional", "fisioterapia", "psicología", "seguimiento usuarios"],
   authors: [{ name: "DomusGes" }],
 };
 

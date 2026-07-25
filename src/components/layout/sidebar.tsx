@@ -31,7 +31,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { view: "dashboard", label: "Inicio", icon: LayoutDashboard },
   { view: "today", label: "Ruta de hoy", icon: MapPin, roles: ["admin", "therapist"] },
-  { view: "patients", label: "Pacientes", icon: Users },
+  { view: "patients", label: "Usuarios/as", icon: Users },
   { view: "calendar", label: "Agenda", icon: CalendarDays },
   { view: "reports", label: "Informes", icon: FileText, roles: ["admin", "therapist"] },
   { view: "equipo", label: "Equipo", icon: ClipboardList },

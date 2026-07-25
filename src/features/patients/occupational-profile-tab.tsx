@@ -662,7 +662,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
         {isEditing("problems") ? (
           <>
             <Field label="Problemas detectados por el/la usuario/a">
-              <RichTextarea rows={4} value={profile.problemsUser ?? ""} onChange={(v) => update("problemsUser", v)} placeholder="Problemas que el/la paciente identifica como principales..." />
+              <RichTextarea rows={4} value={profile.problemsUser ?? ""} onChange={(v) => update("problemsUser", v)} placeholder="Problemas que el/la usuario/a identifica como principales..." />
             </Field>
             <Field label="Problemas detectados por el/la profesional">
               <RichTextarea rows={4} value={profile.problemsProfessional ?? ""} onChange={(v) => update("problemsProfessional", v)} placeholder="Problemas identificados por el/la terapeuta durante la evaluación..." />

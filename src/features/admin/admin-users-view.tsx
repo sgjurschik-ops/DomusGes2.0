@@ -605,8 +605,8 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
                 <div className="grid gap-2">
                   {([
                     { value: "admin", label: "Administrador", icon: "🛡️", desc: "Gestiona usuarios, datos de contacto y facturación. Sin acceso a datos clínicos." },
-                    { value: "therapist", label: "Terapeuta", icon: "🩺", desc: "Acceso clínico completo a sus pacientes. Puede ver (no editar) los de otros terapeutas." },
-                    { value: "guest", label: "Invitado", icon: "👤", desc: "Solo ve y edita sus propios pacientes. Ideal para probar la aplicación." },
+                    { value: "therapist", label: "Terapeuta", icon: "🩺", desc: "Acceso clínico completo a sus usuarios/as. Puede ver (no editar) los de otros terapeutas." },
+                    { value: "guest", label: "Invitado", icon: "👤", desc: "Solo ve y edita sus propios usuarios/as. Ideal para probar la aplicación." },
                   ] as const).map((opt) => (
                     <label
                       key={opt.value}
@@ -789,8 +789,8 @@ function EditUserDialog({
                 <div className="grid gap-2">
                   {([
                     { value: "admin", label: "Administrador", icon: "🛡️", desc: "Gestiona usuarios, datos de contacto y facturación. Sin acceso a datos clínicos." },
-                    { value: "therapist", label: "Terapeuta", icon: "🩺", desc: "Acceso clínico completo a sus pacientes. Puede ver (no editar) los de otros terapeutas." },
-                    { value: "guest", label: "Invitado", icon: "👤", desc: "Solo ve y edita sus propios pacientes. Ideal para probar la aplicación." },
+                    { value: "therapist", label: "Terapeuta", icon: "🩺", desc: "Acceso clínico completo a sus usuarios/as. Puede ver (no editar) los de otros terapeutas." },
+                    { value: "guest", label: "Invitado", icon: "👤", desc: "Solo ve y edita sus propios usuarios/as. Ideal para probar la aplicación." },
                   ] as const).map((opt) => (
                     <label
                       key={opt.value}

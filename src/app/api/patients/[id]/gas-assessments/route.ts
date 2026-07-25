@@ -74,7 +74,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     for (const entry of entries) {
       if (!validIds.has(entry.goalId)) {
         return NextResponse.json(
-          { error: "INVALID_GOAL", message: `El objetivo ${entry.goalId} no pertenece a este paciente.` },
+          { error: "INVALID_GOAL", message: `El objetivo ${entry.goalId} no pertenece a este/a usuario/a.` },
           { status: 400 },
         );
       }

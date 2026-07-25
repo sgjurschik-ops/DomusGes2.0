@@ -105,7 +105,7 @@ export function ReportsView() {
       {/* KPI cards */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
         <KpiCard
-          label="Pacientes activos"
+          label="Usuarios/as activos/as"
           icon={Users}
           value={isLoading ? null : derived.activePatients}
           hint="Total en seguimiento activo"
@@ -117,10 +117,10 @@ export function ReportsView() {
           hint="Sesiones registradas"
         />
         <KpiCard
-          label="Media seguimientos / paciente"
+          label="Media seguimientos / usuario/a"
           icon={TrendingUp}
           value={isLoading ? null : derived.avgVisits.toFixed(1)}
-          hint="Sobre pacientes con actividad"
+          hint="Sobre usuarios/as con actividad"
         />
       </div>
 
@@ -177,7 +177,7 @@ export function ReportsView() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <PieIcon className="w-4 h-4 text-primary" />
-              Pacientes por estado
+              Usuarios/as por estado
             </CardTitle>
             <CardDescription className="text-xs">Distribución actual</CardDescription>
           </CardHeader>
@@ -185,7 +185,7 @@ export function ReportsView() {
             {isLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : derived.byStatus.length === 0 ? (
-              <EmptyChart label="No hay pacientes registrados" />
+              <EmptyChart label="No hay usuarios/as registrados/as" />
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
@@ -203,7 +203,7 @@ export function ReportsView() {
                       <Cell key={s.label} fill={STATUS_COLORS[s.label]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number | string, n: string) => [`${v} pacientes`, n]} />
+                  <Tooltip formatter={(v: number | string, n: string) => [`${v} usuarios/as`, n]} />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -217,10 +217,10 @@ export function ReportsView() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Trophy className="w-4 h-4 text-primary" />
-            Top 10 pacientes por número de seguimientos
+            Top 10 usuarios/as por número de seguimientos
           </CardTitle>
           <CardDescription className="text-xs">
-            Histórico acumulado por paciente
+            Histórico acumulado por usuario/a
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -233,9 +233,9 @@ export function ReportsView() {
           ) : derived.top.length === 0 ? (
             <div className="p-10 text-center">
               <Users className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-              <p className="text-sm font-medium text-foreground mb-1">Sin pacientes</p>
+              <p className="text-sm font-medium text-foreground mb-1">Sin usuarios/as</p>
               <p className="text-xs text-muted-foreground">
-                Aún no hay pacientes para mostrar.
+                Aún no hay usuarios/as para mostrar.
               </p>
             </div>
           ) : (
@@ -243,7 +243,7 @@ export function ReportsView() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10 text-right">#</TableHead>
-                  <TableHead>Paciente</TableHead>
+                  <TableHead>Usuario/a</TableHead>
                   <TableHead>Especialidad</TableHead>
                   <TableHead className="text-right">Seguimientos</TableHead>
                   <TableHead>Último seguimiento</TableHead>
