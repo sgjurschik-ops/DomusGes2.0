@@ -54,9 +54,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
-  // Only admin can change therapist assignments
+  // Any authenticated professional can change therapist assignments (not just admin)
   const therapistUpdate =
-    prof.userRole === "admin" && Array.isArray(body.therapistIds)
+    Array.isArray(body.therapistIds)
       ? { set: body.therapistIds.map((tid: string) => ({ id: tid })) }
       : undefined;
 
