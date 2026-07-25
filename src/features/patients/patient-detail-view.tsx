@@ -29,12 +29,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { assessmentCreateSchema, type AssessmentCreateInput, STRUCTURED_SCALES, QUALITATIVE_SCALES, ASSESSMENT_CATEGORIES, RESOURCE_KEYS } from "@/lib/schemas";
+import { assessmentCreateSchema, type AssessmentCreateInput, STRUCTURED_SCALES, QUALITATIVE_SCALES, ASSESSMENT_CATEGORIES, RESOURCE_KEYS, SCALE_GROUPS } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { formatScaleScore, isScaleComplete, STRUCTURED_SCALE_DEFINITIONS } from "@/lib/scales";
+import { formatScaleScore, isScaleComplete, STRUCTURED_SCALE_DEFINITIONS, computeScaleSubscales } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { CopmFields, formatCopmScore } from "./copm-fields";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
@@ -280,7 +280,7 @@ export function PatientDetailView() {
               </button>
               <button type="button" onClick={() => setActiveTab("assessments")} className="text-left">
                 <KpiChip icon={Activity} color="purple" label="Última evaluación"
-                  value={assessments && assessments.length > 0 ? `${assessments[0].scale} · ${assessments[0].score}` : "Sin registrar"} />
+                  value={assessments && assessments.length > 0 ? `${assessments[0].scale} · ${formatDate(assessments[0].date)}` : "Sin registrar"} />
               </button>
               <button type="button" onClick={() => setActiveTab("occupational-profile")} className="text-left">
                 <KpiChip icon={ListChecks} color="yellow" label="Perfil ocupacional"
@@ -326,19 +326,106 @@ export function PatientDetailView() {
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Últimas evaluaciones</CardTitle>
+                  <CardTitle className="text-sm flex items-center justify-between">
+                    Últimas evaluaciones
+                    <button type="button" className="text-xs font-normal text-primary hover:underline" onClick={() => setActiveTab("assessments")}>
+                      Ver todas →
+                    </button>
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {assessments && assessments.length > 0 ? (
-                    <ul className="space-y-1.5">
-                      {assessments.slice(0, 4).map((a) => (
-                        <li key={a.id} className="flex items-center justify-between text-sm">
-                          <span>{a.scale}</span>
-                          <span className="font-mono">{a.score}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
+                  {assessments && assessments.length > 0 ? (() => {
+                    const latestByScale = new Map<string, typeof assessments[0]>();
+                    const prevByScale = new Map<string, typeof assessments[0]>();
+                    for (const a of [...assessments].sort((x, y) => y.date.localeCompare(x.date))) {
+                      if (!latestByScale.has(a.scale)) latestByScale.set(a.scale, a);
+                      else if (!prevByScale.has(a.scale)) prevByScale.set(a.scale, a);
+                    }
+                    const activeGroups = SCALE_GROUPS
+                      .map((g) => ({ ...g, items: g.scales.map((s) => latestByScale.get(s)).filter(Boolean) as typeof assessments }))
+                      .filter((g) => g.items.length > 0);
+                    const groupColors: Record<string, string> = {
+                      "AVD": "#16a34a", "Desempeño ocupacional": "#2563eb", "Fuerza": "#2563eb",
+                      "Destreza": "#2563eb", "Sensibilidad": "#d97706", "Movilidad": "#16a34a", "Fatiga": "#d97706",
+                    };
+                    const isQualitative = (scale: string) => (QUALITATIVE_SCALES as readonly string[]).includes(scale);
+                    function parsePrimaryScore(score: string): number | null {
+                      const n = parseFloat(score.replace(",", ".").replace(/[^\d.-]/g, ""));
+                      return isNaN(n) ? null : n;
+                    }
+                    return (
+                      <div className="space-y-4">
+                        {activeGroups.map((group) => (
+                          <div key={group.label}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-[11px] font-medium text-muted-foreground">{group.label}</span>
+                              <div className="flex-1 h-px bg-border" />
+                            </div>
+                            <div className="space-y-1">
+                              {group.items.map((a) => {
+                                const dot = groupColors[group.label] ?? "#6b7280";
+                                const qual = isQualitative(a.scale);
+                                const prev = prevByScale.get(a.scale);
+                                let trendEl: React.ReactNode = null;
+                                if (!qual && prev) {
+                                  const cur = parsePrimaryScore(a.score);
+                                  const old = parsePrimaryScore(prev.score);
+                                  const lowerBetter = ["TUG", "9HPT", "Minnesota"].includes(a.scale);
+                                  if (cur !== null && old !== null && cur !== old) {
+                                    const improved = lowerBetter ? cur < old : cur > old;
+                                    trendEl = improved ? (
+                                      <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300 shrink-0">
+                                        <ArrowUp className="w-2.5 h-2.5" /> mejora
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300 shrink-0">
+                                        <ArrowDown className="w-2.5 h-2.5" /> empeora
+                                      </span>
+                                    );
+                                  } else if (cur !== null && old !== null) {
+                                    trendEl = (
+                                      <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0">
+                                        <Minus className="w-2.5 h-2.5" /> estable
+                                      </span>
+                                    );
+                                  }
+                                }
+                                const subscales = (a.scale as string) === "MFIS" && a.itemScores
+                                  ? computeScaleSubscales("MFIS", a.itemScores)
+                                  : null;
+                                return (
+                                  <div key={a.id}>
+                                    <div className="flex items-start gap-2 py-1">
+                                      <span className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: dot }} />
+                                      <span className="text-sm font-medium w-28 shrink-0">{a.scale}</span>
+                                      {qual ? (
+                                        <span className="text-xs text-muted-foreground leading-relaxed flex-1 line-clamp-2">{a.notes ?? a.score}</span>
+                                      ) : (
+                                        <span className="text-sm font-mono flex-1 leading-snug">{a.score}</span>
+                                      )}
+                                      <div className="flex flex-col items-end gap-1 shrink-0">
+                                        {trendEl}
+                                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">{formatDate(a.date)}</span>
+                                      </div>
+                                    </div>
+                                    {subscales && (
+                                      <div className="flex gap-1.5 flex-wrap ml-4 mb-1">
+                                        {subscales.map((s) => (
+                                          <span key={s.title} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                            {s.title}: {s.total}/{s.maxScore}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })() : (
                     <p className="text-sm text-muted-foreground">Sin evaluaciones registradas.</p>
                   )}
                 </CardContent>
