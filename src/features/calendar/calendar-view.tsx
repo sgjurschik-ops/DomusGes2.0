@@ -101,7 +101,7 @@ type ViewMode = "month" | "week" | "day";
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const HOUR_START = 7;
 const HOUR_END = 20;
-const HOUR_PX = 40; // height of one hour row in week/day view (compact)
+const HOUR_PX = 64; // height of one hour row in week/day view
 const SNAP_MIN = 15; // drag-and-drop snaps to 15-minute increments
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -512,108 +512,84 @@ export function CalendarView() {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h2 className="text-lg font-semibold capitalize">{title}</h2>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => openCreateAppt()}>
-              <Plus className="w-4 h-4 mr-1" />
-              Nueva cita
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => openCreateReservation()}>
-              <Lock className="w-4 h-4 mr-1" />
-              Reserva de espacio
-            </Button>
-          </div>
+    <div className="space-y-2">
+      {/* Toolbar — single compact row */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Title */}
+        <h2 className="text-sm font-semibold capitalize shrink-0">{title}</h2>
+
+        {/* Nav */}
+        <div className="flex items-center gap-1 shrink-0">
+          <Popover open={miniCalOpen} onOpenChange={setMiniCalOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" className="h-7 w-7" aria-label="Abrir calendario">
+                <CalendarIcon className="w-3.5 h-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={cursor}
+                onSelect={(d) => { if (d) { setCursor(d); setMiniCalOpen(false); } }}
+                locale={es}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => navigate("prev")} aria-label="Anterior">
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </Button>
+          <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => navigate("today")}>Hoy</Button>
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => navigate("next")} aria-label="Siguiente">
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
         </div>
 
-        <div className="flex items-center justify-between gap-2 flex-wrap pb-3 border-b">
-          <div className="flex items-center gap-1.5">
-            <Popover open={miniCalOpen} onOpenChange={setMiniCalOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-7 w-7"
-                  aria-label="Abrir calendario"
-                >
-                  <CalendarIcon className="w-4 h-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={cursor}
-                  onSelect={(d) => {
-                    if (d) {
-                      setCursor(d);
-                      setMiniCalOpen(false);
-                    }
-                  }}
-                  locale={es}
-                />
-              </PopoverContent>
-            </Popover>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => navigate("prev")}
-              aria-label="Anterior"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button variant="outline" size="sm" className="h-7" onClick={() => navigate("today")}>
-              Hoy
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => navigate("next")}
-              aria-label="Siguiente"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
+        {/* View tabs */}
+        <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
+          <TabsList className="h-7">
+            <TabsTrigger value="month" className="text-xs px-2 h-6">Mes</TabsTrigger>
+            <TabsTrigger value="week" className="text-xs px-2 h-6">Semana</TabsTrigger>
+            <TabsTrigger value="day" className="text-xs px-2 h-6">Día</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-          <div className="flex items-center gap-2">
-            <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
-              <TabsList>
-                <TabsTrigger value="month">Mes</TabsTrigger>
-                <TabsTrigger value="week">Semana</TabsTrigger>
-                <TabsTrigger value="day">Día</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            {isAdmin && (
-              <Select value={filterTherapistId} onValueChange={setFilterTherapistId}>
-                <SelectTrigger aria-label="Filtrar por terapeuta" className="w-[200px] h-8 text-muted-foreground">
-                  <SelectValue placeholder="Todos los terapeutas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los terapeutas</SelectItem>
-                  {(professionals ?? []).filter((p) => p.isActive).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        </div>
-
-        {/* Resource color legend */}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        {/* Resource legend */}
+        <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
           {RESOURCES.map((r) => (
-            <span key={r.key} className="inline-flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+            <span key={r.key} className="inline-flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
               {r.label}
             </span>
           ))}
+        </div>
+
+        {/* Admin therapist filter — pushed to the right */}
+        {isAdmin && (
+          <div className="ml-auto">
+            <Select value={filterTherapistId} onValueChange={setFilterTherapistId}>
+              <SelectTrigger aria-label="Filtrar por terapeuta" className="w-[180px] h-7 text-xs text-muted-foreground">
+                <SelectValue placeholder="Todos los terapeutas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los terapeutas</SelectItem>
+                {(professionals ?? []).filter((p) => p.isActive).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* New appointment buttons */}
+        <div className={`flex items-center gap-1.5 shrink-0 ${isAdmin ? "" : "ml-auto"}`}>
+          <Button size="sm" className="h-7 text-xs px-2.5" onClick={() => openCreateAppt()}>
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            Nueva cita
+          </Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs px-2.5" onClick={() => openCreateReservation()}>
+            <Lock className="w-3.5 h-3.5 mr-1" />
+            Reserva
+          </Button>
         </div>
       </div>
 
