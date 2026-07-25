@@ -13,6 +13,7 @@ export function ClinicalNotes({ html, className, lineClamp }: { html: string; cl
   return (
     <div
       className={`text-sm prose prose-sm max-w-none ${lineClamp ? `line-clamp-${lineClamp}` : ""} ${className ?? ""}`}
+      style={{ fontSize: "0.875rem", lineHeight: "1.5" }}
       dangerouslySetInnerHTML={{ __html: rendered }}
     />
   );

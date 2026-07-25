@@ -25,6 +25,44 @@ export function RichTextarea({ value, onChange, rows = 3, placeholder }: RichTex
     }
   }, [value, focused]);
 
+  function handlePaste(e: React.ClipboardEvent<HTMLDivElement>) {
+    e.preventDefault();
+    // Get plain text or clean HTML — strip all external styles
+    const html = e.clipboardData.getData("text/html");
+    const text = e.clipboardData.getData("text/plain");
+
+    let clean = "";
+    if (html) {
+      // Parse and strip everything except structural bold/italic/underline/br/p
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      // Remove all style attributes and unwanted tags recursively
+      function cleanNode(node: Element) {
+        node.removeAttribute("style");
+        node.removeAttribute("class");
+        node.removeAttribute("id");
+        node.removeAttribute("color");
+        node.removeAttribute("face");
+        node.removeAttribute("size");
+        Array.from(node.children).forEach(cleanNode);
+      }
+      cleanNode(tmp);
+      // Replace spans/divs/fonts that carry no semantic meaning with their text content
+      tmp.querySelectorAll("span, font, h1, h2, h3, h4, h5, h6").forEach((el) => {
+        const text = el.innerHTML;
+        el.replaceWith(document.createRange().createContextualFragment(text));
+      });
+      clean = tmp.innerHTML;
+    } else {
+      // Plain text: convert newlines to <br>
+      clean = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+    }
+
+    // Insert at cursor position
+    document.execCommand("insertHTML", false, clean);
+    if (ref.current) onChange(ref.current.innerHTML);
+  }
+
   function handleFormat(cmd: "bold" | "italic" | "underline") {
     document.execCommand(cmd, false);
     ref.current?.focus();
@@ -82,6 +120,7 @@ export function RichTextarea({ value, onChange, rows = 3, placeholder }: RichTex
         onFocus={() => setFocused(true)}
         onBlur={() => { setFocused(false); if (ref.current) onChange(ref.current.innerHTML); }}
         onInput={() => { if (ref.current) onChange(ref.current.innerHTML); }}
+        onPaste={handlePaste}
       />
     </div>
   );
