@@ -13,6 +13,7 @@ export const PATIENT_STATUSES = ["Activo", "En seguimiento", "Alta", "Pausado"] 
 // basta con añadir una línea aquí — nada más del código depende de que
 // solo existan estos dos.
 export const RESOURCE_KEYS = ["Domicilio", "Asociación EM"] as const;
+export const APPOINTMENT_TYPES = ["Sesión", "Valoración", "Seguimiento", "Coordinación"] as const;
 export interface ResourceConfig {
   key: (typeof RESOURCE_KEYS)[number];
   label: string;
@@ -52,7 +53,6 @@ export const PROFESSIONAL_ROLES = [
   "Administrador",
   "Otro",
 ] as const;
-export const APPOINTMENT_TYPES = ["Sesión", "Valoración", "Seguimiento", "Coordinación"] as const;
 export const APPOINTMENT_STATUSES = [
   "programada",
   "completada",
