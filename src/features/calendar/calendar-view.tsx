@@ -42,7 +42,6 @@ import {
   useMe,
 } from "@/hooks/api";
 import { useNav } from "@/store/nav";
-import { useCenter } from "@/store/center";
 import { toast } from "@/hooks/use-toast";
 import { Avatar, ResourceBadge } from "@/components/domain";
 import { Button } from "@/components/ui/button";
@@ -92,8 +91,6 @@ import {
   type SlotReservationUpdateInput,
   APPOINTMENT_TYPES,
   APPOINTMENT_STATUSES,
-  RESOURCES,
-  getResourceConfig,
 } from "@/lib/schemas";
 import type { AppointmentDTO, AppointmentStatus, SlotReservationDTO, ReservationCategoryDTO } from "@/types/domain";
 
@@ -101,7 +98,7 @@ type ViewMode = "month" | "week" | "day";
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const HOUR_START = 7;
 const HOUR_END = 20;
-const HOUR_PX = 64; // height of one hour row in week/day view
+const HOUR_PX = 40; // height of one hour row in week/day view (compact)
 const SNAP_MIN = 15; // drag-and-drop snaps to 15-minute increments
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -355,8 +352,6 @@ export function CalendarView() {
 
   const { data: me } = useMe();
   const isAdmin = me?.userRole === "admin";
-  const { activeResource } = useCenter();
-  const activeResourceConfig = RESOURCES.find((r) => r.key === activeResource);
   const { data: professionals } = useProfessionals();
   const moveAppt = useMoveAppointment();
   const moveReservation = useMoveReservation();
@@ -512,84 +507,98 @@ export function CalendarView() {
   };
 
   return (
-    <div className="space-y-2">
-      {/* Toolbar — single compact row */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* Title */}
-        <h2 className="text-sm font-semibold capitalize shrink-0">{title}</h2>
-
-        {/* Nav */}
-        <div className="flex items-center gap-1 shrink-0">
-          <Popover open={miniCalOpen} onOpenChange={setMiniCalOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="icon" className="h-7 w-7" aria-label="Abrir calendario">
-                <CalendarIcon className="w-3.5 h-3.5" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={cursor}
-                onSelect={(d) => { if (d) { setCursor(d); setMiniCalOpen(false); } }}
-                locale={es}
-              />
-            </PopoverContent>
-          </Popover>
-          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => navigate("prev")} aria-label="Anterior">
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => navigate("today")}>Hoy</Button>
-          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => navigate("next")} aria-label="Siguiente">
-            <ChevronRight className="w-3.5 h-3.5" />
-          </Button>
-        </div>
-
-        {/* View tabs */}
-        <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
-          <TabsList className="h-7">
-            <TabsTrigger value="month" className="text-xs px-2 h-6">Mes</TabsTrigger>
-            <TabsTrigger value="week" className="text-xs px-2 h-6">Semana</TabsTrigger>
-            <TabsTrigger value="day" className="text-xs px-2 h-6">Día</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {/* Resource legend */}
-        <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-          {RESOURCES.map((r) => (
-            <span key={r.key} className="inline-flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
-              {r.label}
-            </span>
-          ))}
-        </div>
-
-        {/* Admin therapist filter — pushed to the right */}
-        {isAdmin && (
-          <div className="ml-auto">
-            <Select value={filterTherapistId} onValueChange={setFilterTherapistId}>
-              <SelectTrigger aria-label="Filtrar por terapeuta" className="w-[180px] h-7 text-xs text-muted-foreground">
-                <SelectValue placeholder="Todos los terapeutas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los terapeutas</SelectItem>
-                {(professionals ?? []).filter((p) => p.isActive).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-lg font-semibold capitalize">{title}</h2>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => openCreateAppt()}>
+              <Plus className="w-4 h-4 mr-1" />
+              Nueva cita
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => openCreateReservation()}>
+              <Lock className="w-4 h-4 mr-1" />
+              Reserva de espacio
+            </Button>
           </div>
-        )}
+        </div>
 
-        {/* New appointment buttons */}
-        <div className={`flex items-center gap-1.5 shrink-0 ${isAdmin ? "" : "ml-auto"}`}>
-          <Button size="sm" className="h-7 text-xs px-2.5" onClick={() => openCreateAppt()}>
-            <Plus className="w-3.5 h-3.5 mr-1" />
-            Nueva cita
-          </Button>
-          <Button size="sm" variant="outline" className="h-7 text-xs px-2.5" onClick={() => openCreateReservation()}>
-            <Lock className="w-3.5 h-3.5 mr-1" />
-            Reserva
-          </Button>
+        <div className="flex items-center justify-between gap-2 flex-wrap pb-3 border-b">
+          <div className="flex items-center gap-1.5">
+            <Popover open={miniCalOpen} onOpenChange={setMiniCalOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  aria-label="Abrir calendario"
+                >
+                  <CalendarIcon className="w-4 h-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={cursor}
+                  onSelect={(d) => {
+                    if (d) {
+                      setCursor(d);
+                      setMiniCalOpen(false);
+                    }
+                  }}
+                  locale={es}
+                />
+              </PopoverContent>
+            </Popover>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => navigate("prev")}
+              aria-label="Anterior"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" className="h-7" onClick={() => navigate("today")}>
+              Hoy
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => navigate("next")}
+              aria-label="Siguiente"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
+              <TabsList>
+                <TabsTrigger value="month">Mes</TabsTrigger>
+                <TabsTrigger value="week">Semana</TabsTrigger>
+                <TabsTrigger value="day">Día</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {isAdmin && (
+              <Select value={filterTherapistId} onValueChange={setFilterTherapistId}>
+                <SelectTrigger aria-label="Filtrar por terapeuta" className="w-[200px] h-8 text-muted-foreground">
+                  <SelectValue placeholder="Todos los terapeutas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los terapeutas</SelectItem>
+                  {(professionals ?? []).filter((p) => p.isActive).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </div>
       </div>
 
@@ -895,7 +904,7 @@ function MonthView({
                       >
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ backgroundColor: getResourceConfig(a.patientResource)?.color ?? a.patientColor }}
+                          style={{ backgroundColor: a.patientColor }}
                         />
                         <span className={`font-semibold shrink-0 ${a.status === "cancelada" ? "line-through" : ""}`}>
                           {format(new Date(a.start), "HH:mm")}
@@ -1472,7 +1481,7 @@ function DayColumn({
                   left: laneStyle.left,
                   width: laneStyle.width,
                   zIndex: 6 + lane,
-                  borderLeft: `3px solid ${getResourceConfig(a.patientResource)?.color ?? a.patientColor}`,
+                  borderLeft: `3px solid ${a.patientColor}`,
                 }}
                 aria-label={`Cita de ${a.patientName} ${format(effectiveStart, "HH:mm")}–${format(end, "HH:mm")}, ${APPOINTMENT_STATUS_LABELS[a.status]}`}
               >
@@ -1492,7 +1501,7 @@ function DayColumn({
                   <p className={`text-[11px] font-medium leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
                     {a.patientName}
                   </p>
-                  {!compact && <p className="text-[11px] opacity-80 truncate">{a.type}{a.patientResource ? ` · ${a.patientResource}` : ""}</p>}
+                  {!compact && <p className="text-[11px] opacity-80 truncate">{a.type}</p>}
                 </div>
                 <ResizeHandle
                   position="bottom"
@@ -1614,15 +1623,7 @@ function AppointmentDetailDialogInner({
             <Avatar name={appt.patientName} color={appt.patientColor} size={36} />
             <div>
               <div className="text-base">{appt.patientName}</div>
-              <div className="text-xs text-muted-foreground font-normal flex items-center gap-1.5">
-                {appt.type}
-                {appt.patientResource && (
-                  <span className="inline-flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getResourceConfig(appt.patientResource)?.color ?? "#888" }} />
-                    {appt.patientResource}
-                  </span>
-                )}
-              </div>
+              <div className="text-xs text-muted-foreground font-normal">{appt.type}</div>
             </div>
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -1665,7 +1666,7 @@ function AppointmentDetailDialogInner({
               navigate("patient-detail");
             }}
           >
-            Ver usuario/a
+            Ver paciente
           </Button>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
@@ -1814,9 +1815,6 @@ function AppointmentFormDialog({
   const { data: me } = useMe();
   const isAdmin = me?.userRole === "admin";
   const { data: professionals } = useProfessionals();
-  const { activeResource } = useCenter();
-  const centerCfg = RESOURCES.find((r) => r.key === activeResource);
-  const defaultDur = centerCfg?.defaultDurationMin ?? 60;
 
   const schema = mode === "edit" ? appointmentUpdateSchema : appointmentCreateSchema;
 
@@ -1850,7 +1848,7 @@ function AppointmentFormDialog({
             therapistId: "",
             date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
             time: preset?.time ?? "10:00",
-            endTime: preset?.time ? addMinutesToTimeStr(preset.time, defaultDur) : addMinutesToTimeStr("10:00", defaultDur),
+            endTime: preset?.time ? addMinutesToTimeStr(preset.time, 60) : "11:00",
             type: "Sesión",
             notes: "",
           },
@@ -1876,7 +1874,7 @@ function AppointmentFormDialog({
         therapistId: "",
         date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
         time: preset?.time ?? "10:00",
-        endTime: preset?.time ? addMinutesToTimeStr(preset.time, defaultDur) : addMinutesToTimeStr("10:00", defaultDur),
+        endTime: preset?.time ? addMinutesToTimeStr(preset.time, 60) : "11:00",
         type: "Sesión",
         notes: "",
       });
@@ -1925,8 +1923,8 @@ function AppointmentFormDialog({
                   return (
                     <div className="space-y-1.5">
                       <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger aria-label="Usuario/a">
-                          <SelectValue placeholder="Selecciona usuario/a" />
+                        <SelectTrigger aria-label="Paciente">
+                          <SelectValue placeholder="Selecciona paciente" />
                         </SelectTrigger>
                         <SelectContent>
                           {(patients ?? []).map((p) => (
@@ -2008,7 +2006,7 @@ function AppointmentFormDialog({
                     value={field.value}
                     onChange={(v) => {
                       field.onChange(v);
-                      setValue("endTime", addMinutesToTimeStr(v, defaultDur));
+                      setValue("endTime", addMinutesToTimeStr(v, 60));
                     }}
                     ariaLabel="Hora inicio"
                   />
@@ -2126,7 +2124,7 @@ function ReservationFormDialog({
       });
     } else if (mode === "create") {
       reset({
-        therapistId: "",
+        therapistId: me?.id ?? "",
         categoryId: undefined,
         title: "",
         date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
@@ -2134,7 +2132,7 @@ function ReservationFormDialog({
         endTime: addMinutesToTimeStr(preset?.time ?? "10:00", 60),
       });
     }
-  }, [open, mode, reservation?.id, preset?.date, preset?.time]);
+  }, [open, mode, reservation?.id, preset?.date, preset?.time, me?.id]);
 
   const watchedStartTime = watch("time");
   const watchedEndTime = watch("endTime");
@@ -2180,6 +2178,27 @@ function ReservationFormDialog({
           <Field label="Título" error={errors.title?.message} required>
             <Input placeholder="p. ej. Roco, Formación, Reunión de equipo…" {...register("title")} />
           </Field>
+
+          {isAdmin ? (
+            <Field label="Terapeuta" error={errors.therapistId?.message} required>
+              <Controller
+                control={control}
+                name="therapistId"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona terapeuta" /></SelectTrigger>
+                    <SelectContent>
+                      {(professionals ?? []).filter((p) => p.isActive).map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+          ) : (
+            <input type="hidden" {...register("therapistId")} value={me?.id ?? ""} />
+          )}
 
           <Field label="Categoría" error={(errors as any).categoryId?.message}>
             <CategoryPicker

@@ -128,6 +128,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
   useEffect(() => {
     if (!open) return;
     reset(buildDefaults());
+    if (!editVisit && me?.id) setValue("therapistId", me.id);
     setPreviousTasks(isEditMode ? [] : (previousVisit?.tasks ?? []).filter((t) => !t.completed));
     setTaskInput("");
     setInterventionInput("");
@@ -269,7 +270,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
                 {errors.therapistId && <p className="text-xs text-destructive">{errors.therapistId.message}</p>}
               </div>
             ) : (
-              <input type="hidden" {...register("therapistId")} />
+              <input type="hidden" {...register("therapistId")} value={me?.id ?? ""} />
             )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5 min-w-0">
@@ -315,7 +316,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
                 render={({ field }) => (
                   <RichTextarea
                     rows={10}
-                    placeholder="Describe la sesión: hallazgos, técnicas aplicadas, respuesta del/de la usuario/a, plan para el próximo seguimiento…"
+                    placeholder="Describe la sesión: hallazgos, técnicas aplicadas, respuesta del paciente, plan para el próximo seguimiento…"
                     value={field.value ?? ""}
                     onChange={field.onChange}
                   />
@@ -435,7 +436,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
                     </label>
                   ))}
                 </div>
-                <p className="text-[10px] text-muted-foreground italic">Marca las tareas que el/la usuario/a ha completado.</p>
+                <p className="text-[10px] text-muted-foreground italic">Marca las tareas que el paciente ha completado.</p>
               </div>
             )}
 

@@ -3,13 +3,17 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Mail, Send, Trash2, ArrowLeft, Pencil, Inbox, X } from "lucide-react";
+import { Mail, Send, Trash2, ArrowLeft, Pencil, Inbox } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useMessages, useSendMessage, useMarkMessageRead, useDeleteMessage, useProfessionals, useMe, type MessageDTO } from "@/hooks/api";
 import { Avatar } from "@/components/domain";
 
@@ -33,6 +37,7 @@ export function MessagingPanel({ open, onClose }: { open: boolean; onClose: () =
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const messages = box === "inbox" ? (inbox ?? []) : (sent ?? []);
   const unread = (inbox ?? []).filter((m) => !m.readAt).length;
@@ -41,7 +46,7 @@ export function MessagingPanel({ open, onClose }: { open: boolean; onClose: () =
     setSelected(m);
     setView("read");
     if (!m.readAt && m.toId === me?.id) {
-      markRead.mutate(m.id);
+      markRead.mutateAsync(m.id).catch(() => null);
     }
   }
 
@@ -72,9 +77,14 @@ export function MessagingPanel({ open, onClose }: { open: boolean; onClose: () =
   }
 
   function handleDelete(id: string) {
-    deleteMsg.mutate(id);
-    if (view === "read") setView(box);
-    setSelected(null);
+    setConfirmDeleteId(id);
+  }
+
+  function confirmDelete() {
+    if (!confirmDeleteId) return;
+    deleteMsg.mutate(confirmDeleteId);
+    if (view === "read") { setView(box); setSelected(null); }
+    setConfirmDeleteId(null);
   }
 
   const others = (professionals ?? []).filter((p) => p.id !== me?.id && p.isActive);
@@ -91,8 +101,24 @@ export function MessagingPanel({ open, onClose }: { open: boolean; onClose: () =
   };
 
   return (
-    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="right" className="w-full sm:w-[480px] p-0 flex flex-col">
+    <>
+      <AlertDialog open={!!confirmDeleteId} onOpenChange={(o) => { if (!o) setConfirmDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Borrar este mensaje?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Borrar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+        <SheetContent side="right" className="w-full sm:w-[480px] p-0 flex flex-col">
 
         {/* Header */}
         <SheetHeader className="px-4 py-3 border-b flex-row items-center gap-2">
@@ -118,6 +144,10 @@ export function MessagingPanel({ open, onClose }: { open: boolean; onClose: () =
               <Trash2 className="w-4 h-4" />
             </Button>
           )}
+          {/* Explicit close button — replaces any default sheet X */}
+          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground" onClick={onClose} aria-label="Cerrar">
+            ✕
+          </Button>
         </SheetHeader>
 
         {/* Inbox/Sent tabs */}
@@ -238,6 +268,7 @@ export function MessagingPanel({ open, onClose }: { open: boolean; onClose: () =
         </div>
       </SheetContent>
     </Sheet>
+    </>
   );
 }
 
