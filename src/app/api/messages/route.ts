@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getProfessional } from "@/lib/server";
-import { prisma } from "@/lib/prisma";
+import { requireProfessional } from "@/lib/server";
+import { db as prisma } from "@/lib/db";
 import { z } from "zod/v4";
 
 const messageCreateSchema = z.object({
@@ -11,8 +11,8 @@ const messageCreateSchema = z.object({
 
 // GET /api/messages?box=inbox|sent
 export async function GET(req: Request) {
-  const prof = await getProfessional();
-  if (!prof) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const prof = await requireProfessional();
+  
 
   const { searchParams } = new URL(req.url);
   const box = searchParams.get("box") ?? "inbox";
@@ -32,8 +32,8 @@ export async function GET(req: Request) {
 
 // POST /api/messages — send a new message
 export async function POST(req: Request) {
-  const prof = await getProfessional();
-  if (!prof) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const prof = await requireProfessional();
+  
 
   const body = await req.json();
   const parsed = messageCreateSchema.safeParse(body);

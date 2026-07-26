@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getProfessional } from "@/lib/server";
-import { prisma } from "@/lib/prisma";
+import { requireProfessional } from "@/lib/server";
+import { db as prisma } from "@/lib/db";
 
 // PATCH /api/messages/[id] — mark as read
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const prof = await getProfessional();
-  if (!prof) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const prof = await requireProfessional();
+  
 
   const { id } = await params;
 
@@ -23,8 +23,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 // DELETE /api/messages/[id]
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const prof = await getProfessional();
-  if (!prof) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const prof = await requireProfessional();
+  
 
   const { id } = await params;
 
