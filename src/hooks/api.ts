@@ -623,3 +623,58 @@ export function useDeleteGasAssessment(patientId: string) {
     },
   });
 }
+
+// ─── Messages ─────────────────────────────────────────────────────────────────
+
+export interface MessageDTO {
+  id: string;
+  fromId: string;
+  toId: string;
+  subject: string;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+  from: { id: string; name: string; color: string };
+  to:   { id: string; name: string; color: string };
+}
+
+export function useMessages(box: "inbox" | "sent" = "inbox") {
+  return useQuery<MessageDTO[]>({
+    queryKey: ["messages", box],
+    queryFn: () => fetcher(`/api/messages?box=${box}`),
+    refetchInterval: 30_000, // poll every 30 s
+  });
+}
+
+export function useSendMessage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { toId: string; subject: string; body: string }) =>
+      fetcher("/api/messages", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["messages"] });
+    },
+  });
+}
+
+export function useMarkMessageRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetcher(`/api/messages/${id}`, { method: "PATCH" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["messages"] });
+    },
+  });
+}
+
+export function useDeleteMessage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetcher(`/api/messages/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["messages"] });
+    },
+  });
+}

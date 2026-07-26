@@ -34,6 +34,8 @@ model Professional {
   slotReservations SlotReservation[]
   reservationCategories ReservationCategory[]
   auditLogs    AuditLog[]
+  messagesSent     Message[] @relation("MessagesSent")
+  messagesReceived Message[] @relation("MessagesReceived")
 
   @@index([isActive])
 }
@@ -324,4 +326,20 @@ model GasAssessment {
   goal      OccupationalGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
 
   @@index([goalId, date])
+}
+
+model Message {
+  id         String    @id @default(cuid())
+  fromId     String
+  toId       String
+  subject    String
+  body       String
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  from       Professional @relation("MessagesSent",     fields: [fromId], references: [id], onDelete: Cascade)
+  to         Professional @relation("MessagesReceived", fields: [toId],   references: [id], onDelete: Cascade)
+
+  @@index([toId, readAt])
+  @@index([fromId])
 }

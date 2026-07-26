@@ -9,6 +9,7 @@ import { RESOURCES } from "@/lib/schemas";
 import { Sidebar, SidebarToggle } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { Plus, Clock, Activity } from "lucide-react";
+import { MessagingTrigger } from "@/components/messaging-panel";
 
 const VIEW_TITLES: Record<string, string> = {
   dashboard: "Inicio",
@@ -20,7 +21,7 @@ const VIEW_TITLES: Record<string, string> = {
   equipo: "Equipo",
   reports: "Informes",
   settings: "Ajustes",
-  "admin-users": "Gestión de usuarios",
+  "admin-users": "Gestión de profesionales",
   facturacion: "Facturación",
 };
 
@@ -140,6 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Plus className="w-4 h-4 mr-1" /> Nuevo/a usuario/a
               </Button>
             )}
+            <MessagingTrigger />
           </div>
         </header>
         <main className="flex-1 p-4 lg:p-6 overflow-x-hidden">{children}</main>
