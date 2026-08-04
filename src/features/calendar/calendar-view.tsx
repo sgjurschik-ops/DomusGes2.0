@@ -2161,6 +2161,15 @@ function ReservationFormDialog({
   const { data: professionals } = useProfessionals();
   const { data: categories } = useReservationCategories();
 
+  // ── Recurrence (create mode only) ──
+  const [recur, setRecur] = useState(false);
+  const [recurDays, setRecurDays] = useState<number[]>([]);
+  const [recurUntil, setRecurUntil] = useState("");
+
+  useEffect(() => {
+    if (!open) { setRecur(false); setRecurDays([]); setRecurUntil(""); }
+  }, [open]);
+
   const schema = mode === "edit" ? slotReservationUpdateSchema : slotReservationCreateSchema;
 
   const {
@@ -2231,15 +2240,29 @@ function ReservationFormDialog({
         await update.mutateAsync({ id: reservation.id, data: values as SlotReservationUpdateInput });
         toast({ title: "Reserva actualizada" });
       } else {
-        await create.mutateAsync(values as SlotReservationCreateInput);
-        toast({ title: "Reserva creada" });
+        const base = values as SlotReservationCreateInput;
+        if (recur && recurDays.length > 0 && recurUntil) {
+          const until = new Date(recurUntil + "T23:59:59");
+          const dates: string[] = [];
+          const cursor = new Date(base.date + "T00:00:00");
+          while (cursor <= until) {
+            if (recurDays.includes(cursor.getDay())) dates.push(format(cursor, "yyyy-MM-dd"));
+            cursor.setDate(cursor.getDate() + 1);
+          }
+          if (dates.length === 0) {
+            toast({ title: "Sin fechas válidas", description: "Revisa los días y la fecha límite.", variant: "destructive" });
+            return;
+          }
+          for (const date of dates) await create.mutateAsync({ ...base, date });
+          toast({ title: `${dates.length} reservas creadas`, description: `Desde ${dates[0]} hasta ${dates[dates.length - 1]}` });
+        } else {
+          await create.mutateAsync(base);
+          toast({ title: "Reserva creada" });
+        }
       }
       onOpenChange(false);
     } catch {
-      toast({
-        title: mode === "edit" ? "Error al actualizar la reserva" : "Error al crear la reserva",
-        variant: "destructive",
-      });
+      toast({ title: mode === "edit" ? "Error al actualizar la reserva" : "Error al crear la reserva", variant: "destructive" });
     }
   }
 
@@ -2330,6 +2353,51 @@ function ReservationFormDialog({
               </span>
             </Field>
           </div>
+
+          {/* ── Recurrence (create only) ── */}
+          {mode === "create" && (
+            <div className="border rounded-lg p-3 space-y-3 bg-muted/30">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={recur} onChange={(e) => setRecur(e.target.checked)} className="rounded" />
+                <span className="text-sm font-medium">Repetir reserva</span>
+              </label>
+              {recur && (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">Días de la semana</p>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {[{ label: "L", day: 1 }, { label: "M", day: 2 }, { label: "X", day: 3 },
+                        { label: "J", day: 4 }, { label: "V", day: 5 }, { label: "S", day: 6 }, { label: "D", day: 0 }
+                      ].map(({ label, day }) => {
+                        const active = recurDays.includes(day);
+                        return (
+                          <button key={day} type="button"
+                            onClick={() => setRecurDays(active ? recurDays.filter((d) => d !== day) : [...recurDays, day])}
+                            className={`w-8 h-8 rounded-full text-xs font-medium border transition-colors ${active ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}>
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">Repetir hasta</p>
+                    <Input type="date" value={recurUntil} onChange={(e) => setRecurUntil(e.target.value)} className="h-8 text-sm" />
+                  </div>
+                  {recurDays.length > 0 && recurUntil && (() => {
+                    const until = new Date(recurUntil + "T23:59:59");
+                    const startDate = new Date((watch("date") || format(new Date(), "yyyy-MM-dd")) + "T00:00:00");
+                    let count = 0;
+                    const cur = new Date(startDate);
+                    while (cur <= until && count < 500) { if (recurDays.includes(cur.getDay())) count++; cur.setDate(cur.getDate() + 1); }
+                    return count > 0
+                      ? <p className="text-xs text-primary font-medium">Se crearán {count} reservas</p>
+                      : <p className="text-xs text-muted-foreground">Sin fechas en el rango seleccionado</p>;
+                  })()}
+                </div>
+              )}
+            </div>
+          )}
 
           <DialogFooter>
             <Button
