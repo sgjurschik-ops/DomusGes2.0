@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { usePatients } from "@/hooks/api";
 import { useNav } from "@/store/nav";
 import { useCurrentSession } from "@/hooks/api";
+import { useCenter } from "@/store/center";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,14 +12,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Avatar, SpecialtyBadge, StatusBadge, ResourceBadge, formatRelative } from "@/components/domain";
+import { Avatar, SpecialtyBadge, StatusBadge, ResourceBadge, EmCategoryBadge, formatRelative } from "@/components/domain";
 import { Search, Plus, Users, AlertTriangle } from "lucide-react";
 import type { Specialty, PatientStatus, PatientDTO } from "@/types/domain";
-import { RESOURCE_KEYS } from "@/lib/schemas";
+import { RESOURCE_KEYS, EM_CATEGORIES, EM_RESOURCE_KEY } from "@/lib/schemas";
 
 const SPECIALTY_FILTERS: ("Todas" | Specialty)[] = ["Todas", "Fisioterapia", "Psicología", "T. Ocupacional"];
 const STATUS_FILTERS: ("Todos" | PatientStatus)[] = ["Todos", "Activo", "En seguimiento", "Alta", "Pausado"];
 const RESOURCE_FILTERS: ("Todos" | (typeof RESOURCE_KEYS)[number])[] = ["Todos", ...RESOURCE_KEYS];
+const EM_CATEGORY_FILTERS: ("Todas" | (typeof EM_CATEGORIES)[number])[] = ["Todas", ...EM_CATEGORIES];
+
+// Días naturales transcurridos desde la fecha de inicio (alta) del/de la
+// usuario/a — cuánto lleva en la asociación / centro de día.
+function daysSince(iso: string | null): number | null {
+  if (!iso) return null;
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  return d >= 0 ? d : 0;
+}
 
 type SortKey = "name" | "age" | "lastVisit" | "nextAppt";
 const SORT_LABELS: Record<SortKey, string> = {
@@ -68,10 +78,14 @@ export function PatientsListView() {
   const { data: patients, isLoading } = usePatients();
   const { user } = useCurrentSession();
   const { navigate, selectPatient } = useNav();
+  const { activeResource } = useCenter();
+  // "Módulo de Asociación EM": cuando el centro de trabajo activo es EM.
+  const isEM = activeResource === EM_RESOURCE_KEY;
   const [q, setQ] = useState("");
   const [specialty, setSpecialty] = useState<"Todas" | Specialty>("Todas");
   const [status, setStatus] = useState<"Todos" | PatientStatus>("Todos");
   const [resource, setResource] = useState<"Todos" | (typeof RESOURCE_KEYS)[number]>("Todos");
+  const [emCat, setEmCat] = useState<"Todas" | (typeof EM_CATEGORIES)[number]>("Todas");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
 
@@ -82,11 +96,13 @@ export function PatientsListView() {
       if (specialty !== "Todas" && p.specialty !== specialty) return false;
       if (status !== "Todos" && p.status !== status) return false;
       if (resource !== "Todos" && p.resource !== resource) return false;
+      // El filtro de clasificación solo aplica dentro del módulo EM.
+      if (isEM && emCat !== "Todas" && p.emCategory !== emCat) return false;
       if (term && !p.fullName.toLowerCase().includes(term) && !p.diagnosis?.toLowerCase().includes(term)) return false;
       return true;
     });
     return sortPatients(base, sortKey, sortDir);
-  }, [patients, q, specialty, status, resource, sortKey, sortDir]);
+  }, [patients, q, specialty, status, resource, isEM, emCat, sortKey, sortDir]);
 
   function openPatient(id: string) {
     selectPatient(id);
@@ -137,6 +153,18 @@ export function PatientsListView() {
             ))}
           </SelectContent>
         </Select>
+        {isEM && (
+          <Select value={emCat} onValueChange={(v) => setEmCat(v as typeof emCat)}>
+            <SelectTrigger className="w-full sm:w-44" aria-label="Filtrar por clasificación">
+              <SelectValue placeholder="Clasificación" />
+            </SelectTrigger>
+            <SelectContent>
+              {EM_CATEGORY_FILTERS.map((c) => (
+                <SelectItem key={c} value={c}>{c === "Todas" ? "Todas (clasif.)" : c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select
           value={sortKey}
           onValueChange={(v) => setSortKey(v as SortKey)}
@@ -173,7 +201,7 @@ export function PatientsListView() {
           <Users className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-sm font-medium text-foreground mb-1">No hay usuarios/as</p>
           <p className="text-xs text-muted-foreground mb-4">
-            {q || specialty !== "Todas" || status !== "Todos" || resource !== "Todos"
+            {q || specialty !== "Todas" || status !== "Todos" || resource !== "Todos" || (isEM && emCat !== "Todas")
               ? "Prueba a cambiar los filtros de búsqueda."
               : "Añade tu primer usuario/a para empezar."}
           </p>
@@ -190,6 +218,7 @@ export function PatientsListView() {
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                   <th className="text-left font-medium px-4 py-2.5">Usuario/a</th>
                   <th className="text-left font-medium px-4 py-2.5 w-20">Edad</th>
+                  {isEM && <th className="text-left font-medium px-4 py-2.5 w-24">Días</th>}
                   <th className="text-left font-medium px-4 py-2.5 w-40">Última visita</th>
                   <th className="text-left font-medium px-4 py-2.5 w-40">Próxima cita</th>
                 </tr>
@@ -220,6 +249,7 @@ export function PatientsListView() {
                               <SpecialtyBadge specialty={p.specialty} />
                               <StatusBadge status={p.status} />
                               <ResourceBadge resource={p.resource} />
+                              {isEM && <EmCategoryBadge category={p.emCategory} />}
                               {(p.alerts ?? []).slice(0, 2).map((alert) => (
                                 <span
                                   key={alert}
@@ -239,6 +269,11 @@ export function PatientsListView() {
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">{p.age} años</td>
+                      {isEM && (
+                        <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                          {daysSince(p.startDate) !== null ? `${daysSince(p.startDate)} días` : "—"}
+                        </td>
+                      )}
                       <td className={`px-4 py-3 whitespace-nowrap ${stale ? "text-amber-700 font-medium" : "text-muted-foreground"}`}>
                         {formatRelative(p.lastVisitDate)}
                       </td>
@@ -274,9 +309,13 @@ export function PatientsListView() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-sm truncate">{p.fullName}</p>
                       <span className="text-xs text-muted-foreground">{p.age} años</span>
+                      {isEM && daysSince(p.startDate) !== null && (
+                        <span className="text-xs text-muted-foreground">· {daysSince(p.startDate)} días</span>
+                      )}
                       <SpecialtyBadge specialty={p.specialty} />
                       <StatusBadge status={p.status} />
                       <ResourceBadge resource={p.resource} />
+                      {isEM && <EmCategoryBadge category={p.emCategory} />}
                     </div>
                     {(p.alerts ?? []).length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">

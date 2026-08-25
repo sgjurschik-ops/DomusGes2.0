@@ -1,7 +1,7 @@
 // /api/visits — list & create
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapVisit, buildMadridDateTime } from "@/lib/server";
+import { requireProfessional, audit, mapVisit, buildMadridDateTime, isDayCenterPatient } from "@/lib/server";
 import { visitCreateSchema } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
@@ -17,7 +17,10 @@ export async function GET(req: NextRequest) {
   // therapist sees all; admin does not access clinical data but
   // we still allow listing for reporting purposes.
   if (prof.userRole === "guest") {
-    where.therapistId = prof.id;
+    // Los seguimientos de un/a usuario/a de Centro de día son colaborativos:
+    // el invitado los ve todos, no solo los suyos.
+    const dayCenter = patientId ? await isDayCenterPatient(patientId) : false;
+    if (!dayCenter) where.therapistId = prof.id;
   }
 
   const rows = await db.visit.findMany({

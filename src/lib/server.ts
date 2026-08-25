@@ -95,6 +95,18 @@ export async function requireTherapistOrAdmin(): Promise<ProfessionalDTO> {
   return prof;
 }
 
+// ¿Es un/a usuario/a de Centro de día (recurso "Asociación EM" +
+// clasificación "Centro de día")? Para estos/as, la información clínica es
+// colaborativa: cualquier profesional —incluidos los invitados— puede verla
+// y completarla, sin necesidad de estar asignado/a como terapeuta.
+export async function isDayCenterPatient(patientId: string): Promise<boolean> {
+  const p = await db.patient.findUnique({
+    where: { id: patientId },
+    select: { resource: true, emCategory: true },
+  });
+  return p?.resource === "Asociación EM" && p?.emCategory === "Centro de día";
+}
+
 // Can edit a patient's contact/admin data?
 // admin: always. therapist/guest: only if assigned.
 export async function canEditPatient(prof: ProfessionalDTO, patientId: string): Promise<boolean> {
@@ -107,9 +119,11 @@ export async function canEditPatient(prof: ProfessionalDTO, patientId: string): 
 }
 
 // Can edit clinical data (visits, assessments, profile)?
-// Only assigned therapists/guests. Admin cannot touch clinical data.
+// Assigned therapists/guests — PLUS any professional for Centro de día
+// users (colaborativo). Admin cannot touch clinical data.
 export async function canEditClinical(prof: ProfessionalDTO, patientId: string): Promise<boolean> {
   if (prof.userRole === "admin") return false;
+  if (await isDayCenterPatient(patientId)) return true;
   const link = await db.patient.findFirst({
     where: { id: patientId, therapists: { some: { id: prof.id } } },
     select: { id: true },
@@ -118,10 +132,11 @@ export async function canEditClinical(prof: ProfessionalDTO, patientId: string):
 }
 
 // Can view (read) clinical data?
-// therapist: all patients. guest: only assigned. admin: never.
+// therapist: all patients. guest: only assigned (+ Centro de día). admin: never.
 export async function canViewClinical(prof: ProfessionalDTO, patientId: string): Promise<boolean> {
   if (prof.userRole === "admin") return false;
   if (prof.userRole === "therapist") return true;
+  if (await isDayCenterPatient(patientId)) return true;
   const link = await db.patient.findFirst({
     where: { id: patientId, therapists: { some: { id: prof.id } } },
     select: { id: true },
@@ -130,9 +145,10 @@ export async function canViewClinical(prof: ProfessionalDTO, patientId: string):
 }
 
 // Can see a patient at all (list, contact)?
-// admin: all. therapist: all. guest: only assigned.
+// admin: all. therapist: all. guest: only assigned (+ Centro de día).
 export async function canViewPatient(prof: ProfessionalDTO, patientId: string): Promise<boolean> {
   if (prof.userRole !== "guest") return true;
+  if (await isDayCenterPatient(patientId)) return true;
   const link = await db.patient.findFirst({
     where: { id: patientId, therapists: { some: { id: prof.id } } },
     select: { id: true },
@@ -256,6 +272,7 @@ export function mapPatient(
     specialty: p.specialty,
     status: p.status,
     resource: p.resource,
+    emCategory: p.emCategory,
     phone: p.phone,
     address: p.address,
     diagnosis: p.diagnosis,

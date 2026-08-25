@@ -72,6 +72,16 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       specialty: body.specialty,
       status: body.status,
       resource: body.resource !== undefined ? (body.resource || null) : undefined,
+      // La clasificación EM sigue al recurso: si el recurso cambia a algo
+      // que no es "Asociación EM", se limpia; si es EM, se guarda la elegida.
+      emCategory:
+        body.resource !== undefined
+          ? body.resource === "Asociación EM"
+            ? (body.emCategory ?? null)
+            : null
+          : body.emCategory !== undefined
+            ? (body.emCategory || null)
+            : undefined,
       phone: body.phone !== undefined ? (body.phone || null) : undefined,
       address: body.address !== undefined ? (body.address || null) : undefined,
       startDate: body.startDate !== undefined ? new Date(body.startDate) : undefined,

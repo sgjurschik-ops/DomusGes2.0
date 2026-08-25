@@ -53,6 +53,10 @@ model Patient {
   // asignarlo. Ver RESOURCES en src/lib/schemas.ts para la lista de
   // valores válidos y si cada uno es facturable.
   resource      String?
+  // Clasificación interna SOLO para el recurso "Asociación EM":
+  // "Centro de día" | "Asociación". Null para el resto (Domicilio, o
+  // usuarios/as EM creados/as antes de este campo — la ficha avisa si falta).
+  emCategory    String?
   phone         String?
   address       String?
   diagnosis     String?

@@ -9,10 +9,21 @@ export async function GET(req: NextRequest) {
   const prof = await requireProfessional();
   const resource = new URL(req.url).searchParams.get("resource");
 
-  // Guests only see patients assigned to them
+  // Los invitados solo ven sus usuarios/as asignados/as... salvo los de
+  // Centro de día, visibles para todo el equipo (colaborativo).
+  // Usamos AND explícito para no pisar el posible OR de buildResourceFilter.
   const where = {
-    ...(prof.userRole === "guest" ? { therapists: { some: { id: prof.id } } } : {}),
-    ...buildResourceFilter(resource),
+    AND: [
+      buildResourceFilter(resource),
+      prof.userRole === "guest"
+        ? {
+            OR: [
+              { therapists: { some: { id: prof.id } } },
+              { resource: "Asociación EM", emCategory: "Centro de día" },
+            ],
+          }
+        : {},
+    ],
   };
 
   const rows = await db.patient.findMany({
@@ -59,6 +70,7 @@ export async function POST(req: NextRequest) {
       specialty: d.specialty,
       status: d.status,
       resource: d.resource,
+      emCategory: d.resource === "Asociación EM" ? (d.emCategory ?? null) : null,
       phone: d.phone || null,
       address: d.address || null,
       diagnosis: d.diagnosis || null,

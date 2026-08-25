@@ -164,6 +164,8 @@ const EM_PREDEFINED_OBJECTIVES: { text: string; area: GoalArea; gasLevels: GasLe
 
 export function InterventionPlanTab({ patientId }: { patientId: string }) {
   const { data: patient } = usePatient(patientId);
+  // Para usuarios/as de Centro de día esta pestaña se llama "Objetivos PIAI".
+  const isDayCenter = patient?.resource === "Asociación EM" && patient?.emCategory === "Centro de día";
   const gasEnabled = patient?.resource === "Asociación EM";
   const { data: gasAssessments } = useGasAssessments(patientId);
 
@@ -312,7 +314,7 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
     <div className="space-y-5">
       {/* ─── Toolbar ─── */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Plan de intervención</h3>
+        <h3 className="text-sm font-semibold">{isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}</h3>
         <div className="flex gap-2">
           {gasEnabled && goals.filter((g) => g.id).length > 0 && (
             <>

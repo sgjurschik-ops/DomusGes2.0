@@ -28,6 +28,8 @@ import {
   SPECIALTIES,
   PATIENT_STATUSES,
   RESOURCE_KEYS,
+  EM_CATEGORIES,
+  EM_RESOURCE_KEY,
 } from "@/lib/schemas";
 import { toast } from "@/hooks/use-toast";
 import { Avatar } from "@/components/domain";
@@ -54,6 +56,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
     control,
     watch,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<PatientCreateInput>({
     resolver: zodResolver(patientCreateSchema) as Resolver<PatientCreateInput>,
@@ -67,6 +70,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
       // mismo (se puede cambiar igualmente) — sigue sin defaultear a un
       // valor fijo si por lo que sea no hay centro activo.
       resource: (activeResource ?? "") as PatientCreateInput["resource"],
+      emCategory: null,
       phone: "",
       address: "",
       diagnosis: "",
@@ -89,6 +93,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
       specialty: patient.specialty,
       status: patient.status,
       resource: (patient.resource ?? "") as PatientCreateInput["resource"],
+      emCategory: (patient.emCategory ?? null) as PatientCreateInput["emCategory"],
       phone: patient.phone ?? "",
       address: patient.address ?? "",
       diagnosis: patient.diagnosis ?? "",
@@ -132,6 +137,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
 
   const firstName = watch("firstName");
   const lastName = watch("lastName");
+  const resource = watch("resource");
   const isPending = create.isPending || update.isPending;
 
   if (isEdit && isLoadingPatient) {
@@ -213,7 +219,14 @@ export function NewPatientForm({ mode = "create" }: Props) {
                 control={control}
                 name="resource"
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value}
+                    onValueChange={(v) => {
+                      field.onChange(v);
+                      // Al salir de Asociación EM, la clasificación deja de aplicar.
+                      if (v !== EM_RESOURCE_KEY) setValue("emCategory", null);
+                    }}
+                  >
                     <SelectTrigger id="resource"><SelectValue placeholder="Selecciona un recurso" /></SelectTrigger>
                     <SelectContent>
                       {RESOURCE_KEYS.map((r) => (
@@ -224,6 +237,24 @@ export function NewPatientForm({ mode = "create" }: Props) {
                 )}
               />
             </Field>
+            {resource === EM_RESOURCE_KEY && (
+              <Field label="Clasificación (Asociación EM)" error={errors.emCategory?.message} required>
+                <Controller
+                  control={control}
+                  name="emCategory"
+                  render={({ field }) => (
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <SelectTrigger id="emCategory"><SelectValue placeholder="Centro de día o Asociación" /></SelectTrigger>
+                      <SelectContent>
+                        {EM_CATEGORIES.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+            )}
             <Field label="Estado" error={errors.status?.message} required>
               <Controller
                 control={control}

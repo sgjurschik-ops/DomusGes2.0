@@ -75,6 +75,9 @@ export function PatientDetailView() {
   const { data: professionals } = useProfessionals();
   const { data: me } = useMe();
   const isAdmin = me?.userRole === "admin";
+  // Usuario/a de Centro de día (recurso EM + clasificación "Centro de día"):
+  // cambia el nombre de un par de pestañas para adaptarse a su flujo.
+  const isDayCenter = !!patient && patient.resource === "Asociación EM" && patient.emCategory === "Centro de día";
   const deletePatient = useDeletePatient();
   const updatePatient = useUpdatePatient();
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
@@ -240,8 +243,8 @@ export function PatientDetailView() {
         <TabsList className={`inline-flex w-full max-w-4xl gap-1.5 overflow-x-auto ${isAdmin ? "max-w-xs" : ""}`}>
           <TabsTrigger value="overview" className="shrink-0">Resumen</TabsTrigger>
           {!isAdmin && <TabsTrigger value="visits" className="shrink-0">Seguimientos</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="occupational-profile" className="shrink-0">Perfil ocupacional</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="intervention-plan" className="shrink-0">Plan de intervención</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="occupational-profile" className="shrink-0">{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="intervention-plan" className="shrink-0">{isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="assessments" className="shrink-0">Valoración</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="progress" className="shrink-0">Evolución</TabsTrigger>}
         </TabsList>
@@ -283,7 +286,7 @@ export function PatientDetailView() {
                   value={assessments && assessments.length > 0 ? `${assessments[0].scale} · ${formatDate(assessments[0].date)}` : "Sin registrar"} />
               </button>
               <button type="button" onClick={() => setActiveTab("occupational-profile")} className="text-left">
-                <KpiChip icon={ListChecks} color="yellow" label="Perfil ocupacional"
+                <KpiChip icon={ListChecks} color="yellow" label={isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
                   value={profileCompletion ? `${profileCompletion.filled}/${profileCompletion.total} campos` : "—"} />
               </button>
             </div>

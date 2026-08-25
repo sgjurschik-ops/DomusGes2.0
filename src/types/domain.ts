@@ -75,6 +75,8 @@ export interface PatientDTO {
   status: PatientStatus;
   // null = todavía no asignado (usuarios/as creados/as antes de este campo).
   resource: string | null;
+  // Clasificación EM: "Centro de día" | "Asociación" | null (no aplica).
+  emCategory: string | null;
   phone: string | null;
   address: string | null;
   diagnosis: string | null;

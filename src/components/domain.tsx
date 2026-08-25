@@ -81,6 +81,26 @@ export function ResourceBadge({ resource, className }: { resource: string | null
   );
 }
 
+// Clasificación interna del recurso "Asociación EM" (Centro de día / Asociación).
+const EM_CATEGORY_STYLES: Record<string, string> = {
+  "Centro de día": "bg-violet-100 text-violet-800 border-violet-200",
+  "Asociación": "bg-sky-100 text-sky-800 border-sky-200",
+};
+export function EmCategoryBadge({ category, className }: { category: string | null; className?: string }) {
+  if (!category) return null;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium",
+        EM_CATEGORY_STYLES[category] ?? "bg-zinc-100 text-zinc-700 border-zinc-200",
+        className,
+      )}
+    >
+      {category}
+    </span>
+  );
+}
+
 export function Avatar({
   name,
   color = "#1a5c58",

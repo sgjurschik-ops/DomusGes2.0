@@ -40,6 +40,12 @@ export function getResourceConfig(resource: string | null): ResourceConfig | und
   if (!resource) return undefined;
   return RESOURCES.find((r) => r.key === resource);
 }
+// Clave del recurso "Asociación EM" (evita literales repartidos por el código).
+export const EM_RESOURCE_KEY = "Asociación EM";
+// Clasificación interna de los/las usuarios/as del recurso "Asociación EM":
+// distingue a quién pertenece al Centro de día de quién es de la Asociación.
+export const EM_CATEGORIES = ["Centro de día", "Asociación"] as const;
+export type EmCategory = (typeof EM_CATEGORIES)[number];
 export const PROFESSIONAL_ROLES = [
   "Fisioterapeuta",
   "Terapeuta Ocupacional",
@@ -188,23 +194,38 @@ export type ProfessionalUpdateInput = z.infer<typeof professionalUpdateSchema>;
 
 // ─── Patient ─────────────────────────────────────────────────────────────────
 
-export const patientCreateSchema = z.object({
-  firstName: z.string().min(2, "El nombre es obligatorio"),
-  lastName: z.string().min(2, "Los apellidos son obligatorios"),
-  birthDate: z.string().min(1, "La fecha de nacimiento es obligatoria"),
-  specialty: z.enum(SPECIALTIES),
-  status: z.enum(PATIENT_STATUSES).default("Activo"),
-  resource: z.enum(RESOURCE_KEYS, { error: "Selecciona un recurso" }),
-  phone: z.string().optional().default(""),
-  address: z.string().optional().default(""),
-  diagnosis: z.string().optional().default(""),
-  objective: z.string().optional().default(""),
-  alerts: z.array(z.string().min(1).max(60)).default([]),
-  startDate: z.string().min(1, "La fecha de inicio es obligatoria"),
-  referentName: z.string().optional().default(""),
-  referentPhone: z.string().optional().default(""),
-  therapistIds: z.array(z.string()).default([]),
-});
+export const patientCreateSchema = z
+  .object({
+    firstName: z.string().min(2, "El nombre es obligatorio"),
+    lastName: z.string().min(2, "Los apellidos son obligatorios"),
+    birthDate: z.string().min(1, "La fecha de nacimiento es obligatoria"),
+    specialty: z.enum(SPECIALTIES),
+    status: z.enum(PATIENT_STATUSES).default("Activo"),
+    resource: z.enum(RESOURCE_KEYS, { error: "Selecciona un recurso" }),
+    // Solo aplica al recurso "Asociación EM"; obligatorio en ese caso
+    // (ver superRefine). Para el resto queda null/undefined.
+    emCategory: z.enum(EM_CATEGORIES).nullish(),
+    phone: z.string().optional().default(""),
+    address: z.string().optional().default(""),
+    diagnosis: z.string().optional().default(""),
+    objective: z.string().optional().default(""),
+    alerts: z.array(z.string().min(1).max(60)).default([]),
+    startDate: z.string().min(1, "La fecha de inicio es obligatoria"),
+    referentName: z.string().optional().default(""),
+    referentPhone: z.string().optional().default(""),
+    therapistIds: z.array(z.string()).default([]),
+  })
+  .superRefine((d, ctx) => {
+    // En Asociación EM la clasificación es obligatoria; en el resto de
+    // recursos no debe pedirse.
+    if (d.resource === EM_RESOURCE_KEY && !d.emCategory) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["emCategory"],
+        message: "Selecciona la clasificación (Centro de día o Asociación)",
+      });
+    }
+  });
 export type PatientCreateInput = z.infer<typeof patientCreateSchema>;
 
 // ─── Visit ───────────────────────────────────────────────────────────────────
