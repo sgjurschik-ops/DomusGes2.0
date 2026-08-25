@@ -12,8 +12,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
 import { Avatar, SpecialtyBadge, StatusBadge, ResourceBadge, EmCategoryBadge, formatRelative } from "@/components/domain";
-import { Search, Plus, Users, AlertTriangle } from "lucide-react";
+import { Search, Plus, Users, AlertTriangle, SlidersHorizontal, X, ArrowUp, ArrowDown } from "lucide-react";
 import type { Specialty, PatientStatus, PatientDTO } from "@/types/domain";
 import { RESOURCE_KEYS, EM_CATEGORIES, EM_RESOURCE_KEY } from "@/lib/schemas";
 
@@ -109,84 +111,155 @@ export function PatientsListView() {
     navigate("patient-detail");
   }
 
+  // Filtros activos (para el contador del botón y los "chips").
+  const activeCount =
+    (specialty !== "Todas" ? 1 : 0) +
+    (status !== "Todos" ? 1 : 0) +
+    (resource !== "Todos" ? 1 : 0) +
+    (isEM && emCat !== "Todas" ? 1 : 0);
+
+  const chips: { label: string; clear: () => void }[] = [];
+  if (specialty !== "Todas") chips.push({ label: `Especialidad: ${specialty}`, clear: () => setSpecialty("Todas") });
+  if (status !== "Todos") chips.push({ label: `Estado: ${status}`, clear: () => setStatus("Todos") });
+  if (resource !== "Todos") chips.push({ label: `Recurso: ${resource}`, clear: () => setResource("Todos") });
+  if (isEM && emCat !== "Todas") chips.push({ label: `Clasificación: ${emCat}`, clear: () => setEmCat("Todas") });
+
+  function clearAll() {
+    setSpecialty("Todas");
+    setStatus("Todos");
+    setResource("Todos");
+    setEmCat("Todas");
+  }
+
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre o diagnóstico…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="pl-9"
-            aria-label="Buscar usuarios/as"
-          />
+      {/* Búsqueda + filtros */}
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre o diagnóstico…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="pl-9"
+              aria-label="Buscar usuarios/as"
+            />
+          </div>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="gap-2 shrink-0">
+                <SlidersHorizontal className="w-4 h-4" />
+                <span className="hidden sm:inline">Filtros y orden</span>
+                <span className="sm:hidden">Filtros</span>
+                {activeCount > 0 && (
+                  <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[11px] font-semibold w-5 h-5">
+                    {activeCount}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Especialidad</Label>
+                <Select value={specialty} onValueChange={(v) => setSpecialty(v as typeof specialty)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SPECIALTY_FILTERS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Estado</Label>
+                <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STATUS_FILTERS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Recurso</Label>
+                <Select value={resource} onValueChange={(v) => setResource(v as typeof resource)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {RESOURCE_FILTERS.map((r) => (<SelectItem key={r} value={r}>{r}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {isEM && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Clasificación (Asociación EM)</Label>
+                  <Select value={emCat} onValueChange={(v) => setEmCat(v as typeof emCat)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {EM_CATEGORY_FILTERS.map((c) => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="h-px bg-border" />
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Ordenar por</Label>
+                <div className="flex gap-2">
+                  <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+                    <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+                        <SelectItem key={k} value={k}>{SORT_LABELS[k]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setSortDir((d) => (d === 1 ? -1 : 1))}
+                    aria-label={sortDir === 1 ? "Orden ascendente" : "Orden descendente"}
+                    title={sortDir === 1 ? "Ascendente (A→Z, menor→mayor)" : "Descendente (Z→A, mayor→menor)"}
+                    className="shrink-0"
+                  >
+                    {sortDir === 1 ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              {activeCount > 0 && (
+                <Button variant="ghost" size="sm" className="w-full justify-center text-muted-foreground" onClick={clearAll}>
+                  <X className="w-3.5 h-3.5 mr-1.5" /> Limpiar filtros
+                </Button>
+              )}
+            </PopoverContent>
+          </Popover>
         </div>
-        <Select value={specialty} onValueChange={(v) => setSpecialty(v as typeof specialty)}>
-          <SelectTrigger className="w-full sm:w-44" aria-label="Filtrar por especialidad">
-            <SelectValue placeholder="Especialidad" />
-          </SelectTrigger>
-          <SelectContent>
-            {SPECIALTY_FILTERS.map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
+
+        {/* Chips de filtros activos: dejan claro de un vistazo qué se está filtrando */}
+        {chips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {chips.map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                onClick={chip.clear}
+                className="inline-flex items-center gap-1.5 rounded-full border bg-muted/60 hover:bg-muted pl-2.5 pr-1.5 py-1 text-xs transition-colors"
+                aria-label={`Quitar filtro ${chip.label}`}
+              >
+                {chip.label}
+                <X className="w-3 h-3" />
+              </button>
             ))}
-          </SelectContent>
-        </Select>
-        <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-          <SelectTrigger className="w-full sm:w-44" aria-label="Filtrar por estado">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_FILTERS.map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={resource} onValueChange={(v) => setResource(v as typeof resource)}>
-          <SelectTrigger className="w-full sm:w-44" aria-label="Filtrar por recurso">
-            <SelectValue placeholder="Recurso" />
-          </SelectTrigger>
-          <SelectContent>
-            {RESOURCE_FILTERS.map((r) => (
-              <SelectItem key={r} value={r}>{r}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {isEM && (
-          <Select value={emCat} onValueChange={(v) => setEmCat(v as typeof emCat)}>
-            <SelectTrigger className="w-full sm:w-44" aria-label="Filtrar por clasificación">
-              <SelectValue placeholder="Clasificación" />
-            </SelectTrigger>
-            <SelectContent>
-              {EM_CATEGORY_FILTERS.map((c) => (
-                <SelectItem key={c} value={c}>{c === "Todas" ? "Todas (clasif.)" : c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="ml-1 text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+            >
+              Limpiar todo
+            </button>
+          </div>
         )}
-        <Select
-          value={sortKey}
-          onValueChange={(v) => setSortKey(v as SortKey)}
-        >
-          <SelectTrigger className="w-full sm:w-44" aria-label="Ordenar por">
-            <SelectValue placeholder="Ordenar por" />
-          </SelectTrigger>
-          <SelectContent>
-            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-              <SelectItem key={k} value={k}>Ordenar por: {SORT_LABELS[k]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setSortDir((d) => (d === 1 ? -1 : 1))}
-          aria-label={sortDir === 1 ? "Orden ascendente" : "Orden descendente"}
-          title={sortDir === 1 ? "Ascendente" : "Descendente"}
-        >
-          {sortDir === 1 ? "↑" : "↓"}
-        </Button>
       </div>
 
       {/* List */}
@@ -246,9 +319,9 @@ export function PatientsListView() {
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-medium truncate">{p.fullName}</p>
-                              <SpecialtyBadge specialty={p.specialty} />
-                              <StatusBadge status={p.status} />
-                              <ResourceBadge resource={p.resource} />
+                              {p.specialty !== "T. Ocupacional" && <SpecialtyBadge specialty={p.specialty} />}
+                              {p.status !== "Activo" && <StatusBadge status={p.status} />}
+                              {!activeResource && <ResourceBadge resource={p.resource} />}
                               {isEM && <EmCategoryBadge category={p.emCategory} />}
                               {(p.alerts ?? []).slice(0, 2).map((alert) => (
                                 <span
@@ -312,9 +385,9 @@ export function PatientsListView() {
                       {isEM && daysSince(p.startDate) !== null && (
                         <span className="text-xs text-muted-foreground">· {daysSince(p.startDate)} días</span>
                       )}
-                      <SpecialtyBadge specialty={p.specialty} />
-                      <StatusBadge status={p.status} />
-                      <ResourceBadge resource={p.resource} />
+                      {p.specialty !== "T. Ocupacional" && <SpecialtyBadge specialty={p.specialty} />}
+                      {p.status !== "Activo" && <StatusBadge status={p.status} />}
+                      {!activeResource && <ResourceBadge resource={p.resource} />}
                       {isEM && <EmCategoryBadge category={p.emCategory} />}
                     </div>
                     {(p.alerts ?? []).length > 0 && (
