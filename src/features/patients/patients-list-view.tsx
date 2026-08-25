@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { Avatar, SpecialtyBadge, StatusBadge, ResourceBadge, EmCategoryBadge, formatRelative } from "@/components/domain";
 import { Search, Plus, Users, AlertTriangle, SlidersHorizontal, X, ArrowUp, ArrowDown } from "lucide-react";
 import type { Specialty, PatientStatus, PatientDTO } from "@/types/domain";
@@ -111,24 +112,22 @@ export function PatientsListView() {
     navigate("patient-detail");
   }
 
-  // Filtros activos (para el contador del botón y los "chips").
+  // Filtros activos del panel (para el contador del botón y los "chips").
+  // La clasificación EM NO cuenta aquí: tiene su propio selector siempre visible.
   const activeCount =
     (specialty !== "Todas" ? 1 : 0) +
     (status !== "Todos" ? 1 : 0) +
-    (resource !== "Todos" ? 1 : 0) +
-    (isEM && emCat !== "Todas" ? 1 : 0);
+    (resource !== "Todos" ? 1 : 0);
 
   const chips: { label: string; clear: () => void }[] = [];
   if (specialty !== "Todas") chips.push({ label: `Especialidad: ${specialty}`, clear: () => setSpecialty("Todas") });
   if (status !== "Todos") chips.push({ label: `Estado: ${status}`, clear: () => setStatus("Todos") });
   if (resource !== "Todos") chips.push({ label: `Recurso: ${resource}`, clear: () => setResource("Todos") });
-  if (isEM && emCat !== "Todas") chips.push({ label: `Clasificación: ${emCat}`, clear: () => setEmCat("Todas") });
 
   function clearAll() {
     setSpecialty("Todas");
     setStatus("Todos");
     setResource("Todos");
-    setEmCat("Todas");
   }
 
   return (
@@ -188,17 +187,6 @@ export function PatientsListView() {
                   </SelectContent>
                 </Select>
               </div>
-              {isEM && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Clasificación (Asociación EM)</Label>
-                  <Select value={emCat} onValueChange={(v) => setEmCat(v as typeof emCat)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {EM_CATEGORY_FILTERS.map((c) => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
 
               <div className="h-px bg-border" />
 
@@ -235,6 +223,28 @@ export function PatientsListView() {
             </PopoverContent>
           </Popover>
         </div>
+
+        {/* Selector rápido de clasificación (solo módulo EM): pulsar uno u otro */}
+        {isEM && (
+          <div className="inline-flex rounded-lg border bg-muted/50 p-0.5">
+            {EM_CATEGORY_FILTERS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setEmCat(c)}
+                aria-pressed={emCat === c}
+                className={cn(
+                  "px-3.5 py-1.5 text-sm rounded-md transition-colors",
+                  emCat === c
+                    ? "bg-background shadow-sm font-medium text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Chips de filtros activos: dejan claro de un vistazo qué se está filtrando */}
         {chips.length > 0 && (
