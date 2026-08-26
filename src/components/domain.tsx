@@ -83,9 +83,26 @@ export function ResourceBadge({ resource, className }: { resource: string | null
 
 // Clasificación interna del recurso "Asociación EM" (Centro de día / Asociación).
 const EM_CATEGORY_STYLES: Record<string, string> = {
-  "Centro de día": "bg-violet-100 text-violet-800 border-violet-200",
-  "Asociación": "bg-sky-100 text-sky-800 border-sky-200",
+  "Centro de día": "bg-rose-100 text-rose-900 border-rose-200",
+  "Asociación": "bg-teal-100 text-teal-900 border-teal-200",
 };
+// Colores identificativos de la clasificación EM para los AVATARES (círculos).
+// Un único sitio donde viven estos colores: si algún día quieres cambiarlos,
+// se cambian aquí y afectan a toda la app.
+//   Centro de día → burdeos   |   Asociación → azul verdoso
+export const EM_CATEGORY_AVATAR_COLORS: Record<string, string> = {
+  "Centro de día": "#8a2846", // burdeos
+  "Asociación": "#0f766e",    // azul verdoso (teal)
+};
+// Color neutro para quien no tiene clasificación EM (Domicilio, o EM sin
+// clasificar todavía). Así el avatar deja de ser un color aleatorio.
+export const UNCLASSIFIED_AVATAR_COLOR = "#64748b";
+
+// Devuelve el color de avatar que corresponde a una clasificación EM.
+export function emCategoryAvatarColor(category: string | null | undefined): string {
+  return (category && EM_CATEGORY_AVATAR_COLORS[category]) || UNCLASSIFIED_AVATAR_COLOR;
+}
+
 export function EmCategoryBadge({ category, className }: { category: string | null; className?: string }) {
   if (!category) return null;
   return (

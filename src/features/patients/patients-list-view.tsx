@@ -15,7 +15,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Avatar, SpecialtyBadge, StatusBadge, ResourceBadge, EmCategoryBadge, formatRelative } from "@/components/domain";
+import { Avatar, SpecialtyBadge, StatusBadge, ResourceBadge, EmCategoryBadge, emCategoryAvatarColor, formatRelative } from "@/components/domain";
 import { Search, Plus, Users, AlertTriangle, SlidersHorizontal, X, ArrowUp, ArrowDown } from "lucide-react";
 import type { Specialty, PatientStatus, PatientDTO } from "@/types/domain";
 import { RESOURCE_KEYS, EM_CATEGORIES, EM_RESOURCE_KEY } from "@/lib/schemas";
@@ -325,7 +325,7 @@ export function PatientsListView() {
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3 min-w-0">
-                          <Avatar name={p.fullName} color={p.color} size={36} />
+                          <Avatar name={p.fullName} color={emCategoryAvatarColor(p.emCategory)} size={36} />
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-medium truncate">{p.fullName}</p>
@@ -387,7 +387,7 @@ export function PatientsListView() {
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <Avatar name={p.fullName} color={p.color} size={44} />
+                  <Avatar name={p.fullName} color={emCategoryAvatarColor(p.emCategory)} size={44} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-sm truncate">{p.fullName}</p>
