@@ -123,6 +123,9 @@ model Assessment {
                         // VAVDI only) — stored rather than recomputed on
                         // read, so a past assessment's conclusion doesn't
                         // silently change if the scoring rules evolve.
+  inventoryData String? // JSON del "Inventario de AVDs" (escala cualitativa
+                        // de Asociación): datos por ítem + filas "Otras" +
+                        // percepción/conclusión. Ver src/lib/adl-inventory.ts
   notes       String?
   date        DateTime @default(now())
   createdAt   DateTime @default(now())

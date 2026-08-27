@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { assessmentCreateSchema, type AssessmentCreateInput, STRUCTURED_SCALES, QUALITATIVE_SCALES, ASSESSMENT_CATEGORIES, RESOURCE_KEYS, SCALE_GROUPS } from "@/lib/schemas";
+import { assessmentCreateSchema, type AssessmentCreateInput, STRUCTURED_SCALES, QUALITATIVE_SCALES, ASSESSMENT_CATEGORIES, ASSOCIATION_ONLY_SCALES, RESOURCE_KEYS, SCALE_GROUPS } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -37,6 +37,8 @@ import {
 import { formatScaleScore, isScaleComplete, STRUCTURED_SCALE_DEFINITIONS, computeScaleSubscales } from "@/lib/scales";
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { CopmFields, formatCopmScore } from "./copm-fields";
+import { AdlInventoryFields } from "./adl-inventory-fields";
+import { ADL_INVENTORY_SCALE, buildEmptyAdlInventory, summarizeAdlInventory, type AdlInventoryData } from "@/lib/adl-inventory";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { NewVisitForm } from "@/features/visits/new-visit-form";
 import { EvolutionTable } from "./evolution-table";
@@ -546,6 +548,7 @@ export function PatientDetailView() {
           <AssessmentForm
             patientId={patient.id}
             therapistId={patient.therapistIds[0] ?? professionals?.[0]?.id ?? ""}
+            emCategory={patient.emCategory}
           />
         </TabsContent>}
 
@@ -828,11 +831,12 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   cognitiva: Brain,
 };
 
-function AssessmentForm({ patientId, therapistId }: { patientId: string; therapistId: string }) {
+function AssessmentForm({ patientId, therapistId, emCategory }: { patientId: string; therapistId: string; emCategory: string | null }) {
   const create = useCreateAssessment();
   const [itemScores, setItemScores] = useState<Record<string, number>>({});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [copmData, setCopmData] = useState<any>(null);
+  const [inventory, setInventory] = useState<AdlInventoryData>(() => buildEmptyAdlInventory());
   const [activeCategory, setActiveCategory] = useState<string>(ASSESSMENT_CATEGORIES[0].key);
   const {
     register,
@@ -860,6 +864,8 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
   const isCopm = scale === "COPM";
   const isStructured = (STRUCTURED_SCALES as readonly string[]).includes(scale);
   const isQualitative = (QUALITATIVE_SCALES as readonly string[]).includes(scale);
+  const isInventory = scale === ADL_INVENTORY_SCALE;
+  const isAssociation = emCategory === "Asociación";
 
   // Keep the (hidden, but still registered) `score` field in sync with the
   // computed total as items are answered.
@@ -868,8 +874,10 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
       setValue("score", formatCopmScore(itemScores), { shouldValidate: false });
     } else if (isStructured) {
       setValue("score", formatScaleScore(scale, itemScores), { shouldValidate: false });
+    } else if (isInventory) {
+      setValue("score", summarizeAdlInventory(inventory), { shouldValidate: false });
     }
-  }, [isStructured, isCopm, scale, itemScores, setValue]);
+  }, [isStructured, isCopm, isInventory, scale, itemScores, inventory, setValue]);
 
   async function onSubmit(values: AssessmentCreateInput) {
     const payload = isStructured
@@ -879,12 +887,19 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
           // For COPM, store the full problem data in areaSummary
           ...(isCopm && copmData ? { areaSummary: copmData } : {}),
         }
-      : values;
+      : isInventory
+        ? {
+            ...values,
+            inventoryData: JSON.stringify(inventory),
+            score: summarizeAdlInventory(inventory),
+          }
+        : values;
     try {
       await create.mutateAsync(payload);
       toast({ title: "Evaluación registrada" });
       setItemScores({});
       setCopmData(null);
+      setInventory(buildEmptyAdlInventory());
       reset({ ...values, score: "", notes: "" });
     } catch {
       toast({
@@ -899,6 +914,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
     setValue("scale", value);
     setItemScores({});
     setCopmData(null);
+    setInventory(buildEmptyAdlInventory());
   }
 
   return (
@@ -940,7 +956,9 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
               {ASSESSMENT_CATEGORIES.find((c) => c.key === activeCategory)?.scales.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic px-1 py-1.5">Próximamente</p>
               ) : (
-                ASSESSMENT_CATEGORIES.find((c) => c.key === activeCategory)?.scales.map((s) => (
+                ASSESSMENT_CATEGORIES.find((c) => c.key === activeCategory)?.scales
+                  .filter((s) => isAssociation || !(ASSOCIATION_ONLY_SCALES as readonly string[]).includes(s))
+                  .map((s) => (
                   <button
                     key={s}
                     type="button"
@@ -961,7 +979,7 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
             <Input id="date" type="date" {...register("date")} />
             {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
           </div>
-          {(scale as string) === "" ? null : isStructured ? (
+          {(scale as string) === "" ? null : isStructured || isInventory ? (
             <input type="hidden" {...register("score")} />
           ) : isQualitative ? (
             <div className="space-y-1.5 sm:col-span-2">
@@ -987,6 +1005,8 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
             />
           ) : isStructured ? (
             <StructuredScaleFields scale={scale} itemScores={itemScores} onChange={setItemScores} />
+          ) : isInventory ? (
+            <AdlInventoryFields data={inventory} onChange={setInventory} />
           ) : null}
 
           <div className="space-y-1.5 sm:col-span-2">
@@ -1000,7 +1020,10 @@ function AssessmentForm({ patientId, therapistId }: { patientId: string; therapi
               disabled={
                 create.isPending ||
                 (scale as string) === "" ||
-                (isStructured && !isCopm && !isScaleComplete(scale, itemScores))
+                (isStructured && !isCopm && !isScaleComplete(scale, itemScores)) ||
+                (isInventory &&
+                  !Object.values(inventory.items).some((i) => i.autonomy) &&
+                  !inventory.customRows.some((r) => r.autonomy))
               }
             >
               {create.isPending ? "Guardando…" : "Añadir evaluación"}

@@ -79,6 +79,7 @@ export const ASSESSMENT_SCALES = [
   "Esterognosia",
   "Propiocepción",
   "MFIS",
+  "Inventario de AVDs",
 ] as const;
 
 // Scales with a structured, item-by-item form (score is computed, not
@@ -107,12 +108,17 @@ export const SCALE_GROUPS = [
 // (more granular) evolution-table grouping — kept separate so each view
 // can group scales the way that's clearest for its own purpose.
 export const ASSESSMENT_CATEGORIES = [
-  { key: "avd", label: "AVD", scales: ["VAVDI", "Barthel", "Lawton-Brody", "COPM", "TUG"] },
+  { key: "avd", label: "AVD", scales: ["VAVDI", "Barthel", "Lawton-Brody", "COPM", "TUG", "Inventario de AVDs"] },
   { key: "destreza", label: "Destreza", scales: ["9HPT", "Box and Block", "JAMAR", "Minnesota"] },
   { key: "sensibilidad", label: "Sensibilidad", scales: ["Monofilamentos", "Esterognosia", "Propiocepción"] },
   { key: "fatiga", label: "Fatiga", scales: ["MFIS"] },
   { key: "cognitiva", label: "Cognitiva", scales: [] },
 ] as const;
+
+// Escalas que solo se ofrecen a usuarios/as del recurso "Asociación EM" con
+// clasificación "Asociación" (no Centro de día). El selector de Valoración las
+// oculta para el resto.
+export const ASSOCIATION_ONLY_SCALES = ["Inventario de AVDs"] as const;
 
 export const PROFESSIONAL_COLORS = [
   "#1a5c58", // brand teal
@@ -272,6 +278,8 @@ export const assessmentCreateSchema = z.object({
   itemScores: z.record(z.string(), z.number()).optional(),
   // For COPM: stores problem descriptions; for Barthel/VAVDI: strengths/areas.
   areaSummary: z.any().optional(),
+  // JSON serializado del "Inventario de AVDs" (solo esa escala).
+  inventoryData: z.string().optional(),
   notes: z.string().optional().default(""),
   date: z.string().min(1, "La fecha es obligatoria"),
 });
@@ -284,6 +292,8 @@ export const assessmentUpdateSchema = z.object({
   score: z.string().min(1, "La puntuación es obligatoria"),
   itemScores: z.record(z.string(), z.number()).optional(),
   areaSummary: z.any().optional(),
+  // JSON serializado del "Inventario de AVDs" (solo esa escala).
+  inventoryData: z.string().optional(),
   notes: z.string().optional().default(""),
   date: z.string().min(1, "La fecha es obligatoria"),
 });

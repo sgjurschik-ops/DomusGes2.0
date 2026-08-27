@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
       score: d.score,
       itemScores: d.itemScores ? JSON.stringify(d.itemScores) : null,
       areaSummary: areaSummaryData ? JSON.stringify(areaSummaryData) : null,
+      inventoryData: d.inventoryData ?? null,
       notes: d.notes || null,
       date: new Date(d.date),
     },
