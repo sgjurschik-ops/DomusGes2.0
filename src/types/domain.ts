@@ -30,7 +30,8 @@ export type AssessmentScale =
   | "GAD-7" // Ansiedad
   | "Mini-Mental" // Estado cognitivo
   | "COPM"  // Medida Canadiense del Desempeño Ocupacional
-  | "FIM"; // Independencia funcional
+  | "FIM" // Independencia funcional
+  | "Inventario de AVDs"; // Actividades básicas e instrumentales
 
 // View identifiers for client-side navigation.
 // The app is a single / route; views are switched via Zustand store.
