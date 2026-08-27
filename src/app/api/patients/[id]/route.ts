@@ -87,6 +87,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       startDate: body.startDate !== undefined ? new Date(body.startDate) : undefined,
       referentName: body.referentName !== undefined ? (body.referentName || null) : undefined,
       referentPhone: body.referentPhone !== undefined ? (body.referentPhone || null) : undefined,
+      referent: body.referent !== undefined ? (body.referent || null) : undefined,
+      careTeamReferent: body.careTeamReferent !== undefined ? (body.careTeamReferent || null) : undefined,
       therapists: therapistUpdate,
       quickNotes: body.quickNotes,
       ...(isAdmin ? {} : {

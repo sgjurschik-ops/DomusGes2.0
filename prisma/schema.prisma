@@ -65,6 +65,9 @@ model Patient {
   startDate     DateTime @default(now())
   referentName  String?
   referentPhone String?
+  referent          String? // "Referente" (texto libre; en el futuro podrá
+                            // enlazar a un profesional del sistema)
+  careTeamReferent  String? // "Referente equipo de cuidados" (texto libre)
   color         String   @default("#1a5c58")
   quickNotes    String?  // JSON-encoded QuickNote[]: { id, text, color }[]
   createdAt     DateTime @default(now())

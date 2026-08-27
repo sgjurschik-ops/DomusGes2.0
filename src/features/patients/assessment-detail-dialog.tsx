@@ -17,6 +17,8 @@ import {
   SCALE_GROUPS,
 } from "@/lib/schemas";
 import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS, computeScaleSubscales } from "@/lib/scales";
+import { AdlInventoryView } from "./adl-inventory-view";
+import { ADL_INVENTORY_SCALE, parseAdlInventory } from "@/lib/adl-inventory";
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { CopmFields, formatCopmScore, type CopmData } from "./copm-fields";
 import { AreaSummaryView } from "./area-summary-view";
@@ -187,6 +189,7 @@ function AssessmentSummary({
   const remove = useDeleteAssessment();
   const def = STRUCTURED_SCALE_DEFINITIONS[assessment.scale];
   const isCopm = assessment.scale === "COPM";
+  const isInventory = assessment.scale === ADL_INVENTORY_SCALE;
   const subscaleTotals = assessment.itemScores
     ? computeScaleSubscales(assessment.scale, assessment.itemScores)
     : null;
@@ -216,6 +219,8 @@ function AssessmentSummary({
 
       {isCopm ? (
         <CopmSummary assessment={assessment} />
+      ) : isInventory ? (
+        <AdlInventoryView data={parseAdlInventory(assessment.inventoryData)} />
       ) : def && assessment.itemScores ? (
         <>
           <div className="rounded-lg border bg-muted/40 px-4 py-3">

@@ -219,6 +219,8 @@ export const patientCreateSchema = z
     startDate: z.string().min(1, "La fecha de inicio es obligatoria"),
     referentName: z.string().optional().default(""),
     referentPhone: z.string().optional().default(""),
+    referent: z.string().optional().default(""),
+    careTeamReferent: z.string().optional().default(""),
     therapistIds: z.array(z.string()).default([]),
   })
   .superRefine((d, ctx) => {

@@ -79,6 +79,8 @@ export function NewPatientForm({ mode = "create" }: Props) {
       startDate: new Date().toISOString().slice(0, 10),
       referentName: "",
       referentPhone: "",
+      referent: "",
+      careTeamReferent: "",
       therapistIds: [],
     },
   });
@@ -102,6 +104,8 @@ export function NewPatientForm({ mode = "create" }: Props) {
       startDate: patient.startDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
       referentName: patient.referentName ?? "",
       referentPhone: patient.referentPhone ?? "",
+      referent: patient.referent ?? "",
+      careTeamReferent: patient.careTeamReferent ?? "",
       therapistIds: patient.therapistIds ?? [],
     });
   }, [isEdit, patient, reset]);
@@ -302,6 +306,12 @@ export function NewPatientForm({ mode = "create" }: Props) {
             </Field>
             <Field label="Teléfono del referente" error={errors.referentPhone?.message}>
               <Input id="referentPhone" {...register("referentPhone")} />
+            </Field>
+            <Field label="Referente" error={errors.referent?.message}>
+              <Input id="referent" {...register("referent")} />
+            </Field>
+            <Field label="Referente equipo de cuidados" error={errors.careTeamReferent?.message}>
+              <Input id="careTeamReferent" {...register("careTeamReferent")} />
             </Field>
             <div className="sm:col-span-2 space-y-2">
               <Label>Terapeutas asignados</Label>

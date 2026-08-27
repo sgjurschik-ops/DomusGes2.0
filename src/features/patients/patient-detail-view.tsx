@@ -207,8 +207,18 @@ export function PatientDetailView() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <User2 className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Referente:</span>
+                  <span className="text-muted-foreground">Referente familiar:</span>
                   <span className="font-medium">{patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <User2 className="w-3 h-3 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Referente:</span>
+                  <span className="font-medium">{patient.referent || "—"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <User2 className="w-3 h-3 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Referente equipo de cuidados:</span>
+                  <span className="font-medium">{patient.careTeamReferent || "—"}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-3 h-3 text-muted-foreground shrink-0" />

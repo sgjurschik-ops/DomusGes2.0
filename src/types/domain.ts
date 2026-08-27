@@ -85,6 +85,8 @@ export interface PatientDTO {
   startDate: string; // ISO
   referentName: string | null;
   referentPhone: string | null;
+  referent: string | null;
+  careTeamReferent: string | null;
   color: string;
   therapistIds: string[];
   therapistNames: string[];
@@ -132,6 +134,7 @@ export interface AssessmentDTO {
   score: string;
   itemScores: Record<string, number> | null;
   areaSummary: AreaSummaryData | null;
+  inventoryData: string | null;
   notes: string | null;
   date: string;
 }

@@ -281,6 +281,8 @@ export function mapPatient(
     startDate: p.startDate.toISOString(),
     referentName: p.referentName,
     referentPhone: p.referentPhone,
+    referent: p.referent,
+    careTeamReferent: p.careTeamReferent,
     color: p.color,
     quickNotes: p.quickNotes ?? null,
     therapistIds: p.therapists.map((t) => t.id),
@@ -336,6 +338,7 @@ export function mapAssessment(a: AssessmentWithRels) {
     score: a.score,
     itemScores: a.itemScores ? (JSON.parse(a.itemScores) as Record<string, number>) : null,
     areaSummary: a.areaSummary ? (JSON.parse(a.areaSummary) as AreaSummaryData) : null,
+    inventoryData: a.inventoryData ?? null,
     notes: a.notes,
     date: a.date.toISOString(),
   };
