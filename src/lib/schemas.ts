@@ -115,10 +115,10 @@ export const ASSESSMENT_CATEGORIES = [
   { key: "cognitiva", label: "Cognitiva", scales: [] },
 ] as const;
 
-// Escalas que solo se ofrecen a usuarios/as del recurso "Asociación EM" con
-// clasificación "Asociación" (no Centro de día). El selector de Valoración las
-// oculta para el resto.
-export const ASSOCIATION_ONLY_SCALES = ["Inventario de AVDs"] as const;
+// Escalas que solo se ofrecen a usuarios/as del recurso "Asociación EM"
+// (tanto Centro de día como Asociación). El selector de Valoración las oculta
+// para Domicilio.
+export const EM_ONLY_SCALES = ["Inventario de AVDs"] as const;
 
 export const PROFESSIONAL_COLORS = [
   "#1a5c58", // brand teal

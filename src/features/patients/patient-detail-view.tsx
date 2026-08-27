@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { assessmentCreateSchema, type AssessmentCreateInput, STRUCTURED_SCALES, QUALITATIVE_SCALES, ASSESSMENT_CATEGORIES, ASSOCIATION_ONLY_SCALES, RESOURCE_KEYS, SCALE_GROUPS } from "@/lib/schemas";
+import { assessmentCreateSchema, type AssessmentCreateInput, STRUCTURED_SCALES, QUALITATIVE_SCALES, ASSESSMENT_CATEGORIES, EM_ONLY_SCALES, EM_RESOURCE_KEY, RESOURCE_KEYS, SCALE_GROUPS } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -548,7 +548,7 @@ export function PatientDetailView() {
           <AssessmentForm
             patientId={patient.id}
             therapistId={patient.therapistIds[0] ?? professionals?.[0]?.id ?? ""}
-            emCategory={patient.emCategory}
+            resource={patient.resource}
           />
         </TabsContent>}
 
@@ -831,7 +831,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   cognitiva: Brain,
 };
 
-function AssessmentForm({ patientId, therapistId, emCategory }: { patientId: string; therapistId: string; emCategory: string | null }) {
+function AssessmentForm({ patientId, therapistId, resource }: { patientId: string; therapistId: string; resource: string | null }) {
   const create = useCreateAssessment();
   const [itemScores, setItemScores] = useState<Record<string, number>>({});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -865,7 +865,7 @@ function AssessmentForm({ patientId, therapistId, emCategory }: { patientId: str
   const isStructured = (STRUCTURED_SCALES as readonly string[]).includes(scale);
   const isQualitative = (QUALITATIVE_SCALES as readonly string[]).includes(scale);
   const isInventory = scale === ADL_INVENTORY_SCALE;
-  const isAssociation = emCategory === "Asociación";
+  const isEM = resource === EM_RESOURCE_KEY;
 
   // Keep the (hidden, but still registered) `score` field in sync with the
   // computed total as items are answered.
@@ -957,7 +957,7 @@ function AssessmentForm({ patientId, therapistId, emCategory }: { patientId: str
                 <p className="text-xs text-muted-foreground italic px-1 py-1.5">Próximamente</p>
               ) : (
                 ASSESSMENT_CATEGORIES.find((c) => c.key === activeCategory)?.scales
-                  .filter((s) => isAssociation || !(ASSOCIATION_ONLY_SCALES as readonly string[]).includes(s))
+                  .filter((s) => isEM || !(EM_ONLY_SCALES as readonly string[]).includes(s))
                   .map((s) => (
                   <button
                     key={s}
