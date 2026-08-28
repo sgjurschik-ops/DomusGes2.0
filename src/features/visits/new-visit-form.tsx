@@ -60,11 +60,25 @@ type Props = {
    * falling back to a separate, more limited dialog.
    */
   editVisit?: VisitDTO;
+  /**
+   * Tipo de registro que gestiona este formulario:
+   *  - "seguimiento" (por defecto): compartido; muestra Objetivos/GAS e
+   *    Intervenciones realizadas; SIN creación de tareas.
+   *  - "intervencion": privado del profesional; muestra Tareas (con arrastre
+   *    de pendientes), SIN Objetivos/GAS ni Intervenciones realizadas.
+   */
+  kind?: "seguimiento" | "intervencion";
   onClose: () => void;
 };
 
-export function NewVisitForm({ open, patientId, patientName, previousVisit, editVisit, onClose }: Props) {
+export function NewVisitForm({ open, patientId, patientName, previousVisit, editVisit, kind = "seguimiento", onClose }: Props) {
   const isEditMode = !!editVisit;
+  const isIntervention = kind === "intervencion";
+  const showTasks = isIntervention;
+  const showGoals = !isIntervention;
+  const showInterventions = !isIntervention;
+  const noun = isIntervention ? "intervención" : "seguimiento";
+  const Noun = isIntervention ? "Intervención" : "Seguimiento";
   const create = useCreateVisit();
   const update = useUpdateVisit();
   const del = useDeleteVisit();
@@ -129,7 +143,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
     if (!open) return;
     reset(buildDefaults());
     if (!editVisit && me?.id) setValue("therapistId", me.id);
-    setPreviousTasks(isEditMode ? [] : (previousVisit?.tasks ?? []).filter((t) => !t.completed));
+    setPreviousTasks(!showTasks || isEditMode ? [] : (previousVisit?.tasks ?? []).filter((t) => !t.completed));
     setTaskInput("");
     setInterventionInput("");
 
@@ -164,46 +178,52 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
       try {
         const { patientId: _pid, ...updateData } = values;
         await update.mutateAsync({ id: editVisit.id, data: updateData });
-        toast({ title: "Seguimiento actualizado", description: patientName });
+        toast({ title: `${Noun} actualizada`, description: patientName });
         onClose();
       } catch {
-        toast({ title: "Error al actualizar seguimiento", variant: "destructive" });
+        toast({ title: `Error al actualizar ${noun}`, variant: "destructive" });
       }
       return;
     }
     try {
-      // Update previous visit's tasks with completion status marked in this form.
-      if (previousVisit && previousTasks.length > 0) {
-        await fetch(`/api/visits/${previousVisit.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tasks: JSON.stringify(previousTasks) }),
-        }).catch(() => {});
+      // Solo las intervenciones (showTasks) arrastran tareas pendientes de la
+      // sesión anterior; los seguimientos ya no gestionan tareas.
+      let tasks = values.tasks ?? [];
+      if (showTasks) {
+        // Update previous visit's tasks with completion status marked in this form.
+        if (previousVisit && previousTasks.length > 0) {
+          await fetch(`/api/visits/${previousVisit.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tasks: JSON.stringify(previousTasks) }),
+          }).catch(() => {});
+        }
+        // Carry forward any task still pending from the previous visit into
+        // THIS visit's own tasks. Otherwise, once this visit becomes the
+        // "previous visit" for the next one, only its own tasks are reviewed
+        // — anything left pending 2+ visits back would silently disappear
+        // instead of continuing to show up as pending.
+        const stillPending = previousTasks.filter((t) => !t.completed);
+        tasks = [...stillPending, ...(values.tasks ?? [])];
       }
-      // Carry forward any task still pending from the previous visit into
-      // THIS visit's own tasks. Otherwise, once this visit becomes the
-      // "previous visit" for the next one, only its own tasks are reviewed
-      // — anything left pending 2+ visits back would silently disappear
-      // instead of continuing to show up as pending.
-      const stillPending = previousTasks.filter((t) => !t.completed);
-      const payload = { ...values, tasks: [...stillPending, ...(values.tasks ?? [])] };
+      const payload = { ...values, kind, tasks };
       await create.mutateAsync(payload);
-      toast({ title: "Seguimiento registrado", description: patientName });
+      toast({ title: `${Noun} registrada`, description: patientName });
       onClose();
     } catch {
-      toast({ title: "Error al registrar seguimiento", variant: "destructive" });
+      toast({ title: `Error al registrar ${noun}`, variant: "destructive" });
     }
   }
 
   async function handleDelete() {
     if (!editVisit) return;
-    if (!confirm("¿Eliminar este seguimiento? Esta acción no se puede deshacer.")) return;
+    if (!confirm(`¿Eliminar esta ${noun}? Esta acción no se puede deshacer.`)) return;
     try {
       await del.mutateAsync({ id: editVisit.id, patientId });
-      toast({ title: "Seguimiento eliminado" });
+      toast({ title: `${Noun} eliminada` });
       onClose();
     } catch {
-      toast({ title: "Error", description: "No se ha podido eliminar el seguimiento.", variant: "destructive" });
+      toast({ title: "Error", description: `No se ha podido eliminar la ${noun}.`, variant: "destructive" });
     }
   }
 
@@ -243,7 +263,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
       <SheetContent side="right" className="w-full sm:max-w-2xl p-0">
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full min-h-0">
           <SheetHeader>
-            <SheetTitle>{isEditMode ? "Editar seguimiento" : "Nuevo seguimiento"}</SheetTitle>
+            <SheetTitle>{isEditMode ? `Editar ${noun}` : `Nueva ${noun}`}</SheetTitle>
             <SheetDescription>
               {isEditMode ? `Corrige los datos registrados · ${patientName}` : patientName}
             </SheetDescription>
@@ -302,7 +322,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
             <div className="h-px bg-border" />
 
             <div className="space-y-1.5">
-              <Label className="text-sm font-semibold">Título del seguimiento <span className="text-destructive">*</span></Label>
+              <Label className="text-sm font-semibold">Título de la {noun} <span className="text-destructive">*</span></Label>
               <Input placeholder="p. ej. Primera valoración, Revisión mensual…" {...register("title")} />
               {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
             </div>
@@ -325,7 +345,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
               {errors.notes && <p className="text-xs text-destructive">{errors.notes.message}</p>}
             </div>
 
-            {patientGoals.length > 0 && (
+            {showGoals && patientGoals.length > 0 && (
               <Controller control={control} name="goalIds"
                 render={({ field }) => {
                   const selected = (field.value ?? []) as string[];
@@ -440,6 +460,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
               </div>
             )}
 
+            {showTasks && (
             <div className="space-y-1.5">
               <Label className="text-xs">Tareas para la próxima sesión</Label>
               <div className="flex gap-2">
@@ -463,7 +484,9 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
                 </div>
               )} />
             </div>
+            )}
 
+            {showInterventions && (
             <div className="space-y-1.5">
               <Label className="text-xs">Intervenciones realizadas</Label>
               <div className="flex gap-2">
@@ -499,6 +522,7 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
                 </div>
               )}
             </div>
+            )}
           </div>
 
           <SheetFooter className="flex-row items-center justify-between gap-2 border-t">

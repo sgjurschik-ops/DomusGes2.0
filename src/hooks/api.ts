@@ -126,10 +126,15 @@ export function useUpdatePatient() {
 }
 // ─── Visits ──────────────────────────────────────────────────────────────────
 
-export function useVisits(patientId?: string) {
+export function useVisits(patientId?: string, kind: "seguimiento" | "intervencion" = "seguimiento") {
   return useQuery<VisitDTO[]>({
-    queryKey: ["visits", patientId ?? "all"],
-    queryFn: () => fetcher(`/api/visits${patientId ? `?patientId=${patientId}` : ""}`),
+    queryKey: ["visits", patientId ?? "all", kind],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (patientId) params.set("patientId", patientId);
+      params.set("kind", kind);
+      return fetcher(`/api/visits?${params.toString()}`);
+    },
   });
 }
 

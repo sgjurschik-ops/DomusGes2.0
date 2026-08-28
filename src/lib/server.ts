@@ -315,6 +315,7 @@ export function mapVisit(v: VisitWithRels) {
     goalIds: JSON.parse(v.goalIds || "[]") as string[],
     gasScores: JSON.parse(v.gasScores || "{}") as Record<string, number>,
     tasks: JSON.parse(v.tasks || "[]") as { id: string; text: string; completed: boolean }[],
+    kind: (v.kind ?? "seguimiento") as "seguimiento" | "intervencion",
     score: v.score,
     createdAt: v.createdAt.toISOString(),
   };

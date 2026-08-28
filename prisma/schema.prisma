@@ -99,6 +99,10 @@ model Visit {
   // (no hace falta una tabla aparte).
   gasScores     String   @default("{}")
   tasks         String   @default("[]") // JSON-encoded Task[] — { id, text, completed }[]
+  // Discriminador: "seguimiento" = compartido (lo ven todos los profesionales);
+  // "intervencion" = privado del profesional autor (solo lo ve/edita/borra él).
+  // Los registros existentes quedan como "seguimiento" por el valor por defecto.
+  kind          String   @default("seguimiento")
   score         Int?     // 0-10 subjective progress
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -108,6 +112,7 @@ model Visit {
 
   @@index([patientId, date])
   @@index([therapistId, date])
+  @@index([patientId, kind])
 }
 
 model Assessment {

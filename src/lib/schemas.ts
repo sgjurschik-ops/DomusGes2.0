@@ -240,6 +240,9 @@ export type PatientCreateInput = z.infer<typeof patientCreateSchema>;
 
 // ─── Visit ───────────────────────────────────────────────────────────────────
 
+export const VISIT_KINDS = ["seguimiento", "intervencion"] as const;
+export type VisitKind = (typeof VISIT_KINDS)[number];
+
 export const visitCreateSchema = z.object({
   patientId: z.string().min(1, "Paciente obligatorio"),
   therapistId: z.string().min(1, "Terapeuta obligatorio"),
@@ -252,6 +255,7 @@ export const visitCreateSchema = z.object({
   goalIds: z.array(z.string()).default([]),
   gasScores: z.record(z.string(), z.number().int().min(-2).max(2)).default({}),
   tasks: z.array(z.object({ id: z.string(), text: z.string(), completed: z.boolean() })).default([]),
+  kind: z.enum(VISIT_KINDS).default("seguimiento"),
 });
 export type VisitCreateInput = z.infer<typeof visitCreateSchema>;
 
@@ -266,6 +270,7 @@ export const visitUpdateSchema = z.object({
   goalIds: z.array(z.string()).default([]),
   gasScores: z.record(z.string(), z.number().int().min(-2).max(2)).default({}),
   tasks: z.array(z.object({ id: z.string(), text: z.string(), completed: z.boolean() })).default([]),
+  kind: z.enum(VISIT_KINDS).default("seguimiento"),
 });
 export type VisitUpdateInput = z.infer<typeof visitUpdateSchema>;
 

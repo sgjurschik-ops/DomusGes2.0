@@ -20,6 +20,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   if (!(await canViewClinical(prof, row.patientId))) {
     return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
   }
+  // PRIVACIDAD: una intervención privada solo la puede ver su autor.
+  if (row.kind === "intervencion" && row.therapistId !== prof.id) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
   await audit(prof.id, "visit.view", "Visit", row.id, { patientId: row.patientId });
   return NextResponse.json(mapVisit(row));
 }
@@ -28,9 +32,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id } = await params;
 
-  const existing = await db.visit.findUnique({ where: { id }, select: { patientId: true } });
+  const existing = await db.visit.findUnique({ where: { id }, select: { patientId: true, kind: true, therapistId: true } });
   if (!existing) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   if (!(await canEditClinical(prof, existing.patientId))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
+  // PRIVACIDAD: una intervención privada solo la puede editar su autor.
+  if (existing.kind === "intervencion" && existing.therapistId !== prof.id) {
     return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 
@@ -88,6 +96,10 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   const existing = await db.visit.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   if (!(await canEditClinical(prof, existing.patientId))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
+  // PRIVACIDAD: una intervención privada solo la puede borrar su autor.
+  if (existing.kind === "intervencion" && existing.therapistId !== prof.id) {
     return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
   }
 

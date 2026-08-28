@@ -109,6 +109,8 @@ export interface VisitDTO {
   // Puntuación GAS (-2 a +2) registrada en ESTE seguimiento, por objetivo.
   gasScores: Record<string, number>;
   tasks: { id: string; text: string; completed: boolean }[];
+  // "seguimiento" = compartido | "intervencion" = privado del profesional autor
+  kind: "seguimiento" | "intervencion";
   score: number | null;
   createdAt: string;
 }

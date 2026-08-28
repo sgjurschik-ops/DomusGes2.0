@@ -42,6 +42,7 @@ import { ADL_INVENTORY_SCALE, buildEmptyAdlInventory, summarizeAdlInventory, typ
 import { openVisitsPrint, type ExportVisit } from "@/lib/visits-export";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { NewVisitForm } from "@/features/visits/new-visit-form";
+import { InterventionsTab } from "./interventions-tab";
 import { EvolutionTable } from "./evolution-table";
 import { PatientReportDialog } from "./patient-report-dialog";
 import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle, FileDown, Activity, ListChecks, StickyNote, Home, Hand, Fingerprint, BatteryLow, Brain, type LucideIcon } from "lucide-react";
@@ -289,6 +290,7 @@ export function PatientDetailView() {
         <TabsList className={`inline-flex w-full max-w-4xl gap-1.5 overflow-x-auto ${isAdmin ? "max-w-xs" : ""}`}>
           <TabsTrigger value="overview" className="shrink-0">Resumen</TabsTrigger>
           {!isAdmin && <TabsTrigger value="visits" className="shrink-0">Seguimientos</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="interventions" className="shrink-0">Intervenciones</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="occupational-profile" className="shrink-0">{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="intervention-plan" className="shrink-0">{isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="assessments" className="shrink-0">Valoración</TabsTrigger>}
@@ -586,6 +588,11 @@ export function PatientDetailView() {
               </Card>
             ))
           )}
+        </TabsContent>}
+
+        {/* Interventions (private per professional) — hidden for admin */}
+        {!isAdmin && <TabsContent value="interventions" className="mt-4">
+          <InterventionsTab patientId={patient.id} patientName={patient.fullName} />
         </TabsContent>}
 
 {/* Occupational profile — hidden for admin */}
