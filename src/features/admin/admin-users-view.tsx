@@ -506,7 +506,7 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
     defaultValues: {
       name: "",
       email: "",
-      role: "Terapeuta Ocupacional",
+      role: "Terapia ocupacional",
       numColegiado: "",
       phone: "",
       color: PROFESSIONAL_COLORS[0],

@@ -46,18 +46,20 @@ export const EM_RESOURCE_KEY = "Asociación EM";
 // distingue a quién pertenece al Centro de día de quién es de la Asociación.
 export const EM_CATEGORIES = ["Centro de día", "Asociación"] as const;
 export type EmCategory = (typeof EM_CATEGORIES)[number];
+// Perfiles profesionales de Asociación EM. "Administrador" se conserva como
+// perfil de gestión (no clínico); no forma parte de los 7 perfiles clínicos
+// pero debe seguir siendo un valor válido para las cuentas de gestión.
+// Los permisos NO dependen de este campo, sino de `userRole` (admin/therapist/
+// guest), así que la profesión es solo una etiqueta.
 export const PROFESSIONAL_ROLES = [
-  "Fisioterapeuta",
-  "Terapeuta Ocupacional",
-  "Psicólogo/a Clínico/a",
-  "Enfermero/a",
-  "Médico/a",
-  "Trabajador/a Social",
-  "Logopeda",
-  "Auxiliar de Enfermería",
-  "TCAE",
+  "Terapia ocupacional",
+  "Fisioterapia",
+  "Psicología",
+  "Neuropsicología",
+  "Trabajo Social",
+  "Terapeuta Petö",
+  "Cuidados",
   "Administrador",
-  "Otro",
 ] as const;
 export const APPOINTMENT_STATUSES = [
   "programada",

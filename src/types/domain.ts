@@ -6,17 +6,14 @@ export type Specialty = "Fisioterapia" | "Psicología" | "T. Ocupacional";
 export type PatientStatus = "Activo" | "En seguimiento" | "Alta" | "Pausado";
 
 export type ProfessionalRole =
-  | "Fisioterapeuta"
-  | "Terapeuta Ocupacional"
-  | "Psicólogo/a Clínico/a"
-  | "Enfermero/a"
-  | "Médico/a"
-  | "Trabajador/a Social"
-  | "Logopeda"
-  | "Auxiliar de Enfermería"
-  | "TCAE"
-  | "Administrador"
-  | "Otro";
+  | "Terapia ocupacional"
+  | "Fisioterapia"
+  | "Psicología"
+  | "Neuropsicología"
+  | "Trabajo Social"
+  | "Terapeuta Petö"
+  | "Cuidados"
+  | "Administrador";
 
 export type AppointmentType = "Sesión" | "Valoración" | "Seguimiento" | "Coordinación";
 export type AppointmentStatus = "programada" | "completada" | "cancelada" | "no_show";

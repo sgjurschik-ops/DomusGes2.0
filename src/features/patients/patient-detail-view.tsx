@@ -92,12 +92,18 @@ export function PatientDetailView() {
 
   const [patientGoals, setPatientGoals] = useState<{ id: string; text: string; area: string }[]>([]);
 
+  // Mapa profesional → profesión, para mostrar autor + profesión en los
+  // seguimientos (compartidos) y en la exportación.
+  const roleById = useMemo(
+    () => new Map((professionals ?? []).map((p) => [p.id, p.role])),
+    [professionals],
+  );
+
   // Exporta a PDF imprimible todos los seguimientos de este/a usuario/a,
   // reutilizando los datos ya cargados (no vuelve a pedir nada al servidor).
   // Incluye autor + profesión, notas, objetivos/GAS, intervenciones y tareas.
   function exportPatientVisits() {
     if (!patient) return;
-    const roleById = new Map((professionals ?? []).map((p) => [p.id, p.role]));
     const exportVisits: ExportVisit[] = (visits ?? []).map((v) => ({
       date: v.date,
       durationMin: v.durationMin,
@@ -286,7 +292,7 @@ export function PatientDetailView() {
           {!isAdmin && <TabsTrigger value="occupational-profile" className="shrink-0">{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="intervention-plan" className="shrink-0">{isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="assessments" className="shrink-0">Valoración</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="progress" className="shrink-0">Evolución</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="progress" className="shrink-0">Evolución escalas</TabsTrigger>}
         </TabsList>
 
         {/* Overview */}
@@ -524,6 +530,7 @@ export function PatientDetailView() {
                       <p className="text-sm font-semibold">{v.title ?? "Seguimiento"}</p>
                       <p className="text-xs text-muted-foreground">
                         {formatDateTime(v.date)} · {v.durationMin} min · {v.therapistName}
+                        {roleById.get(v.therapistId) ? ` · ${roleById.get(v.therapistId)}` : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
