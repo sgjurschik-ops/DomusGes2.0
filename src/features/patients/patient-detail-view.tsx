@@ -107,12 +107,12 @@ export function PatientDetailView() {
       therapistRole: roleById.get(v.therapistId) ?? null,
       interventions: v.interventions,
       tasks: v.tasks,
-      goals: (v.goalIds ?? [])
-        .map((gid) => {
-          const goal = patientGoals.find((g) => g.id === gid);
-          return goal ? { text: goal.text, gas: v.gasScores?.[gid] } : null;
-        })
-        .filter((g): g is { text: string; gas?: number } => g !== null),
+      goals: (v.goalIds ?? []).flatMap((gid) => {
+        const goal = patientGoals.find((g) => g.id === gid);
+        if (!goal) return [];
+        const gas = v.gasScores?.[gid];
+        return [gas === undefined ? { text: goal.text } : { text: goal.text, gas }];
+      }),
     }));
     openVisitsPrint([{ patientName: patient.fullName, visits: exportVisits }], {
       title: patient.fullName,
