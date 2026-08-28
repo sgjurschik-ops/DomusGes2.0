@@ -262,17 +262,33 @@ export function AdlInventoryFields({
                       <p className="px-3 pt-2 text-[11px] text-muted-foreground">{section.note}</p>
                     )}
 
-                    <div className="divide-y">
-                      {section.items.map((item) => (
-                        <div key={item.id} className="px-3 py-3 space-y-2">
-                          <p className="text-sm font-medium">{item.label}</p>
-                          <ItemFields value={data.items[item.id]} onChange={(patch) => updateItem(item.id, patch)} />
-                        </div>
-                      ))}
+                    <div className="p-2.5 space-y-2.5">
+                      {section.items.map((item) => {
+                        const filled = adlItemHasData(data.items[item.id]);
+                        return (
+                          <div
+                            key={item.id}
+                            className={cn(
+                              "rounded-lg border px-3 py-2.5 space-y-2.5",
+                              filled ? "bg-[#1a5c58]/[0.04] border-[#1a5c58]/25" : "bg-background",
+                            )}
+                          >
+                            <p className="text-sm font-semibold flex items-center gap-2">
+                              <span className="w-1 h-4 rounded-full bg-[#1a5c58] shrink-0" />
+                              {item.label}
+                            </p>
+                            <ItemFields value={data.items[item.id]} onChange={(patch) => updateItem(item.id, patch)} />
+                          </div>
+                        );
+                      })}
 
                       {rows.map((row) => (
-                        <div key={row.id} className="px-3 py-3 space-y-2 bg-muted/20">
+                        <div
+                          key={row.id}
+                          className="rounded-lg border border-dashed bg-muted/30 px-3 py-2.5 space-y-2.5"
+                        >
                           <div className="flex items-center gap-2">
+                            <span className="w-1 h-4 rounded-full bg-[#1a5c58]/50 shrink-0" />
                             <Input
                               className="text-sm h-8"
                               placeholder="Otra actividad (escribe cuál)…"
