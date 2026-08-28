@@ -39,6 +39,7 @@ import { StructuredScaleFields } from "./structured-scale-fields";
 import { CopmFields, formatCopmScore } from "./copm-fields";
 import { AdlInventoryFields } from "./adl-inventory-fields";
 import { ADL_INVENTORY_SCALE, buildEmptyAdlInventory, summarizeAdlInventory, type AdlInventoryData } from "@/lib/adl-inventory";
+import { openVisitsPrint, type ExportVisit } from "@/lib/visits-export";
 import { AssessmentDetailDialog } from "./assessment-detail-dialog";
 import { NewVisitForm } from "@/features/visits/new-visit-form";
 import { EvolutionTable } from "./evolution-table";
@@ -90,6 +91,33 @@ export function PatientDetailView() {
   const [profileCompletion, setProfileCompletion] = useState<{ filled: number; total: number } | null>(null);
 
   const [patientGoals, setPatientGoals] = useState<{ id: string; text: string; area: string }[]>([]);
+
+  // Exporta a PDF imprimible todos los seguimientos de este/a usuario/a,
+  // reutilizando los datos ya cargados (no vuelve a pedir nada al servidor).
+  // Incluye autor + profesión, notas, objetivos/GAS, intervenciones y tareas.
+  function exportPatientVisits() {
+    if (!patient) return;
+    const roleById = new Map((professionals ?? []).map((p) => [p.id, p.role]));
+    const exportVisits: ExportVisit[] = (visits ?? []).map((v) => ({
+      date: v.date,
+      durationMin: v.durationMin,
+      title: v.title,
+      notes: v.notes,
+      therapistName: v.therapistName,
+      therapistRole: roleById.get(v.therapistId) ?? null,
+      interventions: v.interventions,
+      tasks: v.tasks,
+      goals: (v.goalIds ?? [])
+        .map((gid) => {
+          const goal = patientGoals.find((g) => g.id === gid);
+          return goal ? { text: goal.text, gas: v.gasScores?.[gid] } : null;
+        })
+        .filter((g): g is { text: string; gas?: number } => g !== null),
+    }));
+    openVisitsPrint([{ patientName: patient.fullName, visits: exportVisits }], {
+      title: patient.fullName,
+    });
+  }
 
   // Fetch patient-reported problems, profile completion, and goals from occupational profile
   useEffect(() => {
@@ -468,7 +496,16 @@ export function PatientDetailView() {
 
         {/* Visits — hidden for admin */}
         {!isAdmin && <TabsContent value="visits" className="mt-4 space-y-3">
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs px-3"
+              onClick={exportPatientVisits}
+              disabled={!visits || visits.length === 0}
+            >
+              <FileDown className="w-3.5 h-3.5 mr-1" />Exportar PDF
+            </Button>
             <Button size="sm" className="h-8 text-xs px-3" onClick={() => setNewVisitOpen(true)} disabled={!professionals?.length}>
               <Plus className="w-3.5 h-3.5 mr-1" />Registrar seguimiento
             </Button>

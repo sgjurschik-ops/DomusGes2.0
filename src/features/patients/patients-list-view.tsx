@@ -16,7 +16,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Avatar, SpecialtyBadge, StatusBadge, ResourceBadge, EmCategoryBadge, emCategoryAvatarColor, formatRelative } from "@/components/domain";
-import { Search, Plus, Users, AlertTriangle, SlidersHorizontal, X, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, Plus, Users, AlertTriangle, SlidersHorizontal, X, ArrowUp, ArrowDown, FileDown } from "lucide-react";
+import { VisitsExportDialog } from "./visits-export-dialog";
 import type { Specialty, PatientStatus, PatientDTO } from "@/types/domain";
 import { RESOURCE_KEYS, EM_CATEGORIES, EM_RESOURCE_KEY } from "@/lib/schemas";
 
@@ -130,8 +131,11 @@ export function PatientsListView() {
     setResource("Todos");
   }
 
+  const [exportOpen, setExportOpen] = useState(false);
+
   return (
     <div className="space-y-4">
+      <VisitsExportDialog open={exportOpen} onOpenChange={setExportOpen} />
       {/* Búsqueda + filtros */}
       <div className="space-y-3">
         <div className="flex gap-2">
@@ -222,6 +226,16 @@ export function PatientsListView() {
               )}
             </PopoverContent>
           </Popover>
+
+          <Button
+            variant="outline"
+            className="gap-2 shrink-0"
+            onClick={() => setExportOpen(true)}
+            title="Exportar seguimientos a PDF"
+          >
+            <FileDown className="w-4 h-4" />
+            <span className="hidden sm:inline">Exportar</span>
+          </Button>
         </div>
 
         {/* Selector rápido de clasificación (solo módulo EM): pulsar uno u otro */}
