@@ -241,24 +241,37 @@ export function NewPatientForm({ mode = "create" }: Props) {
                 )}
               />
             </Field>
-            {resource === EM_RESOURCE_KEY && (
-              <Field label="Clasificación (Asociación EM)" error={errors.emCategory?.message} required>
-                <Controller
-                  control={control}
-                  name="emCategory"
-                  render={({ field }) => (
-                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                      <SelectTrigger id="emCategory"><SelectValue placeholder="Centro de día o Asociación" /></SelectTrigger>
-                      <SelectContent>
-                        {EM_CATEGORIES.map((c) => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-            )}
+            {/*
+              El campo de clasificación se mantiene SIEMPRE montado (registrado
+              en el formulario) y solo se oculta visualmente cuando el recurso no
+              es "Asociación EM". Antes se montaba de forma condicional, y al
+              entrar en "Editar" el <Controller> se montaba después del reset(),
+              por lo que no recibía el valor y la clasificación aparecía vacía.
+              Al estar siempre montado, el reset() lo rellena igual que a
+              "Recurso" (que nunca se vaciaba). La validación sigue exigiéndolo
+              solo cuando el recurso es EM (superRefine del schema).
+            */}
+            <Field
+              label="Clasificación (Asociación EM)"
+              error={errors.emCategory?.message}
+              required
+              className={resource === EM_RESOURCE_KEY ? undefined : "hidden"}
+            >
+              <Controller
+                control={control}
+                name="emCategory"
+                render={({ field }) => (
+                  <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                    <SelectTrigger id="emCategory"><SelectValue placeholder="Centro de día o Asociación" /></SelectTrigger>
+                    <SelectContent>
+                      {EM_CATEGORIES.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
             <Field label="Estado" error={errors.status?.message} required>
               <Controller
                 control={control}

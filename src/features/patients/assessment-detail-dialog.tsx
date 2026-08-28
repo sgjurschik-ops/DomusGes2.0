@@ -19,7 +19,13 @@ import {
 } from "@/lib/schemas";
 import { formatScaleScore, STRUCTURED_SCALE_DEFINITIONS, computeScaleSubscales } from "@/lib/scales";
 import { AdlInventoryView } from "./adl-inventory-view";
-import { ADL_INVENTORY_SCALE, parseAdlInventory } from "@/lib/adl-inventory";
+import { AdlInventoryFields } from "./adl-inventory-fields";
+import {
+  ADL_INVENTORY_SCALE,
+  parseAdlInventory,
+  summarizeAdlInventory,
+  type AdlInventoryData,
+} from "@/lib/adl-inventory";
 import { StructuredScaleFields } from "./structured-scale-fields";
 import { CopmFields, formatCopmScore, type CopmData } from "./copm-fields";
 import { AreaSummaryView } from "./area-summary-view";
@@ -334,6 +340,13 @@ function AssessmentEditForm({
   const [itemScores, setItemScores] = useState<Record<string, number>>(assessment.itemScores ?? {});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [copmData, setCopmData] = useState<any>(assessment.areaSummary ?? null);
+  // Estado del "Inventario de AVDs" al editar: se rehidrata del JSON guardado
+  // (parseAdlInventory admite null y rellena lo que falte). Al no depender del
+  // scale change, si se cambia de escala y se vuelve al inventario, los datos
+  // cargados siguen ahí.
+  const [inventory, setInventory] = useState<AdlInventoryData>(() =>
+    parseAdlInventory(assessment.inventoryData),
+  );
 
   const {
     register,
@@ -355,14 +368,17 @@ function AssessmentEditForm({
   const isCopm = scale === "COPM";
   const isStructured = (STRUCTURED_SCALES as readonly string[]).includes(scale);
   const isQualitative = (QUALITATIVE_SCALES as readonly string[]).includes(scale);
+  const isInventory = scale === ADL_INVENTORY_SCALE;
 
   useEffect(() => {
     if (isCopm) {
       setValue("score", formatCopmScore(itemScores), { shouldValidate: false });
     } else if (isStructured) {
       setValue("score", formatScaleScore(scale, itemScores), { shouldValidate: false });
+    } else if (isInventory) {
+      setValue("score", summarizeAdlInventory(inventory), { shouldValidate: false });
     }
-  }, [isStructured, isCopm, scale, itemScores, setValue]);
+  }, [isStructured, isCopm, isInventory, scale, itemScores, inventory, setValue]);
 
   async function onSubmit(values: AssessmentUpdateInput) {
     try {
@@ -370,7 +386,13 @@ function AssessmentEditForm({
         ? { ...values, itemScores, areaSummary: copmData }
         : isStructured
           ? { ...values, itemScores }
-          : values;
+          : isInventory
+            ? {
+                ...values,
+                inventoryData: JSON.stringify(inventory),
+                score: summarizeAdlInventory(inventory),
+              }
+            : values;
       await update.mutateAsync({ id: assessmentId, data: payload });
       toast({ title: "Evaluación actualizada" });
       onSaved();
@@ -408,7 +430,7 @@ function AssessmentEditForm({
         </Select>
       </div>
 
-      {isStructured ? (
+      {isStructured || isInventory ? (
         <input type="hidden" {...register("score")} />
       ) : isQualitative ? (
         <div className="space-y-1.5 sm:col-span-2">
@@ -442,6 +464,8 @@ function AssessmentEditForm({
         />
       ) : isStructured ? (
         <StructuredScaleFields scale={scale} itemScores={itemScores} onChange={setItemScores} />
+      ) : isInventory ? (
+        <AdlInventoryFields data={inventory} onChange={setInventory} />
       ) : null}
 
       <div className="space-y-1.5 sm:col-span-2">

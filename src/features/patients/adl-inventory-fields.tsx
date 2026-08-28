@@ -5,13 +5,14 @@
 // `onChange`. Todo el contenido clínico (secciones, ítems, semáforos) vive en
 // src/lib/adl-inventory.ts — aquí solo está la interfaz.
 
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Plus, X } from "lucide-react";
+import { Plus, X, ChevronRight } from "lucide-react";
 import {
   ADL_INVENTORY_SECTIONS,
   AUTONOMY_OPTIONS,
@@ -19,6 +20,7 @@ import {
   CONCLUSION_OPTIONS,
   TRAFFIC_LIGHT_COLORS,
   emptyAdlItemData,
+  adlItemHasData,
   type AdlBlock,
   type AdlInventoryData,
   type AdlItemData,
@@ -139,6 +141,39 @@ export function AdlInventoryFields({
   data: AdlInventoryData;
   onChange: (next: AdlInventoryData) => void;
 }) {
+  // Cada sección (Alimentación, Aseo…) se muestra plegada y se despliega al
+  // pulsar su cabecera, para acortar la escala. El estado guarda solo las
+  // secciones abiertas; por defecto todas empiezan plegadas. Como el contenido
+  // vive en `data` (componente controlado), plegar/desplegar nunca pierde datos.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+
+  function toggleSection(id: string) {
+    setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function setAllSections(open: boolean) {
+    if (!open) {
+      setOpenSections({});
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    for (const s of ADL_INVENTORY_SECTIONS) next[s.id] = true;
+    setOpenSections(next);
+  }
+
+  const allOpen = ADL_INVENTORY_SECTIONS.every((s) => openSections[s.id]);
+
+  // Nº de ítems (fijos + "Otras" con nombre) con algún dato en una sección.
+  function sectionDataCount(sectionId: string): number {
+    const section = ADL_INVENTORY_SECTIONS.find((s) => s.id === sectionId);
+    if (!section) return 0;
+    const fixed = section.items.filter((it) => adlItemHasData(data.items[it.id])).length;
+    const customs = data.customRows.filter(
+      (r) => r.sectionId === sectionId && (adlItemHasData(r) || !!r.label.trim()),
+    ).length;
+    return fixed + customs;
+  }
+
   function updateItem(itemId: string, patch: Partial<AdlItemData>) {
     onChange({
       ...data,
@@ -172,58 +207,102 @@ export function AdlInventoryFields({
 
   return (
     <div className="sm:col-span-2 space-y-6">
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs text-muted-foreground"
+          onClick={() => setAllSections(!allOpen)}
+        >
+          {allOpen ? "Plegar todo" : "Desplegar todo"}
+        </Button>
+      </div>
+
       {blocks.map((block) => (
         <div key={block} className="space-y-4">
           <h3 className="text-sm font-bold text-[#1a5c58] uppercase tracking-wide">{BLOCK_LABELS[block]}</h3>
 
           {ADL_INVENTORY_SECTIONS.filter((s) => s.block === block).map((section) => {
             const rows = data.customRows.filter((r) => r.sectionId === section.id);
+            const open = !!openSections[section.id];
+            const count = sectionDataCount(section.id);
             return (
               <div key={section.id} className="rounded-lg border bg-card">
-                <div className="px-3 py-2 border-b bg-muted/40">
-                  <p className="text-sm font-semibold">{section.title}</p>
-                  {section.note && <p className="text-[11px] text-muted-foreground mt-0.5">{section.note}</p>}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleSection(section.id)}
+                  aria-expanded={open}
+                  className={cn(
+                    "w-full flex items-center justify-between gap-3 px-3 py-2 text-left bg-muted/40 hover:bg-muted/60 transition-colors",
+                    open && "border-b",
+                  )}
+                >
+                  <span className="flex items-center gap-2 min-w-0">
+                    <ChevronRight
+                      className={cn("w-4 h-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
+                    />
+                    <span className="text-sm font-semibold truncate">{section.title}</span>
+                  </span>
+                  {count > 0 ? (
+                    <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium bg-[#1a5c58]/10 border-[#1a5c58]/20 text-[#1a5c58]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#1a5c58]" />
+                      {count} con {count === 1 ? "dato" : "datos"}
+                    </span>
+                  ) : (
+                    <span className="shrink-0 rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
+                      Sin datos
+                    </span>
+                  )}
+                </button>
 
-                <div className="divide-y">
-                  {section.items.map((item) => (
-                    <div key={item.id} className="px-3 py-3 space-y-2">
-                      <p className="text-sm font-medium">{item.label}</p>
-                      <ItemFields value={data.items[item.id]} onChange={(patch) => updateItem(item.id, patch)} />
+                {open && (
+                  <>
+                    {section.note && (
+                      <p className="px-3 pt-2 text-[11px] text-muted-foreground">{section.note}</p>
+                    )}
+
+                    <div className="divide-y">
+                      {section.items.map((item) => (
+                        <div key={item.id} className="px-3 py-3 space-y-2">
+                          <p className="text-sm font-medium">{item.label}</p>
+                          <ItemFields value={data.items[item.id]} onChange={(patch) => updateItem(item.id, patch)} />
+                        </div>
+                      ))}
+
+                      {rows.map((row) => (
+                        <div key={row.id} className="px-3 py-3 space-y-2 bg-muted/20">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              className="text-sm h-8"
+                              placeholder="Otra actividad (escribe cuál)…"
+                              value={row.label}
+                              onChange={(e) => updateCustom(row.id, { label: e.target.value })}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              onClick={() => removeCustom(row.id)}
+                              aria-label="Quitar fila"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <ItemFields value={row} onChange={(patch) => updateCustom(row.id, patch)} />
+                        </div>
+                      ))}
                     </div>
-                  ))}
 
-                  {rows.map((row) => (
-                    <div key={row.id} className="px-3 py-3 space-y-2 bg-muted/20">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          className="text-sm h-8"
-                          placeholder="Otra actividad (escribe cuál)…"
-                          value={row.label}
-                          onChange={(e) => updateCustom(row.id, { label: e.target.value })}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0"
-                          onClick={() => removeCustom(row.id)}
-                          aria-label="Quitar fila"
-                        >
-                          <X className="w-4 h-4" />
+                    {section.allowCustom && (
+                      <div className="px-3 py-2 border-t">
+                        <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => addCustom(section.id)}>
+                          <Plus className="w-3.5 h-3.5 mr-1" /> Añadir otra
                         </Button>
                       </div>
-                      <ItemFields value={row} onChange={(patch) => updateCustom(row.id, patch)} />
-                    </div>
-                  ))}
-                </div>
-
-                {section.allowCustom && (
-                  <div className="px-3 py-2 border-t">
-                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => addCustom(section.id)}>
-                      <Plus className="w-3.5 h-3.5 mr-1" /> Añadir otra
-                    </Button>
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
             );

@@ -328,6 +328,24 @@ export function parseAdlInventory(raw: string | null | undefined): AdlInventoryD
   }
 }
 
+// ─── ¿Un ítem/fila tiene algún dato registrado? ──────────────────────────────
+// Se usa tanto en el formulario de captura (indicador "con datos / sin datos"
+// en la cabecera de cada sección) como en cualquier vista que necesite saber si
+// una actividad está rellena. Un ítem cuenta como "con datos" si tiene semáforo
+// de autonomía o de modificación, texto de desempeño o apoyos, o alguna de las
+// dos casillas marcadas.
+export function adlItemHasData(d: AdlItemData | null | undefined): boolean {
+  if (!d) return false;
+  return (
+    d.autonomy !== null ||
+    d.modificacion !== null ||
+    !!d.desempeno ||
+    !!d.apoyos ||
+    d.vigilancia ||
+    d.prioridad
+  );
+}
+
 // ─── Resumen corto para la lista/historial (campo `score` de Assessment) ─────
 // El campo `score` es obligatorio en la tabla; para esta escala no hay número,
 // así que guardamos un resumen legible (nº de actividades con dependencia /

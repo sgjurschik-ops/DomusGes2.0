@@ -54,6 +54,10 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       score: d.score,
       itemScores: d.itemScores ? JSON.stringify(d.itemScores) : null,
       areaSummary: areaSummaryData ? JSON.stringify(areaSummaryData) : null,
+      // JSON del "Inventario de AVDs" — antes no se escribía en el PATCH, así
+      // que al editar un inventario guardado se perdía. Se persiste igual que
+      // en el POST (para el resto de escalas llega undefined → null).
+      inventoryData: d.inventoryData ?? null,
       notes: d.notes || null,
       date: new Date(d.date),
     },
