@@ -5,6 +5,7 @@ import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   useAssessment,
+  useAssessments,
   useUpdateAssessment,
   useDeleteAssessment,
 } from "@/hooks/api";
@@ -190,6 +191,23 @@ function AssessmentSummary({
   const def = STRUCTURED_SCALE_DEFINITIONS[assessment.scale];
   const isCopm = assessment.scale === "COPM";
   const isInventory = assessment.scale === ADL_INVENTORY_SCALE;
+
+  // Para el inventario: buscar la valoración anterior (misma escala, fecha
+  // anterior) y compararla.
+  const { data: allAssessments } = useAssessments(isInventory ? patientId : undefined);
+  const previousInventory = isInventory
+    ? (() => {
+        const prev = (allAssessments ?? [])
+          .filter(
+            (a) =>
+              a.scale === ADL_INVENTORY_SCALE &&
+              a.id !== assessment.id &&
+              a.date < assessment.date,
+          )
+          .sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+        return prev ? parseAdlInventory(prev.inventoryData) : null;
+      })()
+    : null;
   const subscaleTotals = assessment.itemScores
     ? computeScaleSubscales(assessment.scale, assessment.itemScores)
     : null;
@@ -220,7 +238,11 @@ function AssessmentSummary({
       {isCopm ? (
         <CopmSummary assessment={assessment} />
       ) : isInventory ? (
-        <AdlInventoryView data={parseAdlInventory(assessment.inventoryData)} />
+        <AdlInventoryView
+          data={parseAdlInventory(assessment.inventoryData)}
+          previous={previousInventory}
+          printMeta={{ patientName: assessment.patientName, date: formatDate(assessment.date) }}
+        />
       ) : def && assessment.itemScores ? (
         <>
           <div className="rounded-lg border bg-muted/40 px-4 py-3">
