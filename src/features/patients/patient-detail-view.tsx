@@ -79,6 +79,9 @@ export function PatientDetailView() {
   const { data: professionals } = useProfessionals();
   const { data: me } = useMe();
   const isAdmin = me?.userRole === "admin";
+  // El Perfil ocupacional es un instrumento propio de Terapia ocupacional:
+  // su pestaña (y el acceso directo del Resumen) solo se muestran a ese perfil.
+  const isTO = me?.role === "Terapia ocupacional";
   // Usuario/a de Centro de día (recurso EM + clasificación "Centro de día"):
   // cambia el nombre de un par de pestañas para adaptarse a su flujo.
   const isDayCenter = !!patient && patient.resource === "Asociación EM" && patient.emCategory === "Centro de día";
@@ -308,7 +311,7 @@ export function PatientDetailView() {
           {!isAdmin && <TabsTrigger value="interventions" className={cn(TAB_BASE, TAB_DAILY)}>Intervenciones</TabsTrigger>}
 
           {!isAdmin && <TabSep />}
-          {!isAdmin && <TabsTrigger value="occupational-profile" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}</TabsTrigger>}
+          {!isAdmin && isTO && <TabsTrigger value="occupational-profile" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="intervention-plan" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}</TabsTrigger>}
 
           {!isAdmin && <TabSep />}
@@ -351,10 +354,10 @@ export function PatientDetailView() {
                 <KpiChip icon={Activity} color="purple" label="Última evaluación"
                   value={assessments && assessments.length > 0 ? `${assessments[0].scale} · ${formatDate(assessments[0].date)}` : "Sin registrar"} />
               </button>
-              <button type="button" onClick={() => setActiveTab("occupational-profile")} className="text-left">
+              {isTO && <button type="button" onClick={() => setActiveTab("occupational-profile")} className="text-left">
                 <KpiChip icon={ListChecks} color="yellow" label={isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
                   value={profileCompletion ? `${profileCompletion.filled}/${profileCompletion.total} campos` : "—"} />
-              </button>
+              </button>}
             </div>
           )}
 
@@ -614,7 +617,7 @@ export function PatientDetailView() {
         </TabsContent>}
 
 {/* Occupational profile — hidden for admin */}
-{!isAdmin && <TabsContent value="occupational-profile" className="mt-4">
+{!isAdmin && isTO && <TabsContent value="occupational-profile" className="mt-4">
   <OccupationalProfileTab patientId={patient.id} />
 </TabsContent>}
 
