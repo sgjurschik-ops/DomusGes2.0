@@ -242,16 +242,35 @@ export function PatientDetailView() {
                 </div>
               )}
 
-              {/* Row 3: Clinical info */}
-              <div className="rounded-md bg-accent/40 px-3 py-2 space-y-0.5">
-                <div className="flex items-start gap-2">
-                  <Stethoscope className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                  <p className="text-xs"><span className="text-muted-foreground">Diagnóstico: </span><span className="font-medium">{patient.diagnosis ?? "—"}</span></p>
+              {/* Row 3: Clinical info (+ recuadro de Referentes a la derecha,
+                  solo Centro de día — el diagnóstico se estrecha para dejarle
+                  sitio y así no queda hueco muerto abajo). */}
+              <div className="flex flex-wrap gap-3 items-start">
+                <div className="flex-1 min-w-[220px] rounded-md bg-accent/40 px-3 py-2 space-y-0.5">
+                  <div className="flex items-start gap-2">
+                    <Stethoscope className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                    <p className="text-xs"><span className="text-muted-foreground">Diagnóstico: </span><span className="font-medium">{patient.diagnosis ?? "—"}</span></p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Target className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                    <p className="text-xs"><span className="text-muted-foreground">Objetivo: </span><span className="font-medium">{patient.objective ?? "—"}</span></p>
+                  </div>
                 </div>
-                <div className="flex items-start gap-2">
-                  <Target className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                  <p className="text-xs"><span className="text-muted-foreground">Objetivo: </span><span className="font-medium">{patient.objective ?? "—"}</span></p>
-                </div>
+
+                {isDayCenter && (
+                  <div
+                    className="w-full sm:w-[230px] shrink-0 rounded-lg px-3 py-2"
+                    style={{ backgroundColor: "rgba(138,40,70,0.06)", border: "1px solid rgba(138,40,70,0.22)" }}
+                  >
+                    <p className="text-[10px] uppercase tracking-wide font-bold mb-1 flex items-center gap-1" style={{ color: "#8a2846" }}>
+                      <User2 className="w-3 h-3" /> Referentes
+                    </p>
+                    <div className="text-xs space-y-0.5">
+                      <div><span className="text-muted-foreground">Referente:</span> <span className="font-semibold">{patient.referent || "—"}</span></div>
+                      <div><span className="text-muted-foreground">Equipo de cuidados:</span> <span className="font-semibold">{patient.careTeamReferent || "—"}</span></div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Row 4: Contact & scheduling — smaller text */}
@@ -284,33 +303,13 @@ export function PatientDetailView() {
                 </div>
               </div>
 
-              {/* Row 5: Terapeutas + (solo Centro de día) recuadro de Referentes,
-                  compacto a la derecha para ocupar el hueco junto a las notas.
-                  Color burdeos muy sutil (identidad de Centro de día), distinto
-                  del verde del recuadro de Diagnóstico. */}
-              <div className="flex items-end justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] text-muted-foreground">Terapeutas:</span>
-                  {patient.therapistNames.length === 0 ? (
-                    <span className="text-[11px] text-muted-foreground italic">Sin asignar</span>
-                  ) : (
-                    patient.therapistNames.map((n) => (<Badge key={n} variant="secondary" className="text-[11px] py-0">{n}</Badge>))
-                  )}
-                </div>
-
-                {isDayCenter && (
-                  <div
-                    className="w-full sm:w-[230px] shrink-0 rounded-lg px-3 py-2"
-                    style={{ backgroundColor: "rgba(138,40,70,0.06)", border: "1px solid rgba(138,40,70,0.22)" }}
-                  >
-                    <p className="text-[10px] uppercase tracking-wide font-bold mb-1 flex items-center gap-1" style={{ color: "#8a2846" }}>
-                      <User2 className="w-3 h-3" /> Referentes
-                    </p>
-                    <div className="text-xs space-y-0.5">
-                      <div><span className="text-muted-foreground">Referente:</span> <span className="font-semibold">{patient.referent || "—"}</span></div>
-                      <div><span className="text-muted-foreground">Equipo de cuidados:</span> <span className="font-semibold">{patient.careTeamReferent || "—"}</span></div>
-                    </div>
-                  </div>
+              {/* Row 5: Terapeutas */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] text-muted-foreground">Terapeutas:</span>
+                {patient.therapistNames.length === 0 ? (
+                  <span className="text-[11px] text-muted-foreground italic">Sin asignar</span>
+                ) : (
+                  patient.therapistNames.map((n) => (<Badge key={n} variant="secondary" className="text-[11px] py-0">{n}</Badge>))
                 )}
               </div>
             </div>
