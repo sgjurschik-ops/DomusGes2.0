@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { assessmentCreateSchema, type AssessmentCreateInput, STRUCTURED_SCALES, QUALITATIVE_SCALES, ASSESSMENT_CATEGORIES, EM_ONLY_SCALES, EM_RESOURCE_KEY, RESOURCE_KEYS, SCALE_GROUPS } from "@/lib/schemas";
+import { assessmentCreateSchema, type AssessmentCreateInput, STRUCTURED_SCALES, QUALITATIVE_SCALES, ASSESSMENT_CATEGORIES, EM_ONLY_SCALES, EM_RESOURCE_KEY, RESOURCE_KEYS, SCALE_GROUPS, scalesForRole } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -75,7 +75,7 @@ export function PatientDetailView() {
   const { selectedPatientId, navigate, back } = useNav();
   const { data: patient, isLoading } = usePatient(selectedPatientId);
   const { data: visits } = useVisits(selectedPatientId ?? undefined);
-  const { data: assessments } = useAssessments(selectedPatientId ?? undefined);
+  const { data: assessmentsRaw } = useAssessments(selectedPatientId ?? undefined);
   const { data: professionals } = useProfessionals();
   const { data: me } = useMe();
   const isAdmin = me?.userRole === "admin";
@@ -98,6 +98,16 @@ export function PatientDetailView() {
 
   // Mapa profesional → profesión, para mostrar autor + profesión en los
   // seguimientos (compartidos) y en la exportación.
+  // Escalas por profesión: cada profesional solo ve (en Valoración, Evolución,
+  // Resumen…) las evaluaciones de las escalas de su propio perfil. Filtrando
+  // aquí en el origen, todos los sitios que usan `assessments` quedan filtrados
+  // sin tocarlos uno a uno.
+  const allowedScales = useMemo(() => scalesForRole(me?.role), [me?.role]);
+  const assessments = useMemo(
+    () => (assessmentsRaw ?? []).filter((a) => allowedScales.includes(a.scale)),
+    [assessmentsRaw, allowedScales],
+  );
+
   const roleById = useMemo(
     () => new Map((professionals ?? []).map((p) => [p.id, p.role])),
     [professionals],
@@ -939,6 +949,8 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
 
 function AssessmentForm({ patientId, therapistId, resource }: { patientId: string; therapistId: string; resource: string | null }) {
   const create = useCreateAssessment();
+  const { data: me } = useMe();
+  const allowedScales = scalesForRole(me?.role);
   const [itemScores, setItemScores] = useState<Record<string, number>>({});
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [copmData, setCopmData] = useState<any>(null);
@@ -972,6 +984,14 @@ function AssessmentForm({ patientId, therapistId, resource }: { patientId: strin
   const isQualitative = (QUALITATIVE_SCALES as readonly string[]).includes(scale);
   const isInventory = scale === ADL_INVENTORY_SCALE;
   const isEM = resource === EM_RESOURCE_KEY;
+
+  // Escalas de la categoría activa que este profesional puede usar: se filtran
+  // por su perfil (escalas por profesión) y por el recurso (EM_ONLY para EM).
+  const activeCategoryScales = (
+    ASSESSMENT_CATEGORIES.find((c) => c.key === activeCategory)?.scales ?? []
+  ).filter(
+    (s) => allowedScales.includes(s) && (isEM || !(EM_ONLY_SCALES as readonly string[]).includes(s)),
+  );
 
   // Keep the (hidden, but still registered) `score` field in sync with the
   // computed total as items are answered.
@@ -1059,12 +1079,10 @@ function AssessmentForm({ patientId, therapistId, resource }: { patientId: strin
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {ASSESSMENT_CATEGORIES.find((c) => c.key === activeCategory)?.scales.length === 0 ? (
+              {activeCategoryScales.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic px-1 py-1.5">Próximamente</p>
               ) : (
-                ASSESSMENT_CATEGORIES.find((c) => c.key === activeCategory)?.scales
-                  .filter((s) => isEM || !(EM_ONLY_SCALES as readonly string[]).includes(s))
-                  .map((s) => (
+                activeCategoryScales.map((s) => (
                   <button
                     key={s}
                     type="button"

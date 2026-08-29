@@ -122,6 +122,27 @@ export const ASSESSMENT_CATEGORIES = [
 // para Domicilio.
 export const EM_ONLY_SCALES = ["Inventario de AVDs"] as const;
 
+// Escalas disponibles para cada PERFIL profesional. Hoy todas las escalas son
+// de Terapia ocupacional; el resto de perfiles arrancan sin escalas y se irán
+// añadiendo poco a poco. Cada profesional solo ve/registra y solo ve en la
+// evolución las escalas de su perfil.
+export const PROFESSION_SCALES: Record<string, readonly string[]> = {
+  "Terapia ocupacional": ASSESSMENT_SCALES,
+  "Fisioterapia": [],
+  "Psicología": [],
+  "Neuropsicología": [],
+  "Trabajo Social": [],
+  "Terapeuta Petö": [],
+  "Cuidados": [],
+  "Administrador": [],
+};
+
+// Escalas permitidas para un rol dado (vacío si el rol no tiene escalas aún).
+export function scalesForRole(role: string | null | undefined): readonly string[] {
+  if (!role) return [];
+  return PROFESSION_SCALES[role] ?? [];
+}
+
 export const PROFESSIONAL_COLORS = [
   "#1a5c58", // brand teal
   "#5b3fa0",
