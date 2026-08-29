@@ -36,6 +36,7 @@ model Professional {
   auditLogs    AuditLog[]
   messagesSent     Message[] @relation("MessagesSent")
   messagesReceived Message[] @relation("MessagesReceived")
+  noteEntries      QuickNote[]
 
   @@index([isActive])
 }
@@ -77,6 +78,7 @@ model Patient {
   visits        Visit[]
   assessments   Assessment[]
   appointments  Appointment[]
+  noteEntries   QuickNote[]
   occupationalProfile OccupationalProfile?
 
   @@index([status])
@@ -357,4 +359,23 @@ model Message {
 
   @@index([toId, readAt])
   @@index([fromId])
+}
+
+// Nota rápida (post-it) PRIVADA de cada profesional: cada uno solo ve, crea,
+// edita y borra las suyas. Sustituye al antiguo campo Patient.quickNotes (que
+// era un único bloque compartido). Ese campo se conserva en la tabla para no
+// perder datos antiguos, pero ya no se usa.
+model QuickNote {
+  id             String   @id @default(cuid())
+  patientId      String
+  professionalId String
+  text           String   @default("")
+  colorIdx       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, professionalId])
 }

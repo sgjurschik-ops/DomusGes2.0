@@ -294,7 +294,7 @@ export function PatientDetailView() {
 
             {/* Divider */}
             {!isAdmin && <div className="w-px bg-border mx-4 self-stretch hidden lg:block" />}
-            {!isAdmin && <QuickNotes patientId={patient.id} initial={patient.quickNotes} />}
+            {!isAdmin && <QuickNotes patientId={patient.id} />}
           </div>
         </CardContent>
       </Card>
@@ -812,44 +812,60 @@ const NOTE_COLORS: { bg: string; border: string }[] = [
 
 interface QuickNote { id: string; text: string; colorIdx: number; }
 
-function QuickNotes({ patientId, initial }: { patientId: string; initial?: string | null }) {
-  const [notes, setNotes] = useState<QuickNote[]>(() => {
-    if (!initial) return [];
-    try { return JSON.parse(initial); } catch { return []; }
-  });
-  const [saving, setSaving] = useState(false);
+function QuickNotes({ patientId }: { patientId: string }) {
+  // Notas privadas del profesional de la sesión. Se cargan desde el servidor
+  // (que ya filtra por profesional) y se crean/editan/borran contra los
+  // endpoints /api/patients/[id]/quick-notes. Cada profesional solo ve las suyas.
+  const [notes, setNotes] = useState<QuickNote[]>([]);
 
-  async function persist(updated: QuickNote[]) {
-    setNotes(updated);
-    setSaving(true);
-    try {
-      await fetch(`/api/patients/${patientId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quickNotes: JSON.stringify(updated) }),
-      });
-    } catch { /* silent */ }
-    setSaving(false);
-  }
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/patients/${patientId}/quick-notes`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => { if (!cancelled) setNotes(Array.isArray(data) ? data : []); })
+      .catch(() => { /* silent */ });
+    return () => { cancelled = true; };
+  }, [patientId]);
 
-  function addNote() {
+  async function addNote() {
     const colorIdx = notes.length % NOTE_COLORS.length;
-    persist([...notes, { id: Date.now().toString(), text: "", colorIdx }]);
+    try {
+      const r = await fetch(`/api/patients/${patientId}/quick-notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "", colorIdx }),
+      });
+      if (r.ok) {
+        const created = await r.json();
+        setNotes((prev) => [...prev, created]);
+      }
+    } catch { /* silent */ }
   }
   function updateNote(id: string, text: string) {
     setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, text } : n)));
   }
-  function saveNote(id: string) {
-    persist(notes.map((n) => (n.id === id ? { ...n } : n)));
+  async function saveNote(id: string) {
+    const note = notes.find((n) => n.id === id);
+    if (!note) return;
+    try {
+      await fetch(`/api/patients/${patientId}/quick-notes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: note.text, colorIdx: note.colorIdx }),
+      });
+    } catch { /* silent */ }
   }
-  function removeNote(id: string) {
-    persist(notes.filter((n) => n.id !== id));
+  async function removeNote(id: string) {
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    try {
+      await fetch(`/api/patients/${patientId}/quick-notes/${id}`, { method: "DELETE" });
+    } catch { /* silent */ }
   }
 
   return (
     <div className="shrink-0 hidden lg:flex flex-col gap-1.5" style={{ width: notes.length > 3 ? "28rem" : "14rem", transition: "width 0.2s" }}>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-wide font-bold text-muted-foreground flex items-center gap-1">
+        <span className="text-[10px] uppercase tracking-wide font-bold text-muted-foreground flex items-center gap-1" title="Privadas: solo tú las ves">
           <StickyNote className="w-3 h-3" /> Notas rápidas
         </span>
         <button type="button" onClick={addNote} className="text-xs text-primary hover:underline">+ Añadir</button>
