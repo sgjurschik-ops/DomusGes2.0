@@ -52,9 +52,12 @@ export async function POST(req: NextRequest) {
   }
   const d = parsed.data;
   const date = buildMadridDateTime(d.date, d.time);
-  // Para intervenciones (privadas) el autor es SIEMPRE el profesional de la
-  // sesión: no se puede crear una intervención privada a nombre de otra persona.
-  const therapistId = d.kind === "intervencion" ? prof.id : d.therapistId;
+  // El autor de un registro recién creado es SIEMPRE el profesional de la
+  // sesión: ni seguimientos ni intervenciones permiten elegir otro autor al
+  // crear (el selector de terapeuta solo aparece al EDITAR). Así evitamos que
+  // un id obsoleto o incorrecto en el formulario guarde el registro a nombre de
+  // otra persona. La reasignación de autor sigue siendo posible al editar.
+  const therapistId = prof.id;
   const row = await db.visit.create({
     data: {
       patientId: d.patientId,

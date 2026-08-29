@@ -100,6 +100,19 @@ export function PatientDetailView() {
     [professionals],
   );
 
+  // Estilo de las pestañas agrupadas por color: cada grupo tiene su tono
+  // (registro diario = teal de marca, documentación = índigo, medición =
+  // violeta, entrada = gris). La pestaña activa se rellena en sólido para que
+  // destaque mucho más que antes. `cn`/twMerge hace que estos colores ganen
+  // sobre los del componente base.
+  const TAB_BASE = "shrink-0 px-3 py-1.5 rounded-md font-medium data-[state=active]:shadow-sm";
+  const TAB_ENTRY = "text-slate-600 hover:bg-slate-200/60 data-[state=active]:bg-slate-700 data-[state=active]:text-white";
+  const TAB_DAILY = "text-[#1a5c58] hover:bg-[#1a5c58]/10 data-[state=active]:bg-[#1a5c58] data-[state=active]:text-white";
+  const TAB_DOC = "text-indigo-600 hover:bg-indigo-100/70 data-[state=active]:bg-indigo-600 data-[state=active]:text-white";
+  const TAB_MEASURE = "text-violet-600 hover:bg-violet-100/70 data-[state=active]:bg-violet-600 data-[state=active]:text-white";
+  const SUBTAB = "px-4 text-violet-600 data-[state=active]:bg-violet-600 data-[state=active]:text-white data-[state=active]:shadow-sm";
+  const TabSep = () => <span aria-hidden className="h-5 w-px bg-border shrink-0 self-center mx-0.5" />;
+
   // Exporta a PDF imprimible todos los seguimientos de este/a usuario/a,
   // reutilizando los datos ya cargados (no vuelve a pedir nada al servidor).
   // Incluye autor + profesión, notas, objetivos/GAS, intervenciones y tareas.
@@ -287,14 +300,19 @@ export function PatientDetailView() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className={`inline-flex w-full max-w-4xl gap-1.5 overflow-x-auto ${isAdmin ? "max-w-xs" : ""}`}>
-          <TabsTrigger value="overview" className="shrink-0">Resumen</TabsTrigger>
-          {!isAdmin && <TabsTrigger value="visits" className="shrink-0">Seguimientos</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="interventions" className="shrink-0">Intervenciones</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="occupational-profile" className="shrink-0">{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="intervention-plan" className="shrink-0">{isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="assessments" className="shrink-0">Valoración</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="progress" className="shrink-0">Evolución escalas</TabsTrigger>}
+        <TabsList className="inline-flex w-full max-w-4xl items-center gap-1 overflow-x-auto bg-muted/60 py-1">
+          <TabsTrigger value="overview" className={cn(TAB_BASE, TAB_ENTRY)}>Resumen</TabsTrigger>
+
+          {!isAdmin && <TabSep />}
+          {!isAdmin && <TabsTrigger value="visits" className={cn(TAB_BASE, TAB_DAILY)}>Seguimientos</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="interventions" className={cn(TAB_BASE, TAB_DAILY)}>Intervenciones</TabsTrigger>}
+
+          {!isAdmin && <TabSep />}
+          {!isAdmin && <TabsTrigger value="occupational-profile" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="intervention-plan" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}</TabsTrigger>}
+
+          {!isAdmin && <TabSep />}
+          {!isAdmin && <TabsTrigger value="assessments" className={cn(TAB_BASE, TAB_MEASURE)}>Valoración</TabsTrigger>}
         </TabsList>
 
         {/* Overview */}
@@ -605,16 +623,22 @@ export function PatientDetailView() {
 </TabsContent>}
 
         {/* Assessments — hidden for admin */}
-        {!isAdmin && <TabsContent value="assessments" className="mt-4 space-y-4">
-          <AssessmentForm
-            patientId={patient.id}
-            therapistId={patient.therapistIds[0] ?? professionals?.[0]?.id ?? ""}
-            resource={patient.resource}
-          />
-        </TabsContent>}
+        {!isAdmin && <TabsContent value="assessments" className="mt-4">
+          <Tabs defaultValue="scales" className="w-full">
+            <TabsList className="inline-flex gap-1 bg-muted/60">
+              <TabsTrigger value="scales" className={SUBTAB}>Escalas</TabsTrigger>
+              <TabsTrigger value="evolution" className={SUBTAB}>Evolución</TabsTrigger>
+            </TabsList>
 
-        {/* Progress — hidden for admin */}
-        {!isAdmin && <TabsContent value="progress" className="mt-4 space-y-4">
+            <TabsContent value="scales" className="mt-4 space-y-4">
+              <AssessmentForm
+                patientId={patient.id}
+                therapistId={patient.therapistIds[0] ?? professionals?.[0]?.id ?? ""}
+                resource={patient.resource}
+              />
+            </TabsContent>
+
+            <TabsContent value="evolution" className="mt-4 space-y-4">
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded-md border bg-muted/40 p-0.5">
               <button type="button"
@@ -669,6 +693,8 @@ export function PatientDetailView() {
               </CardContent>
             </Card>
           )}
+            </TabsContent>
+          </Tabs>
         </TabsContent>}
       </Tabs>
 
