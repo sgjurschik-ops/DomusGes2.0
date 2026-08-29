@@ -142,6 +142,10 @@ export function NewPatientForm({ mode = "create" }: Props) {
   const firstName = watch("firstName");
   const lastName = watch("lastName");
   const resource = watch("resource");
+  const emCategory = watch("emCategory");
+  // Los referentes (terapeuta y equipo de cuidados) son específicos de Centro
+  // de día: solo se muestran/editan para ese tipo de usuario/a.
+  const isDayCenterForm = resource === EM_RESOURCE_KEY && emCategory === "Centro de día";
   const isPending = create.isPending || update.isPending;
 
   if (isEdit && isLoadingPatient) {
@@ -314,18 +318,22 @@ export function NewPatientForm({ mode = "create" }: Props) {
             <CardTitle className="text-base">Referente y terapeutas asignados</CardTitle>
           </CardHeader>
           <CardContent className="grid sm:grid-cols-2 gap-4">
-            <Field label="Nombre del referente familiar" error={errors.referentName?.message}>
+            <Field label="Nombre del familiar de referencia" error={errors.referentName?.message}>
               <Input id="referentName" {...register("referentName")} />
             </Field>
-            <Field label="Teléfono del referente" error={errors.referentPhone?.message}>
+            <Field label="Teléfono del familiar de referencia" error={errors.referentPhone?.message}>
               <Input id="referentPhone" {...register("referentPhone")} />
             </Field>
-            <Field label="Referente" error={errors.referent?.message}>
-              <Input id="referent" {...register("referent")} />
-            </Field>
-            <Field label="Referente equipo de cuidados" error={errors.careTeamReferent?.message}>
-              <Input id="careTeamReferent" {...register("careTeamReferent")} />
-            </Field>
+            {isDayCenterForm && (
+              <Field label="Referente" error={errors.referent?.message}>
+                <Input id="referent" {...register("referent")} />
+              </Field>
+            )}
+            {isDayCenterForm && (
+              <Field label="Referente equipo de cuidados" error={errors.careTeamReferent?.message}>
+                <Input id="careTeamReferent" {...register("careTeamReferent")} />
+              </Field>
+            )}
             <div className="sm:col-span-2 space-y-2">
               <Label>Terapeutas asignados</Label>
               <div className="grid sm:grid-cols-2 gap-2">

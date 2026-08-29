@@ -268,18 +268,8 @@ export function PatientDetailView() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <User2 className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Referente familiar:</span>
+                  <span className="text-muted-foreground">Familiar de referencia:</span>
                   <span className="font-medium">{patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <User2 className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Referente:</span>
-                  <span className="font-medium">{patient.referent || "—"}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <User2 className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Referente equipo de cuidados:</span>
-                  <span className="font-medium">{patient.careTeamReferent || "—"}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-3 h-3 text-muted-foreground shrink-0" />
@@ -293,6 +283,26 @@ export function PatientDetailView() {
                   )}
                 </div>
               </div>
+
+              {/* Referentes (terapeuta y equipo de cuidados) — solo Centro de día,
+                  agrupados en un recuadro destacado. */}
+              {isDayCenter && (
+                <div className="rounded-lg border border-[#1a5c58]/25 bg-[#1a5c58]/[0.05] px-3 py-2.5">
+                  <p className="text-[10px] uppercase tracking-wide font-bold text-[#1a5c58] mb-1.5 flex items-center gap-1">
+                    <User2 className="w-3 h-3" /> Referentes
+                  </p>
+                  <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-muted-foreground">Referente:</span>
+                      <span className="font-semibold text-foreground">{patient.referent || "—"}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-muted-foreground">Referente equipo de cuidados:</span>
+                      <span className="font-semibold text-foreground">{patient.careTeamReferent || "—"}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Row 5: Therapists */}
               <div className="flex items-center gap-2 flex-wrap">
