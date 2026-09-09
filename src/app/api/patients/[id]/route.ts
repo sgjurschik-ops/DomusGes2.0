@@ -43,10 +43,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id } = await params;
 
-  if (!(await canEditPatient(prof, id))) {
-    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
-  }
-
   let body: any;
   try {
     body = await req.json();
@@ -54,7 +50,97 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
-  // Any authenticated professional can change therapist assignments (not just admin)
+  const hasFullEditAccess = await canEditPatient(prof, id);
+
+  // ─── Auto-asignación de un/a terapeuta no asignado/a ────────────────────
+  // Un/a profesional que NO forma parte del equipo de este paciente no tiene
+  // permiso de edición general (canEditPatient = false), pero SÍ debe poder
+  // añadirse a sí mismo/a como terapeuta — igual que ya puede hacerlo al
+  // crear un paciente nuevo. No puede tocar ningún otro dato del paciente
+  // ni quitar a nadie del equipo. Para garantizarlo, se compara la petición
+  // campo a campo contra los datos actuales: si algo más además de sumarse
+  // a sí mismo/a ha cambiado, se rechaza.
+  if (!hasFullEditAccess) {
+    const current = await db.patient.findUnique({
+      where: { id },
+      include: { therapists: { select: { id: true } } },
+    });
+    if (!current) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+
+    if ((current as any).restricted) {
+      // Paciente restringido: nadie puede auto-asignarse. Solo la
+      // Administradora o un/a terapeuta ya asignado/a puede añadir a
+      // alguien más al equipo.
+      return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    }
+
+    const sameOrUnset = (key: string, currentValue: unknown) =>
+      body[key] === undefined || (body[key] ?? null) === (currentValue ?? null);
+
+    const sameDateOrUnset = (key: string, currentValue: Date) =>
+      body[key] === undefined || new Date(body[key]).getTime() === currentValue.getTime();
+
+    const sameArrayOrUnset = (key: string, currentValue: unknown) =>
+      body[key] === undefined || JSON.stringify(body[key]) === JSON.stringify(currentValue ?? []);
+
+    const onlyTherapistsChanged =
+      sameOrUnset("firstName", current.firstName) &&
+      sameOrUnset("lastName", current.lastName) &&
+      sameDateOrUnset("birthDate", current.birthDate) &&
+      sameOrUnset("specialty", current.specialty) &&
+      sameOrUnset("status", current.status) &&
+      sameOrUnset("resource", current.resource) &&
+      sameOrUnset("emCategory", current.emCategory) &&
+      sameOrUnset("phone", current.phone) &&
+      sameOrUnset("address", current.address) &&
+      sameDateOrUnset("startDate", current.startDate) &&
+      sameOrUnset("referentName", current.referentName) &&
+      sameOrUnset("referentPhone", current.referentPhone) &&
+      sameOrUnset("referent", current.referent) &&
+      sameOrUnset("careTeamReferent", current.careTeamReferent) &&
+      sameOrUnset("quickNotes", current.quickNotes) &&
+      sameOrUnset("diagnosis", current.diagnosis) &&
+      sameOrUnset("objective", current.objective) &&
+      sameArrayOrUnset("alerts", (current as any).alerts);
+
+    if (!onlyTherapistsChanged) {
+      return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    }
+
+    const currentTherapistIds = new Set(current.therapists.map((t) => t.id));
+    const requestedTherapistIds = Array.isArray(body.therapistIds)
+      ? new Set<string>(body.therapistIds)
+      : currentTherapistIds;
+
+    const removedSomeone = [...currentTherapistIds].some((tid) => !requestedTherapistIds.has(tid));
+    const addedIds = [...requestedTherapistIds].filter((tid) => !currentTherapistIds.has(tid));
+    const onlyAddsSelf = addedIds.length === 1 && addedIds[0] === prof.id;
+
+    if (removedSomeone || addedIds.length === 0 || !onlyAddsSelf) {
+      return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    }
+
+    const row = await db.patient.update({
+      where: { id },
+      data: { therapists: { connect: { id: prof.id } } },
+      include: {
+        therapists: { select: { id: true, name: true } },
+        _count: { select: { visits: true } },
+      },
+    });
+
+    const { lastVisitMap, nextApptMap } = await getPatientTimelineMap([row.id]);
+    await audit(prof.id, "patient.self_assign", "Patient", row.id);
+
+    return NextResponse.json(
+      mapPatient(row, {
+        lastVisitDate: lastVisitMap.get(row.id) ?? null,
+        nextAppointmentDate: nextApptMap.get(row.id) ?? null,
+      }),
+    );
+  }
+
+  // ─── Edición completa (admin o terapeuta ya asignado) ───────────────────
   const therapistUpdate =
     Array.isArray(body.therapistIds)
       ? { set: body.therapistIds.map((tid: string) => ({ id: tid })) }
@@ -91,6 +177,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       careTeamReferent: body.careTeamReferent !== undefined ? (body.careTeamReferent || null) : undefined,
       therapists: therapistUpdate,
       quickNotes: body.quickNotes,
+      restricted: typeof body.restricted === "boolean" ? body.restricted : undefined,
       ...(isAdmin ? {} : {
         diagnosis: body.diagnosis !== undefined ? (body.diagnosis || null) : undefined,
         objective: body.objective !== undefined ? (body.objective || null) : undefined,

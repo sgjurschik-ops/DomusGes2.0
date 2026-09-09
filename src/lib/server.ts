@@ -33,24 +33,9 @@ export async function getCurrentProfessional(): Promise<ProfessionalDTO | null> 
   };
 }
 
-// ─── Timezone-safe local datetime construction ─────────────────────────────
-//
-// All "date" + "time" form fields represent wall-clock time in Madrid (the
-// clinic's timezone), but `new Date("YYYY-MM-DDTHH:mm")` is interpreted in
-// whatever timezone the *process* running this code happens to be in. That's
-// Europe/Madrid on a developer's Mac, but Vercel's serverless functions run
-// in UTC — so the exact same code silently shifted every appointment by the
-// Madrid UTC offset (1h in winter, 2h in summer DST) once deployed. This
-// helper computes Madrid's real offset for the given date (handling the
-// CET/CEST transition correctly) and builds the Date explicitly from that,
-// so the result is correct regardless of the server's own timezone.
 export function buildMadridDateTime(dateStr: string, timeStr: string): Date {
   const [year, month, day] = dateStr.split("-").map(Number);
   const [hour, minute] = timeStr.split(":").map(Number);
-
-  // Find Madrid's current UTC offset by formatting the same instant in both
-  // UTC and Europe/Madrid, then comparing — this naturally accounts for
-  // daylight saving without hardcoding transition dates.
   const naiveUtc = new Date(Date.UTC(year, month - 1, day, hour, minute));
   const madridParts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Europe/Madrid",
@@ -61,7 +46,6 @@ export function buildMadridDateTime(dateStr: string, timeStr: string): Date {
     hour: "2-digit",
     minute: "2-digit",
   }).formatToParts(naiveUtc);
-
   const get = (type: string) => Number(madridParts.find((p) => p.type === type)?.value);
   const madridAsUtc = Date.UTC(
     get("year"),
@@ -71,9 +55,6 @@ export function buildMadridDateTime(dateStr: string, timeStr: string): Date {
     get("minute"),
   );
   const offsetMs = madridAsUtc - naiveUtc.getTime();
-
-  // The wall-clock time the person typed, minus Madrid's offset, gives the
-  // correct UTC instant.
   return new Date(naiveUtc.getTime() - offsetMs);
 }
 
@@ -95,10 +76,6 @@ export async function requireTherapistOrAdmin(): Promise<ProfessionalDTO> {
   return prof;
 }
 
-// ¿Es un/a usuario/a de Centro de día (recurso "Asociación EM" +
-// clasificación "Centro de día")? Para estos/as, la información clínica es
-// colaborativa: cualquier profesional —incluidos los invitados— puede verla
-// y completarla, sin necesidad de estar asignado/a como terapeuta.
 export async function isDayCenterPatient(patientId: string): Promise<boolean> {
   const p = await db.patient.findUnique({
     where: { id: patientId },
@@ -107,53 +84,55 @@ export async function isDayCenterPatient(patientId: string): Promise<boolean> {
   return p?.resource === "Asociación EM" && p?.emCategory === "Centro de día";
 }
 
-// Can edit a patient's contact/admin data?
-// admin: always. therapist/guest: only if assigned.
+// ─── Pacientes restringidos ─────────────────────────────────────────────
+// Un paciente marcado como "restricted" solo es visible/editable por los
+// profesionales que estén expresamente asignados a él como terapeutas.
+// Esto anula, SOLO para ese paciente, el acceso general que normalmente
+// tiene cualquier "therapist" a todos los pacientes, y también anula el
+// acceso colaborativo de Centro de día. Pensado para casos puntuales de
+// protección de datos (ej. Eduardo), no para uso general.
+export async function isPatientRestricted(patientId: string): Promise<boolean> {
+  const p = await db.patient.findUnique({
+    where: { id: patientId },
+    select: { restricted: true },
+  });
+  return !!p?.restricted;
+}
+
+async function isAssignedTherapist(profId: string, patientId: string): Promise<boolean> {
+  const link = await db.patient.findFirst({
+    where: { id: patientId, therapists: { some: { id: profId } } },
+    select: { id: true },
+  });
+  return !!link;
+}
+
 export async function canEditPatient(prof: ProfessionalDTO, patientId: string): Promise<boolean> {
   if (prof.userRole === "admin") return true;
-  const link = await db.patient.findFirst({
-    where: { id: patientId, therapists: { some: { id: prof.id } } },
-    select: { id: true },
-  });
-  return !!link;
+  return isAssignedTherapist(prof.id, patientId);
 }
 
-// Can edit clinical data (visits, assessments, profile)?
-// Assigned therapists/guests — PLUS any professional for Centro de día
-// users (colaborativo). Admin cannot touch clinical data.
 export async function canEditClinical(prof: ProfessionalDTO, patientId: string): Promise<boolean> {
   if (prof.userRole === "admin") return false;
+  if (await isPatientRestricted(patientId)) return isAssignedTherapist(prof.id, patientId);
   if (await isDayCenterPatient(patientId)) return true;
-  const link = await db.patient.findFirst({
-    where: { id: patientId, therapists: { some: { id: prof.id } } },
-    select: { id: true },
-  });
-  return !!link;
+  return isAssignedTherapist(prof.id, patientId);
 }
 
-// Can view (read) clinical data?
-// therapist: all patients. guest: only assigned (+ Centro de día). admin: never.
 export async function canViewClinical(prof: ProfessionalDTO, patientId: string): Promise<boolean> {
   if (prof.userRole === "admin") return false;
+  if (await isPatientRestricted(patientId)) return isAssignedTherapist(prof.id, patientId);
   if (prof.userRole === "therapist") return true;
   if (await isDayCenterPatient(patientId)) return true;
-  const link = await db.patient.findFirst({
-    where: { id: patientId, therapists: { some: { id: prof.id } } },
-    select: { id: true },
-  });
-  return !!link;
+  return isAssignedTherapist(prof.id, patientId);
 }
 
-// Can see a patient at all (list, contact)?
-// admin: all. therapist: all. guest: only assigned (+ Centro de día).
 export async function canViewPatient(prof: ProfessionalDTO, patientId: string): Promise<boolean> {
+  if (prof.userRole === "admin") return true;
+  if (await isPatientRestricted(patientId)) return isAssignedTherapist(prof.id, patientId);
   if (prof.userRole !== "guest") return true;
   if (await isDayCenterPatient(patientId)) return true;
-  const link = await db.patient.findFirst({
-    where: { id: patientId, therapists: { some: { id: prof.id } } },
-    select: { id: true },
-  });
-  return !!link;
+  return isAssignedTherapist(prof.id, patientId);
 }
 
 export async function audit(
@@ -176,24 +155,14 @@ export async function audit(
       },
     });
   } catch (err) {
-    // Audit failure must never break the user flow
     console.error("[audit] failed to write log:", err);
   }
 }
 
-// ─── Patient timeline (last visit / next appointment) ──────────────────────
-// Computes, for a set of patient IDs, the most recent visit date and the
-// next scheduled appointment date — in exactly 2 queries total, regardless
-// of how many patient IDs are passed in. This replaces the old approach of
-// nesting `visits`/`appointments` with `orderBy` + `take: 1` inside a
-// `findMany`/`findUnique` include, which Prisma cannot turn into a single
-// query and instead resolves with one extra query per patient (see notes
-// above `PatientWithRels`).
 export async function getPatientTimelineMap(patientIds: string[]) {
   const lastVisitMap = new Map<string, Date>();
   const nextApptMap = new Map<string, Date>();
   if (patientIds.length === 0) return { lastVisitMap, nextApptMap };
-
   const [lastVisits, nextAppts] = await Promise.all([
     db.visit.groupBy({
       by: ["patientId"],
@@ -210,18 +179,14 @@ export async function getPatientTimelineMap(patientIds: string[]) {
       _min: { start: true },
     }),
   ]);
-
   for (const v of lastVisits) {
     if (v._max.date) lastVisitMap.set(v.patientId, v._max.date);
   }
   for (const a of nextAppts) {
     if (a._min.start) nextApptMap.set(a.patientId, a._min.start);
   }
-
   return { lastVisitMap, nextApptMap };
 }
-
-// ─── Mappers (Prisma row → DTO) ─────────────────────────────────────────────
 
 export function calcAge(birthDate: Date, now: Date = new Date()): number {
   let age = now.getFullYear() - birthDate.getFullYear();
@@ -230,14 +195,6 @@ export function calcAge(birthDate: Date, now: Date = new Date()): number {
   return age;
 }
 
-// NOTE on performance: this type intentionally does NOT include `visits` or
-// `appointments` as nested relations. Prisma cannot resolve a nested relation
-// that combines `orderBy` + `take` into a single SQL query — it falls back to
-// issuing one extra query PER PARENT ROW (confirmed Prisma behaviour, not a
-// bug in our code). For a list of N patients that meant 1 + 2N queries.
-// Instead, the caller fetches `lastVisitDate`/`nextAppointmentDate` separately
-// with two aggregate queries (one for the whole list, regardless of N) and
-// passes the result in here.
 type PatientWithRels = Prisma.PatientGetPayload<{
   include: {
     therapists: { select: { id: true; name: true } };
@@ -245,12 +202,6 @@ type PatientWithRels = Prisma.PatientGetPayload<{
   };
 }>;
 
-// Shared filter for scoping queries to the professional's currently active
-// "centro" (recurso) — Domicilio / Asociación EM / etc. Patients created
-// before this field existed have resource=null; those count as belonging
-// to the FIRST resource (Domicilio) so they don't just vanish from every
-// view until someone manually assigns them. Passing resource=null/undefined
-// (no center chosen yet, e.g. admin overview) returns no filter at all.
 export function buildResourceFilter(resource: string | null | undefined): Prisma.PatientWhereInput {
   if (!resource) return {};
   const isDefaultResource = RESOURCES[0]?.key === resource;
@@ -285,6 +236,7 @@ export function mapPatient(
     careTeamReferent: p.careTeamReferent,
     color: p.color,
     quickNotes: p.quickNotes ?? null,
+    restricted: (p as any).restricted ?? false,
     therapistIds: p.therapists.map((t) => t.id),
     therapistNames: p.therapists.map((t) => t.name),
     totalVisits: p._count.visits,
@@ -401,13 +353,6 @@ export function mapReservationCategory(c: { id: string; professionalId: string; 
   };
 }
 
-// ─── Safe partial update ─────────────────────────────────────────────────────
-// Filters out undefined values from an object so that Prisma's `update` or
-// `upsert` only touches fields explicitly sent by the client.  This prevents
-// the class of bugs where a partial request body (e.g. saving just quickNotes)
-// accidentally sets every other field to null.
-//
-// Usage:  db.patient.update({ where: { id }, data: safePartial(body) })
 export function safePartial<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
