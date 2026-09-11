@@ -30,6 +30,9 @@ const SPECIALTY_COLORS: Record<Specialty, string> = {
   "Psicología": "#5b3fa0",
   "Neuropsicología": "#b03060",
   "T. Ocupacional": "#c17f3a",
+  "Trabajo Social": "#1a5c80",
+  "Terapeuta Petö": "#4338ca",
+  "Cuidados": "#0891b2",
 };
 const STATUS_COLORS: Record<PatientStatus, string> = {
   "Activo": "#10b981",

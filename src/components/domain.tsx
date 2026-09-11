@@ -10,7 +10,10 @@ const SPECIALTY_STYLES: Record<Specialty, string> = {
   Fisioterapia: "bg-emerald-100 text-emerald-900 border-emerald-200",
   Psicología: "bg-violet-100 text-violet-900 border-violet-200",
   Neuropsicología: "bg-fuchsia-100 text-fuchsia-900 border-fuchsia-200",
-  "T. Ocupacional": "bg-blue-100 text-blue-900 border-blue-200",
+  "T. Ocupacional": "bg-orange-100 text-orange-900 border-orange-300",
+  "Trabajo Social": "bg-blue-100 text-blue-900 border-blue-200",
+  "Terapeuta Petö": "bg-indigo-100 text-indigo-900 border-indigo-200",
+  Cuidados: "bg-cyan-100 text-cyan-900 border-cyan-200",
 };
 
 // Abreviaturas para sitios con poco espacio (listado de usuarios/as). El
@@ -21,7 +24,11 @@ const SPECIALTY_ABBR: Record<Specialty, string> = {
   Psicología: "PS",
   Neuropsicología: "NPS",
   "T. Ocupacional": "TO",
+  "Trabajo Social": "TS",
+  "Terapeuta Petö": "PET",
+  Cuidados: "CU",
 };
+export { SPECIALTY_ABBR };
 
 export function SpecialtyBadge({
   specialty,

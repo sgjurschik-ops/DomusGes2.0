@@ -21,7 +21,15 @@ import { VisitsExportDialog } from "./visits-export-dialog";
 import type { Specialty, PatientStatus, PatientDTO } from "@/types/domain";
 import { RESOURCE_KEYS, EM_CATEGORIES, EM_RESOURCE_KEY } from "@/lib/schemas";
 
-const SPECIALTY_FILTERS: ("Todas" | Specialty)[] = ["Todas", "Fisioterapia", "Psicología", "Neuropsicología", "T. Ocupacional"];
+const ALL_SPECIALTIES: Specialty[] = [
+  "Fisioterapia",
+  "Psicología",
+  "Neuropsicología",
+  "T. Ocupacional",
+  "Trabajo Social",
+  "Terapeuta Petö",
+  "Cuidados",
+];
 const STATUS_FILTERS: ("Todos" | PatientStatus)[] = ["Todos", "Activo", "En seguimiento", "Alta", "Pausado"];
 const RESOURCE_FILTERS: ("Todos" | (typeof RESOURCE_KEYS)[number])[] = ["Todos", ...RESOURCE_KEYS];
 const EM_CATEGORY_FILTERS: ("Todas" | (typeof EM_CATEGORIES)[number])[] = ["Todas", ...EM_CATEGORIES];
@@ -201,15 +209,6 @@ export function PatientsListView() {
             </PopoverTrigger>
             <PopoverContent align="end" className="w-72 space-y-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Especialidad</Label>
-                <Select value={specialty} onValueChange={(v) => setSpecialty(v as typeof specialty)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {SPECIALTY_FILTERS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
                 <Label className="text-xs">Estado</Label>
                 <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -284,6 +283,36 @@ export function PatientsListView() {
             <FileDown className="w-4 h-4" />
             <span className="hidden sm:inline">Exportar</span>
           </Button>
+        </div>
+
+        {/* Leyenda de especialidades: doble función, explica cada sello de
+            color y sirve de filtro rápido con un solo clic. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setSpecialty("Todas")}
+            aria-pressed={specialty === "Todas"}
+            className={cn(
+              "px-2 py-1 rounded-md text-xs font-medium border transition-colors",
+              specialty === "Todas"
+                ? "bg-foreground text-background border-foreground"
+                : "text-muted-foreground border-transparent hover:bg-muted",
+            )}
+          >
+            Todas
+          </button>
+          {ALL_SPECIALTIES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSpecialty((prev) => (prev === s ? "Todas" : s))}
+              aria-pressed={specialty === s}
+              className="rounded-[4px] transition-opacity"
+              style={{ opacity: specialty === "Todas" || specialty === s ? 1 : 0.4 }}
+            >
+              <SpecialtyBadge specialty={s} compact />
+            </button>
+          ))}
         </div>
 
         {/* Selector rápido de clasificación (solo módulo EM): pulsar uno u otro */}

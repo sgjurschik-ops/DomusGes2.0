@@ -2,7 +2,7 @@
 // These mirror Prisma models but are decoupled so the API can evolve
 // without forcing every consumer to import @prisma/client.
 
-export type Specialty = "Fisioterapia" | "Psicología" | "Neuropsicología" | "T. Ocupacional";
+export type Specialty = "Fisioterapia" | "Psicología" | "Neuropsicología" | "T. Ocupacional" | "Trabajo Social" | "Terapeuta Petö" | "Cuidados";
 export type PatientStatus = "Activo" | "En seguimiento" | "Alta" | "Pausado";
 
 export type ProfessionalRole =
