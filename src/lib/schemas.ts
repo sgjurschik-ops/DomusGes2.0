@@ -5,7 +5,7 @@ import { z } from "zod";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-export const SPECIALTIES = ["Fisioterapia", "Psicología", "T. Ocupacional"] as const;
+export const SPECIALTIES = ["Fisioterapia", "Psicología", "Neuropsicología", "T. Ocupacional"] as const;
 export const PATIENT_STATUSES = ["Activo", "En seguimiento", "Alta", "Pausado"] as const;
 
 // Recurso/centro de procedencia del/de la usuario/a. Extensible a propósito: para

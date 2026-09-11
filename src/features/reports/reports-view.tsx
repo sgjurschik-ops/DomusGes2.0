@@ -28,6 +28,7 @@ import { PATIENT_STATUSES, SPECIALTIES, ASSESSMENT_SCALES, RESOURCES } from "@/l
 const SPECIALTY_COLORS: Record<Specialty, string> = {
   "Fisioterapia": "#1a5c58",
   "Psicología": "#5b3fa0",
+  "Neuropsicología": "#b03060",
   "T. Ocupacional": "#c17f3a",
 };
 const STATUS_COLORS: Record<PatientStatus, string> = {

@@ -9,19 +9,39 @@ import type { Specialty, PatientStatus } from "@/types/domain";
 const SPECIALTY_STYLES: Record<Specialty, string> = {
   Fisioterapia: "bg-emerald-100 text-emerald-900 border-emerald-200",
   Psicología: "bg-violet-100 text-violet-900 border-violet-200",
+  Neuropsicología: "bg-fuchsia-100 text-fuchsia-900 border-fuchsia-200",
   "T. Ocupacional": "bg-blue-100 text-blue-900 border-blue-200",
 };
 
-export function SpecialtyBadge({ specialty, className }: { specialty: Specialty; className?: string }) {
+// Abreviaturas para sitios con poco espacio (listado de usuarios/as). El
+// nombre completo sigue disponible como tooltip (title) para no perder
+// claridad.
+const SPECIALTY_ABBR: Record<Specialty, string> = {
+  Fisioterapia: "FT",
+  Psicología: "PS",
+  Neuropsicología: "NPS",
+  "T. Ocupacional": "TO",
+};
+
+export function SpecialtyBadge({
+  specialty,
+  className,
+  compact,
+}: {
+  specialty: Specialty;
+  className?: string;
+  compact?: boolean;
+}) {
   return (
     <span
+      title={compact ? specialty : undefined}
       className={cn(
         "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
         SPECIALTY_STYLES[specialty],
         className,
       )}
     >
-      {specialty}
+      {compact ? SPECIALTY_ABBR[specialty] : specialty}
     </span>
   );
 }

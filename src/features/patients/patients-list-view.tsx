@@ -21,7 +21,7 @@ import { VisitsExportDialog } from "./visits-export-dialog";
 import type { Specialty, PatientStatus, PatientDTO } from "@/types/domain";
 import { RESOURCE_KEYS, EM_CATEGORIES, EM_RESOURCE_KEY } from "@/lib/schemas";
 
-const SPECIALTY_FILTERS: ("Todas" | Specialty)[] = ["Todas", "Fisioterapia", "Psicología", "T. Ocupacional"];
+const SPECIALTY_FILTERS: ("Todas" | Specialty)[] = ["Todas", "Fisioterapia", "Psicología", "Neuropsicología", "T. Ocupacional"];
 const STATUS_FILTERS: ("Todos" | PatientStatus)[] = ["Todos", "Activo", "En seguimiento", "Alta", "Pausado"];
 const RESOURCE_FILTERS: ("Todos" | (typeof RESOURCE_KEYS)[number])[] = ["Todos", ...RESOURCE_KEYS];
 const EM_CATEGORY_FILTERS: ("Todas" | (typeof EM_CATEGORIES)[number])[] = ["Todas", ...EM_CATEGORIES];
@@ -339,17 +339,16 @@ export function PatientsListView() {
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-medium truncate">{p.fullName}</p>
-                              {p.specialty !== "T. Ocupacional" && <SpecialtyBadge specialty={p.specialty} />}
+                              {p.specialty !== "T. Ocupacional" && <SpecialtyBadge specialty={p.specialty} compact />}
                               {p.status !== "Activo" && <StatusBadge status={p.status} />}
                               {!activeResource && <ResourceBadge resource={p.resource} />}
                               {isEM && <EmCategoryBadge category={p.emCategory} />}
                               {p.resource === "Asociación EM" && p.informedConsent && (
                                 <span
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-emerald-600 border border-emerald-700 text-white font-semibold whitespace-nowrap"
                                   title="Consentimiento informado firmado"
+                                  className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-600 shrink-0"
                                 >
-                                  <ShieldCheck className="w-2.5 h-2.5" />
-                                  Consentimiento
+                                  <ShieldCheck className="w-3 h-3 text-white" />
                                 </span>
                               )}
                               {(p.alerts ?? []).slice(0, 2).map((alert) => (
@@ -412,22 +411,21 @@ export function PatientsListView() {
                       {isEM && daysSince(p.startDate) !== null && (
                         <span className="text-xs text-muted-foreground">· {daysSince(p.startDate)} días</span>
                       )}
-                      {p.specialty !== "T. Ocupacional" && <SpecialtyBadge specialty={p.specialty} />}
+                      {p.specialty !== "T. Ocupacional" && <SpecialtyBadge specialty={p.specialty} compact />}
                       {p.status !== "Activo" && <StatusBadge status={p.status} />}
                       {!activeResource && <ResourceBadge resource={p.resource} />}
                       {isEM && <EmCategoryBadge category={p.emCategory} />}
+                      {p.resource === "Asociación EM" && p.informedConsent && (
+                        <span
+                          title="Consentimiento informado firmado"
+                          className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-600 shrink-0"
+                        >
+                          <ShieldCheck className="w-3 h-3 text-white" />
+                        </span>
+                      )}
                     </div>
-                    {(p.resource === "Asociación EM" && p.informedConsent) || (p.alerts ?? []).length > 0 ? (
+                    {(p.alerts ?? []).length > 0 ? (
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {p.resource === "Asociación EM" && p.informedConsent && (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-emerald-600 border border-emerald-700 text-white font-semibold"
-                            title="Consentimiento informado firmado"
-                          >
-                            <ShieldCheck className="w-2.5 h-2.5" />
-                            Consentimiento
-                          </span>
-                        )}
                         {(p.alerts ?? []).map((alert) => (
                           <span
                             key={alert}
