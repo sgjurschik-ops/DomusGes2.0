@@ -371,8 +371,8 @@ function ListadosView() {
   // ── CSV exports ──
   function exportUsers() {
     downloadCSV("usuarios.csv",
-      filteredUsers.map((p) => [p.fullName, String(p.age), p.specialty, p.status, p.resource ?? "", p.diagnosis ?? "", fmtDate(p.startDate), String(p.totalVisits), p.lastVisitDate ? fmtDate(p.lastVisitDate) : "", p.therapistNames.join(", "), p.phone ?? ""]),
-      ["Nombre", "Edad", "Especialidad", "Estado", "Centro", "Diagnóstico", "Inicio", "Seguimientos", "Última visita", "Terapeutas", "Teléfono"]
+      filteredUsers.map((p) => [p.fullName, p.specialty, p.status, p.resource ?? "", p.diagnosis ?? "", fmtDate(p.startDate), String(p.totalVisits), p.lastVisitDate ? fmtDate(p.lastVisitDate) : "", p.therapistNames.join(", "), p.phone ?? ""]),
+      ["Nombre", "Especialidad", "Estado", "Centro", "Diagnóstico", "Inicio", "Seguimientos", "Última visita", "Terapeutas", "Teléfono"]
     );
   }
   function exportVisits() {
@@ -438,7 +438,6 @@ function ListadosView() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nombre</TableHead>
-                    <TableHead>Edad</TableHead>
                     <TableHead>Centro</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Diagnóstico</TableHead>
@@ -450,11 +449,10 @@ function ListadosView() {
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.length === 0 ? (
-                    <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-8">Sin resultados.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">Sin resultados.</TableCell></TableRow>
                   ) : filteredUsers.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.fullName}</TableCell>
-                      <TableCell>{p.age}</TableCell>
                       <TableCell>{p.resource ? <ResourceBadge resource={p.resource} className="text-[11px] py-0" /> : <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell><span className="text-xs px-2 py-0.5 rounded-full" style={{ background: STATUS_COLORS[p.status] + "22", color: STATUS_COLORS[p.status] }}>{p.status}</span></TableCell>
                       <TableCell className="text-muted-foreground text-xs">{p.diagnosis ?? "—"}</TableCell>
