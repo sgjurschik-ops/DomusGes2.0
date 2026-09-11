@@ -345,7 +345,7 @@ export function PatientsListView() {
                               {isEM && <EmCategoryBadge category={p.emCategory} />}
                               {p.resource === "Asociación EM" && p.informedConsent && (
                                 <span
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-emerald-100 border border-emerald-300 text-emerald-900 whitespace-nowrap"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-indigo-100 border border-indigo-300 text-indigo-900 whitespace-nowrap"
                                   title="Consentimiento informado firmado"
                                 >
                                   <ShieldCheck className="w-2.5 h-2.5" />
@@ -421,7 +421,7 @@ export function PatientsListView() {
                       <div className="flex flex-wrap gap-1 mt-1">
                         {p.resource === "Asociación EM" && p.informedConsent && (
                           <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-emerald-100 border border-emerald-300 text-emerald-900"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-indigo-100 border border-indigo-300 text-indigo-900"
                             title="Consentimiento informado firmado"
                           >
                             <ShieldCheck className="w-2.5 h-2.5" />

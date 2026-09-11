@@ -283,6 +283,24 @@ export function NewPatientForm({ mode = "create" }: Props) {
                 )}
               />
             </Field>
+            {resource === EM_RESOURCE_KEY && (
+              <div className="sm:col-span-2 flex items-center gap-2.5 -mt-1">
+                <Controller
+                  control={control}
+                  name="informedConsent"
+                  render={({ field }) => (
+                    <Checkbox
+                      id="informedConsent"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
+                <Label htmlFor="informedConsent" className="text-sm cursor-pointer">
+                  Consentimiento informado firmado
+                </Label>
+              </div>
+            )}
             <Field label="Estado" error={errors.status?.message} required>
               <Controller
                 control={control}
@@ -340,24 +358,6 @@ export function NewPatientForm({ mode = "create" }: Props) {
               <Field label="Referente equipo de cuidados" error={errors.careTeamReferent?.message}>
                 <Input id="careTeamReferent" {...register("careTeamReferent")} />
               </Field>
-            )}
-            {resource === EM_RESOURCE_KEY && (
-              <div className="sm:col-span-2 flex items-center gap-2.5">
-                <Controller
-                  control={control}
-                  name="informedConsent"
-                  render={({ field }) => (
-                    <Checkbox
-                      id="informedConsent"
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  )}
-                />
-                <Label htmlFor="informedConsent" className="text-sm cursor-pointer">
-                  Consentimiento informado firmado
-                </Label>
-              </div>
             )}
             <div className="sm:col-span-2 space-y-2">
               <Label>Terapeutas asignados</Label>
