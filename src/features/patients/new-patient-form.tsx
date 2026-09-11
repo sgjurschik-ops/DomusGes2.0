@@ -85,6 +85,15 @@ export function NewPatientForm({ mode = "create" }: Props) {
     },
   });
 
+  // Mientras esto es false en modo edición, el formulario NO se muestra
+  // (ver guardia más abajo). Evita que el desplegable de clasificación (y
+  // cualquier otro campo) "nazca" con el valor vacío por defecto y se
+  // rellene un instante después sin haber sido nunca abierto — eso podía
+  // dejar el desplegable mostrando el placeholder aunque el valor interno
+  // ya fuera correcto. Esperar a que reset() ya se haya aplicado antes de
+  // pintar el formulario asegura que nace directamente con el valor bueno.
+  const [editDataReady, setEditDataReady] = useState(false);
+
   useEffect(() => {
     if (!isEdit || !patient) return;
 
@@ -108,6 +117,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
       informedConsent: patient.informedConsent ?? false,
       therapistIds: patient.therapistIds ?? [],
     });
+    setEditDataReady(true);
   }, [isEdit, patient, reset]);
 
   async function onSubmit(values: PatientCreateInput) {
@@ -148,7 +158,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
   const isDayCenterForm = resource === EM_RESOURCE_KEY && emCategory === "Centro de día";
   const isPending = create.isPending || update.isPending;
 
-  if (isEdit && isLoadingPatient) {
+  if (isEdit && (isLoadingPatient || !editDataReady)) {
     return <p className="text-sm text-muted-foreground">Cargando datos del/de la usuario/a…</p>;
   }
 
