@@ -86,7 +86,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     const onlyTherapistsChanged =
       sameOrUnset("firstName", current.firstName) &&
       sameOrUnset("lastName", current.lastName) &&
-      sameDateOrUnset("birthDate", current.birthDate) &&
       sameOrUnset("specialty", current.specialty) &&
       sameOrUnset("status", current.status) &&
       sameOrUnset("resource", current.resource) &&
@@ -154,7 +153,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     data: safePartial({
       firstName: body.firstName,
       lastName: body.lastName,
-      birthDate: body.birthDate !== undefined ? new Date(body.birthDate) : undefined,
       specialty: body.specialty,
       status: body.status,
       resource: body.resource !== undefined ? (body.resource || null) : undefined,
@@ -178,6 +176,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       therapists: therapistUpdate,
       quickNotes: body.quickNotes,
       restricted: typeof body.restricted === "boolean" ? body.restricted : undefined,
+      informedConsent: typeof body.informedConsent === "boolean" ? body.informedConsent : undefined,
       ...(isAdmin ? {} : {
         diagnosis: body.diagnosis !== undefined ? (body.diagnosis || null) : undefined,
         objective: body.objective !== undefined ? (body.objective || null) : undefined,

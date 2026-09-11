@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Avatar, SpecialtyBadge, StatusBadge, ResourceBadge, EmCategoryBadge, emCategoryAvatarColor, formatRelative } from "@/components/domain";
-import { Search, Plus, Users, AlertTriangle, SlidersHorizontal, X, ArrowUp, ArrowDown, FileDown } from "lucide-react";
+import { Search, Plus, Users, AlertTriangle, SlidersHorizontal, X, ArrowUp, ArrowDown, FileDown, ShieldCheck } from "lucide-react";
 import { VisitsExportDialog } from "./visits-export-dialog";
 import type { Specialty, PatientStatus, PatientDTO } from "@/types/domain";
 import { RESOURCE_KEYS, EM_CATEGORIES, EM_RESOURCE_KEY } from "@/lib/schemas";
@@ -34,10 +34,9 @@ function daysSince(iso: string | null): number | null {
   return d >= 0 ? d : 0;
 }
 
-type SortKey = "name" | "age" | "lastVisit" | "nextAppt";
+type SortKey = "name" | "lastVisit" | "nextAppt";
 const SORT_LABELS: Record<SortKey, string> = {
   name: "Nombre",
-  age: "Edad",
   lastVisit: "Última visita",
   nextAppt: "Próxima cita",
 };
@@ -58,8 +57,6 @@ function sortPatients(patients: PatientDTO[], sortKey: SortKey, dir: 1 | -1): Pa
     switch (sortKey) {
       case "name":
         return a.fullName.localeCompare(b.fullName, "es") * dir;
-      case "age":
-        return (a.age - b.age) * dir;
       case "lastVisit":
         return compareDatesWithNullsLast(a.lastVisitDate, b.lastVisitDate, dir);
       case "nextAppt":
@@ -314,7 +311,6 @@ export function PatientsListView() {
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                   <th className="text-left font-medium px-4 py-2.5">Usuario/a</th>
-                  <th className="text-left font-medium px-4 py-2.5 w-20">Edad</th>
                   {isEM && <th className="text-left font-medium px-4 py-2.5 w-24">Días</th>}
                   <th className="text-left font-medium px-4 py-2.5 w-40">Última visita</th>
                   <th className="text-left font-medium px-4 py-2.5 w-40">Próxima cita</th>
@@ -347,6 +343,15 @@ export function PatientsListView() {
                               {p.status !== "Activo" && <StatusBadge status={p.status} />}
                               {!activeResource && <ResourceBadge resource={p.resource} />}
                               {isEM && <EmCategoryBadge category={p.emCategory} />}
+                              {p.resource === "Asociación EM" && p.informedConsent && (
+                                <span
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-emerald-100 border border-emerald-300 text-emerald-900 whitespace-nowrap"
+                                  title="Consentimiento informado firmado"
+                                >
+                                  <ShieldCheck className="w-2.5 h-2.5" />
+                                  Consentimiento
+                                </span>
+                              )}
                               {(p.alerts ?? []).slice(0, 2).map((alert) => (
                                 <span
                                   key={alert}
@@ -365,7 +370,6 @@ export function PatientsListView() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">{p.age} años</td>
                       {isEM && (
                         <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                           {daysSince(p.startDate) !== null ? `${daysSince(p.startDate)} días` : "—"}
@@ -405,7 +409,6 @@ export function PatientsListView() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-sm truncate">{p.fullName}</p>
-                      <span className="text-xs text-muted-foreground">{p.age} años</span>
                       {isEM && daysSince(p.startDate) !== null && (
                         <span className="text-xs text-muted-foreground">· {daysSince(p.startDate)} días</span>
                       )}
@@ -414,8 +417,17 @@ export function PatientsListView() {
                       {!activeResource && <ResourceBadge resource={p.resource} />}
                       {isEM && <EmCategoryBadge category={p.emCategory} />}
                     </div>
-                    {(p.alerts ?? []).length > 0 && (
+                    {(p.resource === "Asociación EM" && p.informedConsent) || (p.alerts ?? []).length > 0 ? (
                       <div className="flex flex-wrap gap-1 mt-1">
+                        {p.resource === "Asociación EM" && p.informedConsent && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-emerald-100 border border-emerald-300 text-emerald-900"
+                            title="Consentimiento informado firmado"
+                          >
+                            <ShieldCheck className="w-2.5 h-2.5" />
+                            Consentimiento
+                          </span>
+                        )}
                         {(p.alerts ?? []).map((alert) => (
                           <span
                             key={alert}
@@ -426,7 +438,7 @@ export function PatientsListView() {
                           </span>
                         ))}
                       </div>
-                    )}
+                    ) : null}
                   </div>
                   <div className="text-right hidden sm:block">
                     <p className="text-[11px] text-muted-foreground uppercase">Próxima cita</p>

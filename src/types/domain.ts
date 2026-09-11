@@ -67,8 +67,6 @@ export interface PatientDTO {
   firstName: string;
   lastName: string;
   fullName: string;
-  birthDate: string; // ISO date
-  age: number;
   specialty: Specialty;
   status: PatientStatus;
   // null = todavía no asignado (usuarios/as creados/as antes de este campo).
@@ -85,6 +83,7 @@ export interface PatientDTO {
   referentPhone: string | null;
   referent: string | null;
   careTeamReferent: string | null;
+  informedConsent: boolean;
   color: string;
   therapistIds: string[];
   therapistNames: string[];

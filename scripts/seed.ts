@@ -69,7 +69,7 @@ async function main() {
   // ─── Pacientes (datos claramente ficticios) ────────────────────────────────
   const patients: Prisma.PatientCreateInput[] = [
     {
-      firstName: "Marta", lastName: "Ejemplo Uno", birthDate: new Date("1958-03-12"),
+      firstName: "Marta", lastName: "Ejemplo Uno",
       specialty: "Fisioterapia", status: "Activo",
       phone: "612 345 678", address: "Calle Demo 12, 1ºA — Pamplona",
       diagnosis: "Fractura de cadera derecha — post-quirúrgico",
@@ -79,7 +79,7 @@ async function main() {
       color: PALETTE[0],
     },
     {
-      firstName: "Joaquín", lastName: "Ejemplo Dos", birthDate: new Date("1981-07-23"),
+      firstName: "Joaquín", lastName: "Ejemplo Dos",
       specialty: "Psicología", status: "En seguimiento",
       phone: "689 012 345", address: "Av. Demo 45, 3ºB — Pamplona",
       diagnosis: "Trastorno adaptativo con componente ansioso",
@@ -89,7 +89,7 @@ async function main() {
       color: PALETTE[1],
     },
     {
-      firstName: "Cándida", lastName: "Ejemplo Tres", birthDate: new Date("1944-09-04"),
+      firstName: "Cándida", lastName: "Ejemplo Tres",
       specialty: "T. Ocupacional", status: "Activo",
       phone: "654 789 012", address: "C/ Demo 8, 2ºC — Pamplona",
       diagnosis: "Deterioro cognitivo leve (DCL)",
@@ -99,7 +99,7 @@ async function main() {
       color: PALETTE[2],
     },
     {
-      firstName: "Atilano", lastName: "Ejemplo Cuatro", birthDate: new Date("1955-01-30"),
+      firstName: "Atilano", lastName: "Ejemplo Cuatro",
       specialty: "Fisioterapia", status: "En seguimiento",
       phone: "638 456 789", address: "Calle Demo 15, 1ºD — Pamplona",
       diagnosis: "Ictus isquémico — secuelas motoras lado izquierdo",
@@ -109,7 +109,7 @@ async function main() {
       color: PALETTE[3],
     },
     {
-      firstName: "Lorena", lastName: "Ejemplo Cinco", birthDate: new Date("1992-11-08"),
+      firstName: "Lorena", lastName: "Ejemplo Cinco",
       specialty: "Psicología", status: "Activo",
       phone: "601 234 567", address: "C/ Demo 52, 4ºA — Pamplona",
       diagnosis: "TDAH adulto — desregulación emocional",
@@ -119,7 +119,7 @@ async function main() {
       color: PALETTE[4],
     },
     {
-      firstName: "Manuel", lastName: "Ejemplo Seis", birthDate: new Date("1949-05-19"),
+      firstName: "Manuel", lastName: "Ejemplo Seis",
       specialty: "T. Ocupacional", status: "Activo",
       phone: "677 890 123", address: "Calle Demo 28, 3ºB — Pamplona",
       diagnosis: "Enfermedad de Parkinson — estadio II",

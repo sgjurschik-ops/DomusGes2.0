@@ -17,16 +17,6 @@ export function parseSections(raw: string | null): ReportSection[] {
   return valid.length > 0 ? valid : [...REPORT_SECTIONS];
 }
 
-function calcAge(birthDate: Date): number {
-  const now = new Date();
-  let age = now.getFullYear() - birthDate.getFullYear();
-  const monthDiff = now.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return age;
-}
-
 export type ReportAudience = "professional" | "family";
 
 function parseAudience(raw: string | null): ReportAudience {
@@ -47,7 +37,6 @@ export interface PatientReportData {
   audience: ReportAudience;
   patient: {
     fullName: string;
-    age: number;
     specialty: string;
     status: string;
     diagnosis: string | null;
@@ -102,7 +91,6 @@ export async function gatherPatientReportData(
     audience,
     patient: {
       fullName: `${patient.firstName} ${patient.lastName}`,
-      age: calcAge(patient.birthDate),
       specialty: patient.specialty,
       status: patient.status,
       diagnosis: patient.diagnosis,

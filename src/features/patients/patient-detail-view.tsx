@@ -45,7 +45,7 @@ import { NewVisitForm } from "@/features/visits/new-visit-form";
 import { InterventionsTab } from "./interventions-tab";
 import { EvolutionTable } from "./evolution-table";
 import { PatientReportDialog } from "./patient-report-dialog";
-import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle, FileDown, Activity, ListChecks, StickyNote, Home, Hand, Fingerprint, BatteryLow, Brain, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, Stethoscope, Target, User2, Calendar, ClipboardList, Plus, Trash2, Pencil, MoreVertical, ArrowUp, ArrowDown, Minus, AlertTriangle, FileDown, Activity, ListChecks, StickyNote, Home, Hand, Fingerprint, BatteryLow, Brain, ShieldCheck, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Dot,
@@ -85,6 +85,7 @@ export function PatientDetailView() {
   // Usuario/a de Centro de día (recurso EM + clasificación "Centro de día"):
   // cambia el nombre de un par de pestañas para adaptarse a su flujo.
   const isDayCenter = !!patient && patient.resource === "Asociación EM" && patient.emCategory === "Centro de día";
+  const isEM = !!patient && patient.resource === "Asociación EM";
   const deletePatient = useDeletePatient();
   const updatePatient = useUpdatePatient();
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
@@ -212,7 +213,7 @@ export function PatientDetailView() {
                     <ResourceBadge resource={patient.resource} />
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {patient.age} años · {patient.totalVisits} seguimientos · Inicio {formatDate(patient.startDate)}
+                    {patient.totalVisits} seguimientos · Inicio {formatDate(patient.startDate)}
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -269,6 +270,17 @@ export function PatientDetailView() {
                       <div><span className="text-muted-foreground">Referente:</span> <span className="font-semibold">{patient.referent || "—"}</span></div>
                       <div><span className="text-muted-foreground">Equipo de cuidados:</span> <span className="font-semibold">{patient.careTeamReferent || "—"}</span></div>
                     </div>
+                  </div>
+                )}
+
+                {isEM && patient.informedConsent && (
+                  <div
+                    className="w-full sm:w-[230px] shrink-0 rounded-lg px-3 py-2"
+                    style={{ backgroundColor: "rgba(16,122,87,0.06)", border: "1px solid rgba(16,122,87,0.22)" }}
+                  >
+                    <p className="text-[10px] uppercase tracking-wide font-bold flex items-center gap-1" style={{ color: "#107a57" }}>
+                      <ShieldCheck className="w-3 h-3" /> Consentimiento informado firmado
+                    </p>
                   </div>
                 )}
               </div>

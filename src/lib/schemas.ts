@@ -227,7 +227,6 @@ export const patientCreateSchema = z
   .object({
     firstName: z.string().min(2, "El nombre es obligatorio"),
     lastName: z.string().min(2, "Los apellidos son obligatorios"),
-    birthDate: z.string().min(1, "La fecha de nacimiento es obligatoria"),
     specialty: z.enum(SPECIALTIES),
     status: z.enum(PATIENT_STATUSES).default("Activo"),
     resource: z.enum(RESOURCE_KEYS, { error: "Selecciona un recurso" }),
@@ -244,6 +243,7 @@ export const patientCreateSchema = z
     referentPhone: z.string().optional().default(""),
     referent: z.string().optional().default(""),
     careTeamReferent: z.string().optional().default(""),
+    informedConsent: z.boolean().optional().default(false),
     therapistIds: z.array(z.string()).default([]),
   })
   .superRefine((d, ctx) => {

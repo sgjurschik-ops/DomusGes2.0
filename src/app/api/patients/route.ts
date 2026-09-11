@@ -84,7 +84,6 @@ export async function POST(req: NextRequest) {
     data: {
       firstName: d.firstName,
       lastName: d.lastName,
-      birthDate: new Date(d.birthDate),
       specialty: d.specialty,
       status: d.status,
       resource: d.resource,
@@ -99,6 +98,7 @@ export async function POST(req: NextRequest) {
       referentPhone: d.referentPhone || null,
       referent: d.referent || null,
       careTeamReferent: d.careTeamReferent || null,
+      informedConsent: d.informedConsent ?? false,
       color: ["#1a5c58", "#5b3fa0", "#c17f3a", "#b03060", "#2a6b3f", "#1a5c80"][
         Math.floor(Math.random() * 6)
       ],

@@ -45,7 +45,6 @@ model Patient {
   id            String   @id @default(cuid())
   firstName     String
   lastName      String
-  birthDate     DateTime
   specialty     String   // Fisioterapia | Psicología | T. Ocupacional
   status        String   @default("Activo") // Activo | En seguimiento | Alta | Pausado
   // Recurso/centro de procedencia (p. ej. "Domicilio", "Asociación EM").
@@ -72,6 +71,7 @@ model Patient {
   color         String   @default("#1a5c58")
   quickNotes    String?  // JSON-encoded QuickNote[]: { id, text, color }[]
   restricted    Boolean  @default(false)
+  informedConsent Boolean @default(false) // Consentimiento informado firmado (solo Asociación EM)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

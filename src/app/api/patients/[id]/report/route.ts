@@ -62,13 +62,6 @@ function fmtDate(d: Date | string | null): string {
   return new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-function calcAge(d: Date): number {
-  const now = new Date();
-  let age = now.getFullYear() - d.getFullYear();
-  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) age--;
-  return age;
-}
-
 function safeJson<T>(raw: string | null | undefined): T[] {
   if (!raw) return [];
   try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch { return []; }
@@ -124,7 +117,6 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     const d: Record<string, any> = { ...(profile ?? {}) };
     const today = fmtDate(new Date());
     const fullName = `${patient.firstName} ${patient.lastName}`;
-    const age = calcAge(patient.birthDate);
     const goals: any[] = profile?.goals ?? [];
 
     // Balance data
@@ -345,8 +337,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     <div class="value">${esc(fullName)}</div>
   </div>
   <div class="patient-cell">
-    <div class="label">Fecha de nacimiento</div>
-    <div class="value-sm">${fmtDate(patient.birthDate)} (${age} años)</div>
+    <div class="label">Inicio</div>
+    <div class="value-sm">${fmtDate(patient.startDate)}</div>
   </div>
 </div>
 

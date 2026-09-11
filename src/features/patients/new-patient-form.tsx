@@ -63,7 +63,6 @@ export function NewPatientForm({ mode = "create" }: Props) {
     defaultValues: {
       firstName: "",
       lastName: "",
-      birthDate: "",
       specialty: "T. Ocupacional",
       status: "Activo",
       // Pre-seleccionamos el centro en el que se está trabajando ahora
@@ -81,6 +80,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
       referentPhone: "",
       referent: "",
       careTeamReferent: "",
+      informedConsent: false,
       therapistIds: [],
     },
   });
@@ -91,7 +91,6 @@ export function NewPatientForm({ mode = "create" }: Props) {
     reset({
       firstName: patient.firstName ?? "",
       lastName: patient.lastName ?? "",
-      birthDate: patient.birthDate?.slice(0, 10) ?? "",
       specialty: patient.specialty,
       status: patient.status,
       resource: (patient.resource ?? "") as PatientCreateInput["resource"],
@@ -106,6 +105,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
       referentPhone: patient.referentPhone ?? "",
       referent: patient.referent ?? "",
       careTeamReferent: patient.careTeamReferent ?? "",
+      informedConsent: patient.informedConsent ?? false,
       therapistIds: patient.therapistIds ?? [],
     });
   }, [isEdit, patient, reset]);
@@ -178,9 +178,6 @@ export function NewPatientForm({ mode = "create" }: Props) {
             </Field>
             <Field label="Apellidos" error={errors.lastName?.message} required>
               <Input id="lastName" {...register("lastName")} />
-            </Field>
-            <Field label="Fecha de nacimiento" error={errors.birthDate?.message} required>
-              <Input id="birthDate" type="date" {...register("birthDate")} />
             </Field>
             <Field label="Teléfono" error={errors.phone?.message}>
               <Input id="phone" placeholder="6XX XXX XXX" {...register("phone")} />
@@ -333,6 +330,24 @@ export function NewPatientForm({ mode = "create" }: Props) {
               <Field label="Referente equipo de cuidados" error={errors.careTeamReferent?.message}>
                 <Input id="careTeamReferent" {...register("careTeamReferent")} />
               </Field>
+            )}
+            {resource === EM_RESOURCE_KEY && (
+              <div className="sm:col-span-2 flex items-center gap-2.5">
+                <Controller
+                  control={control}
+                  name="informedConsent"
+                  render={({ field }) => (
+                    <Checkbox
+                      id="informedConsent"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
+                <Label htmlFor="informedConsent" className="text-sm cursor-pointer">
+                  Consentimiento informado firmado
+                </Label>
+              </div>
             )}
             <div className="sm:col-span-2 space-y-2">
               <Label>Terapeutas asignados</Label>

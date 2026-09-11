@@ -188,13 +188,6 @@ export async function getPatientTimelineMap(patientIds: string[]) {
   return { lastVisitMap, nextApptMap };
 }
 
-export function calcAge(birthDate: Date, now: Date = new Date()): number {
-  let age = now.getFullYear() - birthDate.getFullYear();
-  const m = now.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) age--;
-  return age;
-}
-
 type PatientWithRels = Prisma.PatientGetPayload<{
   include: {
     therapists: { select: { id: true; name: true } };
@@ -212,14 +205,11 @@ export function mapPatient(
   p: PatientWithRels,
   extra: { lastVisitDate: Date | null; nextAppointmentDate: Date | null },
 ) {
-  const now = new Date();
   return {
     id: p.id,
     firstName: p.firstName,
     lastName: p.lastName,
     fullName: `${p.firstName} ${p.lastName}`,
-    birthDate: p.birthDate.toISOString(),
-    age: calcAge(p.birthDate, now),
     specialty: p.specialty,
     status: p.status,
     resource: p.resource,
@@ -237,6 +227,7 @@ export function mapPatient(
     color: p.color,
     quickNotes: p.quickNotes ?? null,
     restricted: (p as any).restricted ?? false,
+    informedConsent: (p as any).informedConsent ?? false,
     therapistIds: p.therapists.map((t) => t.id),
     therapistNames: p.therapists.map((t) => t.name),
     totalVisits: p._count.visits,
