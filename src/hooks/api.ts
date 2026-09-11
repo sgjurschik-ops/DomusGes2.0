@@ -629,6 +629,57 @@ export function useDeleteGasAssessment(patientId: string) {
   });
 }
 
+// ─── Tasks (checklist personal, privado, sin agenda ni pacientes) ─────────────
+
+export interface TaskDTO {
+  id: string;
+  professionalId: string;
+  text: string;
+  tags: string[];
+  done: boolean;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export function useTasks() {
+  return useQuery<TaskDTO[]>({
+    queryKey: ["tasks"],
+    queryFn: () => fetcher("/api/tasks"),
+  });
+}
+
+export function useCreateTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { text: string; tags?: string[] }) =>
+      fetcher("/api/tasks", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+}
+
+export function useUpdateTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string; text?: string; tags?: string[]; done?: boolean }) =>
+      fetcher(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+}
+
+export function useDeleteTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => fetcher(`/api/tasks/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+}
+
 // ─── Messages ─────────────────────────────────────────────────────────────────
 
 export interface MessageDTO {

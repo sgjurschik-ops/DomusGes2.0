@@ -10,6 +10,7 @@ import { Sidebar, SidebarToggle } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { Plus, Clock, Activity } from "lucide-react";
 import { MessagingTrigger } from "@/components/messaging-panel";
+import { TasksTrigger } from "@/components/tasks-panel";
 
 const VIEW_TITLES: Record<string, string> = {
   dashboard: "Inicio",
@@ -141,6 +142,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Plus className="w-4 h-4 mr-1" /> Nuevo/a usuario/a
               </Button>
             )}
+            <TasksTrigger />
             <MessagingTrigger />
           </div>
         </header>

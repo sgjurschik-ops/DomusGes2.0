@@ -37,6 +37,7 @@ model Professional {
   messagesSent     Message[] @relation("MessagesSent")
   messagesReceived Message[] @relation("MessagesReceived")
   noteEntries      QuickNote[]
+  tasks            Task[]
 
   @@index([isActive])
 }
@@ -360,6 +361,24 @@ model Message {
 
   @@index([toId, readAt])
   @@index([fromId])
+}
+
+// Tarea personal simple (checklist) de cada profesional: privada — cada
+// quien solo ve, crea, marca y borra las suyas. Deliberadamente NO se
+// asocia a pacientes ni aparece en la Agenda; es solo un "to-do" rápido con
+// etiquetas libres (ej. "Urgente").
+model Task {
+  id             String    @id @default(cuid())
+  professionalId String
+  text           String
+  tags           String[]  @default([])
+  done           Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId, done])
 }
 
 // Nota rápida (post-it) PRIVADA de cada profesional: cada uno solo ve, crea,

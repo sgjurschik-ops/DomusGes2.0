@@ -1843,7 +1843,7 @@ function AppointmentFormDialog({
             therapistId: "",
             date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
             time: preset?.time ?? "10:00",
-            endTime: preset?.time ? addMinutesToTimeStr(preset.time, 60) : "11:00",
+            endTime: preset?.time ? addMinutesToTimeStr(preset.time, 45) : "10:45",
             type: "Sesión",
             notes: "",
           },
@@ -1869,7 +1869,7 @@ function AppointmentFormDialog({
         therapistId: "",
         date: preset?.date ?? format(new Date(), "yyyy-MM-dd"),
         time: preset?.time ?? "10:00",
-        endTime: preset?.time ? addMinutesToTimeStr(preset.time, 60) : "11:00",
+        endTime: preset?.time ? addMinutesToTimeStr(preset.time, 45) : "10:45",
         type: "Sesión",
         notes: "",
       });
