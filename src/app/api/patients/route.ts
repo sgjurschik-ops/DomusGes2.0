@@ -4,25 +4,43 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireProfessional, audit, mapPatient, getPatientTimelineMap, buildResourceFilter } from "@/lib/server";
 import { patientCreateSchema } from "@/lib/schemas";
+import type { Prisma } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
   const prof = await requireProfessional();
   const resource = new URL(req.url).searchParams.get("resource");
 
-  // Los invitados solo ven sus usuarios/as asignados/as... salvo los de
-  // Centro de día, visibles para todo el equipo (colaborativo).
-  // Usamos AND explícito para no pisar el posible OR de buildResourceFilter.
+  const isAdmin = prof.userRole === "admin";
+  const isGuest = prof.userRole === "guest";
+
+  // ─── Visibilidad de pacientes ───────────────────────────────────────────
+  // - Administrador/a: ve todo, sin restricción.
+  // - Cualquier otro/a profesional: un paciente marcado como "restricted"
+  //   SOLO es visible si está asignado/a a él, sin excepción (ni siquiera
+  //   Centro de día, que normalmente es colaborativo).
+  // - Para pacientes NO restringidos: terapeuta ve todos; invitado/a solo
+  //   los suyos asignados, más los de Centro de día (colaborativo).
+  const nonRestrictedCondition: Prisma.PatientWhereInput = isGuest
+    ? {
+        restricted: false,
+        OR: [
+          { therapists: { some: { id: prof.id } } },
+          { resource: "Asociación EM", emCategory: "Centro de día" },
+        ],
+      }
+    : { restricted: false };
+
+  const visibilityFilter: Prisma.PatientWhereInput = {
+    OR: [
+      { restricted: true, therapists: { some: { id: prof.id } } },
+      nonRestrictedCondition,
+    ],
+  };
+
   const where = {
     AND: [
       buildResourceFilter(resource),
-      prof.userRole === "guest"
-        ? {
-            OR: [
-              { therapists: { some: { id: prof.id } } },
-              { resource: "Asociación EM", emCategory: "Centro de día" },
-            ],
-          }
-        : {},
+      isAdmin ? {} : visibilityFilter,
     ],
   };
 
@@ -92,8 +110,6 @@ export async function POST(req: NextRequest) {
     },
   });
   await audit(prof.id, "patient.create", "Patient", row.id, { name: `${row.firstName} ${row.lastName}` });
-  // A brand-new patient has no visits or appointments yet, so both are null —
-  // no extra query needed here.
   return NextResponse.json(
     mapPatient(row, { lastVisitDate: null, nextAppointmentDate: null }),
     { status: 201 },
