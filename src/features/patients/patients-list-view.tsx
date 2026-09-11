@@ -339,7 +339,7 @@ export function PatientsListView() {
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-medium truncate">{p.fullName}</p>
-                              {p.specialty !== "T. Ocupacional" && <SpecialtyBadge specialty={p.specialty} compact />}
+                              <SpecialtyBadge specialty={p.specialty} compact />
                               {p.status !== "Activo" && <StatusBadge status={p.status} />}
                               {!activeResource && <ResourceBadge resource={p.resource} />}
                               {isEM && <EmCategoryBadge category={p.emCategory} />}
@@ -411,7 +411,7 @@ export function PatientsListView() {
                       {isEM && daysSince(p.startDate) !== null && (
                         <span className="text-xs text-muted-foreground">· {daysSince(p.startDate)} días</span>
                       )}
-                      {p.specialty !== "T. Ocupacional" && <SpecialtyBadge specialty={p.specialty} compact />}
+                      <SpecialtyBadge specialty={p.specialty} compact />
                       {p.status !== "Activo" && <StatusBadge status={p.status} />}
                       {!activeResource && <ResourceBadge resource={p.resource} />}
                       {isEM && <EmCategoryBadge category={p.emCategory} />}
