@@ -36,7 +36,13 @@ export function SpecialtyBadge({
     <span
       title={compact ? specialty : undefined}
       className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+        // La versión compacta usa esquinas casi rectas (en vez de la
+        // pastilla redondeada del resto de etiquetas) para distinguirse a
+        // simple vista como "profesional/perfil" y no confundirse con
+        // estado/recurso/clasificación en el listado.
+        compact
+          ? "inline-flex items-center rounded-[4px] border px-1.5 py-0.5 text-[11px] font-bold tracking-wide"
+          : "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
         SPECIALTY_STYLES[specialty],
         className,
       )}

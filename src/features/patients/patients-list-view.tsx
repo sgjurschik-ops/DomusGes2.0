@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { usePatients } from "@/hooks/api";
+import { usePatients, useProfessionals } from "@/hooks/api";
 import { useNav } from "@/store/nav";
 import { useCurrentSession } from "@/hooks/api";
 import { useCenter } from "@/store/center";
@@ -25,14 +25,6 @@ const SPECIALTY_FILTERS: ("Todas" | Specialty)[] = ["Todas", "Fisioterapia", "Ps
 const STATUS_FILTERS: ("Todos" | PatientStatus)[] = ["Todos", "Activo", "En seguimiento", "Alta", "Pausado"];
 const RESOURCE_FILTERS: ("Todos" | (typeof RESOURCE_KEYS)[number])[] = ["Todos", ...RESOURCE_KEYS];
 const EM_CATEGORY_FILTERS: ("Todas" | (typeof EM_CATEGORIES)[number])[] = ["Todas", ...EM_CATEGORIES];
-
-// Días naturales transcurridos desde la fecha de inicio (alta) del/de la
-// usuario/a — cuánto lleva en la asociación / centro de día.
-function daysSince(iso: string | null): number | null {
-  if (!iso) return null;
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  return d >= 0 ? d : 0;
-}
 
 type SortKey = "name" | "lastVisit" | "nextAppt";
 const SORT_LABELS: Record<SortKey, string> = {
@@ -75,8 +67,39 @@ function isStaleVisit(iso: string | null): boolean {
   return diffDays > STALE_VISIT_DAYS;
 }
 
+function SortableHeader({
+  label,
+  active,
+  dir,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  dir: 1 | -1;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1 font-medium hover:text-foreground transition-colors",
+        active ? "text-foreground" : "text-muted-foreground",
+      )}
+    >
+      {label}
+      {active ? (
+        dir === 1 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+      ) : (
+        <ArrowUp className="w-3 h-3 opacity-0" />
+      )}
+    </button>
+  );
+}
+
 export function PatientsListView() {
   const { data: patients, isLoading } = usePatients();
+  const { data: professionals } = useProfessionals();
   const { user } = useCurrentSession();
   const { navigate, selectPatient } = useNav();
   const { activeResource } = useCenter();
@@ -87,6 +110,7 @@ export function PatientsListView() {
   const [status, setStatus] = useState<"Todos" | PatientStatus>("Todos");
   const [resource, setResource] = useState<"Todos" | (typeof RESOURCE_KEYS)[number]>("Todos");
   const [emCat, setEmCat] = useState<"Todas" | (typeof EM_CATEGORIES)[number]>("Todas");
+  const [professionalId, setProfessionalId] = useState<string>("Todos");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
 
@@ -99,11 +123,21 @@ export function PatientsListView() {
       if (resource !== "Todos" && p.resource !== resource) return false;
       // El filtro de clasificación solo aplica dentro del módulo EM.
       if (isEM && emCat !== "Todas" && p.emCategory !== emCat) return false;
+      if (professionalId !== "Todos" && !p.therapistIds.includes(professionalId)) return false;
       if (term && !p.fullName.toLowerCase().includes(term) && !p.diagnosis?.toLowerCase().includes(term)) return false;
       return true;
     });
     return sortPatients(base, sortKey, sortDir);
-  }, [patients, q, specialty, status, resource, isEM, emCat, sortKey, sortDir]);
+  }, [patients, q, specialty, status, resource, isEM, emCat, professionalId, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 1 ? -1 : 1));
+    } else {
+      setSortKey(key);
+      setSortDir(1);
+    }
+  }
 
   function openPatient(id: string) {
     selectPatient(id);
@@ -115,17 +149,22 @@ export function PatientsListView() {
   const activeCount =
     (specialty !== "Todas" ? 1 : 0) +
     (status !== "Todos" ? 1 : 0) +
-    (resource !== "Todos" ? 1 : 0);
+    (resource !== "Todos" ? 1 : 0) +
+    (professionalId !== "Todos" ? 1 : 0);
+
+  const professionalName = (professionals ?? []).find((p) => p.id === professionalId)?.name;
 
   const chips: { label: string; clear: () => void }[] = [];
   if (specialty !== "Todas") chips.push({ label: `Especialidad: ${specialty}`, clear: () => setSpecialty("Todas") });
   if (status !== "Todos") chips.push({ label: `Estado: ${status}`, clear: () => setStatus("Todos") });
   if (resource !== "Todos") chips.push({ label: `Recurso: ${resource}`, clear: () => setResource("Todos") });
+  if (professionalId !== "Todos" && professionalName) chips.push({ label: `Profesional: ${professionalName}`, clear: () => setProfessionalId("Todos") });
 
   function clearAll() {
     setSpecialty("Todas");
     setStatus("Todos");
     setResource("Todos");
+    setProfessionalId("Todos");
   }
 
   const [exportOpen, setExportOpen] = useState(false);
@@ -185,6 +224,18 @@ export function PatientsListView() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {RESOURCE_FILTERS.map((r) => (<SelectItem key={r} value={r}>{r}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Profesional</Label>
+                <Select value={professionalId} onValueChange={setProfessionalId}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Todos">Todos</SelectItem>
+                    {(professionals ?? []).filter((p) => p.isActive).map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -295,7 +346,7 @@ export function PatientsListView() {
           <Users className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-sm font-medium text-foreground mb-1">No hay usuarios/as</p>
           <p className="text-xs text-muted-foreground mb-4">
-            {q || specialty !== "Todas" || status !== "Todos" || resource !== "Todos" || (isEM && emCat !== "Todas")
+            {q || specialty !== "Todas" || status !== "Todos" || resource !== "Todos" || professionalId !== "Todos" || (isEM && emCat !== "Todas")
               ? "Prueba a cambiar los filtros de búsqueda."
               : "Añade tu primer usuario/a para empezar."}
           </p>
@@ -311,9 +362,22 @@ export function PatientsListView() {
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                   <th className="text-left font-medium px-4 py-2.5">Usuario/a</th>
-                  {isEM && <th className="text-left font-medium px-4 py-2.5 w-24">Días</th>}
-                  <th className="text-left font-medium px-4 py-2.5 w-40">Última visita</th>
-                  <th className="text-left font-medium px-4 py-2.5 w-40">Próxima cita</th>
+                  <th className="text-left font-medium px-4 py-2.5 w-40">
+                    <SortableHeader
+                      label="Última visita"
+                      active={sortKey === "lastVisit"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("lastVisit")}
+                    />
+                  </th>
+                  <th className="text-left font-medium px-4 py-2.5 w-40">
+                    <SortableHeader
+                      label="Próxima cita"
+                      active={sortKey === "nextAppt"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("nextAppt")}
+                    />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -369,11 +433,6 @@ export function PatientsListView() {
                           </div>
                         </div>
                       </td>
-                      {isEM && (
-                        <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                          {daysSince(p.startDate) !== null ? `${daysSince(p.startDate)} días` : "—"}
-                        </td>
-                      )}
                       <td className={`px-4 py-3 whitespace-nowrap ${stale ? "text-amber-700 font-medium" : "text-muted-foreground"}`}>
                         {formatRelative(p.lastVisitDate)}
                       </td>
@@ -408,9 +467,6 @@ export function PatientsListView() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-sm truncate">{p.fullName}</p>
-                      {isEM && daysSince(p.startDate) !== null && (
-                        <span className="text-xs text-muted-foreground">· {daysSince(p.startDate)} días</span>
-                      )}
                       <SpecialtyBadge specialty={p.specialty} compact />
                       {p.status !== "Activo" && <StatusBadge status={p.status} />}
                       {!activeResource && <ResourceBadge resource={p.resource} />}
