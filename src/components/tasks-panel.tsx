@@ -6,16 +6,26 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask, type TaskDTO } from "@/hooks/api";
 import { cn } from "@/lib/utils";
 
 // Etiquetas rápidas sugeridas — no son la única opción, se puede escribir
-// cualquier otra etiqueta libre al crear la tarea.
+// cualquier otra etiqueta libre al crear la tarea. Cada una con su propio
+// color pastel (a juego con el resto de la app) para diferenciarlas de un
+// vistazo, tanto en los botones de selección como en las tareas ya creadas.
 const QUICK_TAGS = ["Urgente", "Hoy", "Recordar"];
 
-function tagVariant(tag: string): "destructive" | "secondary" {
-  return tag.toLowerCase() === "urgente" ? "destructive" : "secondary";
+function tagStyle(tag: string): string {
+  switch (tag.toLowerCase()) {
+    case "urgente":
+      return "bg-rose-100 text-rose-800 border-rose-300";
+    case "hoy":
+      return "bg-sky-100 text-sky-800 border-sky-300";
+    case "recordar":
+      return "bg-violet-100 text-violet-800 border-violet-300";
+    default:
+      return "bg-slate-100 text-slate-700 border-slate-300";
+  }
 }
 
 export function TasksPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -56,23 +66,26 @@ export function TasksPanel({ open, onClose }: { open: boolean; onClose: () => vo
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="right" className="w-full sm:w-[420px] p-0 flex flex-col">
-        <SheetHeader className="px-4 py-3 border-b flex-row items-center gap-2">
+      <SheetContent side="right" showCloseButton={false} className="w-full sm:w-[420px] p-0 flex flex-col">
+        <SheetHeader className="px-4 py-3 border-b flex-row items-center gap-2 bg-primary/5">
+          <span className="w-7 h-7 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0">
+            <ListChecks className="w-4 h-4" />
+          </span>
           <SheetTitle className="text-base flex-1">Tareas</SheetTitle>
           <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground" onClick={onClose} aria-label="Cerrar">
-            ✕
+            <X className="w-4 h-4" />
           </Button>
         </SheetHeader>
 
         {/* Añadir tarea */}
-        <div className="px-4 py-3 border-b space-y-2">
+        <div className="px-4 py-3 border-b space-y-2 bg-primary/5">
           <div className="flex gap-2">
             <Input
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
               placeholder="Nueva tarea…"
-              className="flex-1"
+              className="flex-1 bg-background"
             />
             <Button size="icon" onClick={handleAdd} disabled={!text.trim()} aria-label="Añadir tarea">
               <Plus className="w-4 h-4" />
@@ -85,10 +98,10 @@ export function TasksPanel({ open, onClose }: { open: boolean; onClose: () => vo
                 type="button"
                 onClick={() => toggleDraftTag(tag)}
                 className={cn(
-                  "text-[11px] px-2 py-0.5 rounded-full border transition-colors",
+                  "text-[11px] px-2 py-0.5 rounded-full border transition-colors font-medium",
                   draftTags.includes(tag)
-                    ? "bg-foreground text-background border-foreground"
-                    : "text-muted-foreground border-border hover:bg-muted",
+                    ? tagStyle(tag)
+                    : "text-muted-foreground border-border bg-background hover:bg-muted",
                 )}
               >
                 {tag}
@@ -105,7 +118,7 @@ export function TasksPanel({ open, onClose }: { open: boolean; onClose: () => vo
               />
             </div>
             {draftTags.filter((t) => !QUICK_TAGS.includes(t)).map((t) => (
-              <span key={t} className="text-[11px] px-2 py-0.5 rounded-full bg-foreground text-background flex items-center gap-1">
+              <span key={t} className={cn("text-[11px] px-2 py-0.5 rounded-full border font-medium flex items-center gap-1", tagStyle(t))}>
                 {t}
                 <button type="button" onClick={() => toggleDraftTag(t)} aria-label={`Quitar etiqueta ${t}`}>
                   <X className="w-2.5 h-2.5" />
@@ -133,7 +146,9 @@ export function TasksPanel({ open, onClose }: { open: boolean; onClose: () => vo
                       {task.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {task.tags.map((tag) => (
-                            <Badge key={tag} variant={tagVariant(tag)} className="text-[10px] px-1.5 py-0">{tag}</Badge>
+                            <span key={tag} className={cn("text-[10px] px-1.5 py-0.5 rounded-full border font-medium", tagStyle(tag))}>
+                              {tag}
+                            </span>
                           ))}
                         </div>
                       )}
@@ -164,7 +179,9 @@ export function TasksPanel({ open, onClose }: { open: boolean; onClose: () => vo
                           {task.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {task.tags.map((tag) => (
-                                <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0 opacity-60">{tag}</Badge>
+                                <span key={tag} className={cn("text-[10px] px-1.5 py-0.5 rounded-full border font-medium opacity-60", tagStyle(tag))}>
+                                  {tag}
+                                </span>
                               ))}
                             </div>
                           )}
