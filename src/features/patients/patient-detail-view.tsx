@@ -275,12 +275,11 @@ export function PatientDetailView() {
 
                 {isEM && patient.informedConsent && (
                   <div
-                    className="w-full sm:w-[230px] shrink-0 rounded-lg px-3 py-2"
-                    style={{ backgroundColor: "rgba(79,70,229,0.07)", border: "1px solid rgba(79,70,229,0.25)" }}
+                    className="w-full sm:w-[230px] shrink-0 rounded-lg px-3 py-2 flex items-center gap-1.5"
+                    style={{ backgroundColor: "#059669" }}
                   >
-                    <p className="text-[10px] uppercase tracking-wide font-bold flex items-center gap-1" style={{ color: "#4338ca" }}>
-                      <ShieldCheck className="w-3 h-3" /> Consentimiento informado firmado
-                    </p>
+                    <ShieldCheck className="w-3.5 h-3.5 text-white shrink-0" />
+                    <p className="text-[11px] font-semibold text-white leading-tight">Consentimiento informado firmado</p>
                   </div>
                 )}
               </div>
