@@ -695,7 +695,9 @@ export function PatientDetailView() {
 
           {!assessments || assessments.length === 0 ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">
-              Sin evaluaciones registradas todavía.
+              {me && allowedScales.length === 0
+                ? "Aún no se han incorporado las escalas propias de esta especialidad."
+                : "Sin evaluaciones registradas todavía."}
             </Card>
           ) : (
             <Card>
@@ -1061,6 +1063,17 @@ function AssessmentForm({ patientId, therapistId, resource }: { patientId: strin
     setItemScores({});
     setCopmData(null);
     setInventory(buildEmptyAdlInventory());
+  }
+
+  // Perfiles distintos de Terapia ocupacional todavía no tienen sus propias
+  // escalas cargadas en la app. En vez de mostrar el selector de categorías
+  // vacío (con "Próximamente" repetido en cada una), se explica una sola vez.
+  if (me && allowedScales.length === 0) {
+    return (
+      <Card className="p-8 text-center text-sm text-muted-foreground">
+        Aún no se han incorporado las escalas propias de esta especialidad.
+      </Card>
+    );
   }
 
   return (
