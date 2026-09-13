@@ -5,13 +5,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional } from "@/lib/server";
+import { requireProfessional, canViewClinical, canEditClinical } from "@/lib/server";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id: patientId } = await params;
+
+  if (!(await canViewClinical(prof, patientId))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
 
   // PRIVACIDAD: se filtra SIEMPRE por el profesional de la sesión en el
   // servidor, no solo se oculta en la interfaz. Cada profesional (incluido
@@ -28,6 +32,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 export async function POST(req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id: patientId } = await params;
+
+  if (!(await canEditClinical(prof, patientId))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
+
   const body = await req.json().catch(() => ({}));
 
   const note = await db.quickNote.create({

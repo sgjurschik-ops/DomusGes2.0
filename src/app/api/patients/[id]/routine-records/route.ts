@@ -3,13 +3,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional } from "@/lib/server";
+import { requireProfessional, canViewClinical, canEditClinical } from "@/lib/server";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  await requireProfessional();
+  const prof = await requireProfessional();
   const { id: patientId } = await params;
+
+  if (!(await canViewClinical(prof, patientId))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
 
   const profile = await db.occupationalProfile.findUnique({
     where: { patientId },
@@ -34,8 +38,13 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  await requireProfessional();
+  const prof = await requireProfessional();
   const { id: patientId } = await params;
+
+  if (!(await canEditClinical(prof, patientId))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
+
   const body = await req.json();
 
   const profile = await db.occupationalProfile.upsert({

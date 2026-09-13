@@ -2,13 +2,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit } from "@/lib/server";
+import { requireProfessional, audit, canEditClinical } from "@/lib/server";
 
 type Ctx = { params: Promise<{ id: string; assessmentId: string }> };
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id: patientId, assessmentId } = await params;
+
+  if (!(await canEditClinical(prof, patientId))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
 
   try {
     // Verify the assessment belongs to a goal of this patient

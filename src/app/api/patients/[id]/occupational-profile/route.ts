@@ -2,13 +2,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, safePartial } from "@/lib/server";
+import { requireProfessional, audit, safePartial, canViewClinical, canEditClinical } from "@/lib/server";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id } = await params;
+
+  if (!(await canViewClinical(prof, id))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
 
   try {
     const profile = await db.occupationalProfile.findUnique({
@@ -28,6 +32,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 export async function PUT(req: NextRequest, { params }: Ctx) {
   const prof = await requireProfessional();
   const { id } = await params;
+
+  if (!(await canEditClinical(prof, id))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
 
   let body: any;
   try {

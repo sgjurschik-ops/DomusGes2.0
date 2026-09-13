@@ -1,7 +1,7 @@
 // /api/visits — list & create
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit, mapVisit, buildMadridDateTime, isDayCenterPatient } from "@/lib/server";
+import { requireProfessional, audit, mapVisit, buildMadridDateTime, isDayCenterPatient, canViewClinical, canEditClinical } from "@/lib/server";
 import { visitCreateSchema } from "@/lib/schemas";
 
 export async function GET(req: NextRequest) {
@@ -20,11 +20,26 @@ export async function GET(req: NextRequest) {
     // Cada profesional (incluido admin) solo ve las suyas. Esto se fuerza
     // SIEMPRE en el servidor, no solo se oculta en la interfaz.
     where.therapistId = prof.id;
+  } else if (patientId) {
+    // Seguimientos de un paciente concreto: hay que tener permiso real
+    // sobre ESE paciente (respeta pacientes restringidos para cualquier
+    // rol, y el filtro de invitado/a para el resto de casos).
+    if (!(await canViewClinical(prof, patientId))) {
+      return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    }
   } else if (prof.userRole === "guest") {
-    // Seguimientos (compartidos): el invitado solo ve los de sus usuarios/as,
-    // salvo en Centro de día, donde son colaborativos y los ve todos.
-    const dayCenter = patientId ? await isDayCenterPatient(patientId) : false;
-    if (!dayCenter) where.therapistId = prof.id;
+    // Listado sin paciente concreto: el invitado solo ve los suyos.
+    where.therapistId = prof.id;
+  } else if (prof.userRole !== "admin") {
+    // Listado sin paciente concreto (ej. Informes): un/a terapeuta ve los
+    // suyos y los de pacientes no restringidos, pero nunca los de un
+    // paciente restringido al que no esté asignado/a.
+    where.patient = {
+      OR: [
+        { restricted: false },
+        { therapists: { some: { id: prof.id } } },
+      ],
+    };
   }
 
   const rows = await db.visit.findMany({
@@ -51,6 +66,11 @@ export async function POST(req: NextRequest) {
     );
   }
   const d = parsed.data;
+
+  if (!(await canEditClinical(prof, d.patientId))) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
+
   const date = buildMadridDateTime(d.date, d.time);
   // El autor de un registro recién creado es SIEMPRE el profesional de la
   // sesión: ni seguimientos ni intervenciones permiten elegir otro autor al

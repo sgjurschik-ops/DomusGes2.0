@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProfessional, audit } from "@/lib/server";
+import { requireProfessional, audit, canViewClinical } from "@/lib/server";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -98,6 +98,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   try {
     const prof = await requireProfessional();
     const { id } = await params;
+
+    if (!(await canViewClinical(prof, id))) {
+      return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    }
 
     const patient = await db.patient.findUnique({ where: { id } });
     if (!patient) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
