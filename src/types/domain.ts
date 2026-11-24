@@ -84,6 +84,8 @@ export interface PatientDTO {
   referent: string | null;
   careTeamReferent: string | null;
   informedConsent: boolean;
+  // Perfil ocupacional opcional: true = pestaña activada para este/a usuario/a.
+  occupationalProfileEnabled: boolean;
   color: string;
   therapistIds: string[];
   therapistNames: string[];

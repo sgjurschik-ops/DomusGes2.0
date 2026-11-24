@@ -5,6 +5,7 @@ import {
   requireProfessional,
   canViewPatient,
   canEditPatient,
+  canEditClinical,
   audit,
   safePartial,
   mapPatient,
@@ -48,6 +49,39 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
+  }
+
+  // ─── Activar / desactivar el Perfil ocupacional (opcional) ──────────────
+  // Es una decisión clínica, no un dato administrativo: la puede tomar
+  // cualquier profesional con permiso de edición clínica sobre este/a
+  // usuario/a (no hace falta ser terapeuta asignado/a). Solo se acepta si
+  // es lo ÚNICO que viene en la petición.
+  const bodyKeys = body && typeof body === "object" ? Object.keys(body) : [];
+  if (bodyKeys.length === 1 && bodyKeys[0] === "occupationalProfileEnabled") {
+    if (typeof body.occupationalProfileEnabled !== "boolean") {
+      return NextResponse.json({ error: "VALIDATION" }, { status: 400 });
+    }
+    if (!(await canEditClinical(prof, id))) {
+      return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    }
+    const row = await db.patient.update({
+      where: { id },
+      data: { occupationalProfileEnabled: body.occupationalProfileEnabled },
+      include: {
+        therapists: { select: { id: true, name: true } },
+        _count: { select: { visits: true } },
+      },
+    });
+    const { lastVisitMap, nextApptMap } = await getPatientTimelineMap([row.id]);
+    await audit(prof.id, "patient.occupational_profile_toggle", "Patient", row.id, {
+      enabled: body.occupationalProfileEnabled,
+    });
+    return NextResponse.json(
+      mapPatient(row, {
+        lastVisitDate: lastVisitMap.get(row.id) ?? null,
+        nextAppointmentDate: nextApptMap.get(row.id) ?? null,
+      }),
+    );
   }
 
   const hasFullEditAccess = await canEditPatient(prof, id);

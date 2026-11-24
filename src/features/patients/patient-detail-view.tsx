@@ -53,6 +53,9 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { OccupationalProfileTab, getProfileCompletion } from "./occupational-profile-tab";
 import { InterventionPlanTab } from "./intervention-plan-tab";
+import { EvaluationTab } from "./evaluation-tab";
+import { useQueryClient } from "@tanstack/react-query";
+import { ListPlus, EyeOff } from "lucide-react";
 import { ClinicalNotes } from "@/components/clinical-notes";
 import { Mic, MicOff } from "lucide-react";
 
@@ -69,6 +72,12 @@ function shortenAddress(full: string): string {
   const isNum = /^\d/.test(num);
   if (isNum && street) return `${street} ${num}, ${city}`;
   return `${parts[0]}, ${city}`;
+}
+
+// Separador visual entre grupos de pestañas (definido fuera del render para
+// que React no lo recree en cada pintado).
+function TabSep() {
+  return <span aria-hidden className="h-5 w-px bg-border shrink-0 self-center mx-0.5" />;
 }
 
 export function PatientDetailView() {
@@ -90,6 +99,10 @@ export function PatientDetailView() {
   const updatePatient = useUpdatePatient();
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  // Sub-pestaña dentro de "Valoración": valoración escrita | escalas | evolución.
+  const [assessmentSubTab, setAssessmentSubTab] = useState("evaluation");
+  const queryClient = useQueryClient();
+  const [togglingProfile, setTogglingProfile] = useState(false);
   const [openVisitId, setOpenVisitId] = useState<string | null>(null);
   const [newVisitOpen, setNewVisitOpen] = useState(false);
   const [problemsUser, setProblemsUser] = useState<string>("");
@@ -125,7 +138,6 @@ export function PatientDetailView() {
   const TAB_DOC = "text-indigo-600 hover:bg-indigo-100/70 data-[state=active]:bg-indigo-600 data-[state=active]:text-white";
   const TAB_MEASURE = "text-violet-600 hover:bg-violet-100/70 data-[state=active]:bg-violet-600 data-[state=active]:text-white";
   const SUBTAB = "px-4 text-violet-600 data-[state=active]:bg-violet-600 data-[state=active]:text-white data-[state=active]:shadow-sm";
-  const TabSep = () => <span aria-hidden className="h-5 w-px bg-border shrink-0 self-center mx-0.5" />;
 
   // Exporta a PDF imprimible todos los seguimientos de este/a usuario/a,
   // reutilizando los datos ya cargados (no vuelve a pedir nada al servidor).
@@ -172,6 +184,37 @@ export function PatientDetailView() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [evolutionView, setEvolutionView] = useState<"chart" | "table">("table");
+
+  // Perfil ocupacional OPCIONAL (solo Terapia ocupacional): la pestaña se ve
+  // si se ha activado para este/a usuario/a o si ya tiene datos de antes
+  // (así nunca se "esconde" información ya escrita).
+  const profileHasData = (profileCompletion?.filled ?? 0) > 0;
+  const showOccupationalProfile = isTO && (!!patient?.occupationalProfileEnabled || profileHasData);
+
+  async function setOccupationalProfileEnabled(enabled: boolean) {
+    if (!patient) return;
+    setTogglingProfile(true);
+    try {
+      const r = await fetch(`/api/patients/${patient.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ occupationalProfileEnabled: enabled }),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      await queryClient.invalidateQueries({ queryKey: ["patients"] });
+      if (enabled) {
+        setActiveTab("occupational-profile");
+        toast({ title: isDayCenter ? "Historia de Vida activada" : "Perfil ocupacional activado" });
+      } else {
+        if (activeTab === "occupational-profile") setActiveTab("assessments");
+        toast({ title: isDayCenter ? "Historia de Vida ocultada" : "Perfil ocupacional ocultado" });
+      }
+    } catch {
+      toast({ title: "Error", description: "No se ha podido cambiar la pestaña.", variant: "destructive" });
+    } finally {
+      setTogglingProfile(false);
+    }
+  }
 
   if (!selectedPatientId) {
     return <p className="text-sm text-muted-foreground">Selecciona un paciente.</p>;
@@ -226,6 +269,17 @@ export function PatientDetailView() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => navigate("edit-patient")}><Pencil className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
+                      {!isAdmin && isTO && !profileHasData && (
+                        patient.occupationalProfileEnabled ? (
+                          <DropdownMenuItem disabled={togglingProfile} onClick={() => setOccupationalProfileEnabled(false)}>
+                            <EyeOff className="w-4 h-4 mr-2" />Ocultar {isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem disabled={togglingProfile} onClick={() => setOccupationalProfileEnabled(true)}>
+                            <ListPlus className="w-4 h-4 mr-2" />Activar {isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
+                          </DropdownMenuItem>
+                        )
+                      )}
                       <DropdownMenuItem variant="destructive" onClick={() => setDeleteDialogOpen(true)}><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -341,11 +395,22 @@ export function PatientDetailView() {
           {!isAdmin && <TabsTrigger value="interventions" className={cn(TAB_BASE, TAB_DAILY)}>Intervenciones</TabsTrigger>}
 
           {!isAdmin && <TabSep />}
-          {!isAdmin && isTO && <TabsTrigger value="occupational-profile" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="intervention-plan" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="assessments" className={cn(TAB_BASE, TAB_MEASURE)}>Valoración</TabsTrigger>}
 
           {!isAdmin && <TabSep />}
-          {!isAdmin && <TabsTrigger value="assessments" className={cn(TAB_BASE, TAB_MEASURE)}>Valoración</TabsTrigger>}
+          {!isAdmin && showOccupationalProfile && <TabsTrigger value="occupational-profile" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="intervention-plan" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}</TabsTrigger>}
+          {!isAdmin && isTO && !showOccupationalProfile && (
+            <button
+              type="button"
+              onClick={() => setOccupationalProfileEnabled(true)}
+              disabled={togglingProfile}
+              className="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-indigo-500 hover:bg-indigo-100/70 disabled:opacity-50"
+              title={`Activar la pestaña ${isDayCenter ? "Historia de Vida" : "Perfil ocupacional"} para este/a usuario/a (opcional)`}
+            >
+              <Plus className="w-3 h-3" />{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
+            </button>
+          )}
         </TabsList>
 
         {/* Overview */}
@@ -380,11 +445,11 @@ export function PatientDetailView() {
                 <KpiChip icon={ClipboardList} color="green" label="Seguimientos"
                   value={`${patient.totalVisits}`} />
               </button>
-              <button type="button" onClick={() => setActiveTab("assessments")} className="text-left">
+              <button type="button" onClick={() => { setActiveTab("assessments"); setAssessmentSubTab("scales"); }} className="text-left">
                 <KpiChip icon={Activity} color="purple" label="Última evaluación"
                   value={assessments && assessments.length > 0 ? `${assessments[0].scale} · ${formatDate(assessments[0].date)}` : "Sin registrar"} />
               </button>
-              {isTO && <button type="button" onClick={() => setActiveTab("occupational-profile")} className="text-left">
+              {showOccupationalProfile && <button type="button" onClick={() => setActiveTab("occupational-profile")} className="text-left">
                 <KpiChip icon={ListChecks} color="yellow" label={isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
                   value={profileCompletion ? `${profileCompletion.filled}/${profileCompletion.total} campos` : "—"} />
               </button>}
@@ -430,7 +495,7 @@ export function PatientDetailView() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center justify-between">
                     Últimas evaluaciones
-                    <button type="button" className="text-xs font-normal text-primary hover:underline" onClick={() => setActiveTab("assessments")}>
+                    <button type="button" className="text-xs font-normal text-primary hover:underline" onClick={() => { setActiveTab("assessments"); setAssessmentSubTab("evolution"); }}>
                       Ver todas →
                     </button>
                   </CardTitle>
@@ -647,7 +712,7 @@ export function PatientDetailView() {
         </TabsContent>}
 
 {/* Occupational profile — hidden for admin */}
-{!isAdmin && isTO && <TabsContent value="occupational-profile" className="mt-4">
+{!isAdmin && showOccupationalProfile && <TabsContent value="occupational-profile" className="mt-4">
   <OccupationalProfileTab patientId={patient.id} />
 </TabsContent>}
 
@@ -657,11 +722,22 @@ export function PatientDetailView() {
 
         {/* Assessments — hidden for admin */}
         {!isAdmin && <TabsContent value="assessments" className="mt-4">
-          <Tabs defaultValue="scales" className="w-full">
+          <Tabs value={assessmentSubTab} onValueChange={setAssessmentSubTab} className="w-full">
             <TabsList className="inline-flex gap-1 bg-muted/60">
+              <TabsTrigger value="evaluation" className={SUBTAB}>Valoración</TabsTrigger>
               <TabsTrigger value="scales" className={SUBTAB}>Escalas</TabsTrigger>
               <TabsTrigger value="evolution" className={SUBTAB}>Evolución</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="evaluation" className="mt-4">
+              <EvaluationTab
+                patientId={patient.id}
+                assessments={assessments}
+                allowedScales={allowedScales}
+                onGoToScales={() => setAssessmentSubTab("scales")}
+                onOpenAssessment={setOpenAssessmentId}
+              />
+            </TabsContent>
 
             <TabsContent value="scales" className="mt-4 space-y-4">
               <AssessmentForm
@@ -974,7 +1050,6 @@ function AssessmentForm({ patientId, therapistId, resource }: { patientId: strin
   const { data: me } = useMe();
   const allowedScales = scalesForRole(me?.role);
   const [itemScores, setItemScores] = useState<Record<string, number>>({});
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [copmData, setCopmData] = useState<any>(null);
   const [inventory, setInventory] = useState<AdlInventoryData>(() => buildEmptyAdlInventory());
   const [activeCategory, setActiveCategory] = useState<string>(ASSESSMENT_CATEGORIES[0].key);

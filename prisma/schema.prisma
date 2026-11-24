@@ -38,6 +38,7 @@ model Professional {
   messagesReceived Message[] @relation("MessagesReceived")
   noteEntries      QuickNote[]
   tasks            Task[]
+  evaluations      PatientEvaluation[]
 
   @@index([isActive])
 }
@@ -73,6 +74,9 @@ model Patient {
   quickNotes    String?  // JSON-encoded QuickNote[]: { id, text, color }[]
   restricted    Boolean  @default(false)
   informedConsent Boolean @default(false) // Consentimiento informado firmado (solo Asociación EM)
+  // El Perfil ocupacional es opcional: su pestaña solo aparece si se activa
+  // para este/a usuario/a (o si ya tiene datos rellenados de antes).
+  occupationalProfileEnabled Boolean @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -81,6 +85,7 @@ model Patient {
   assessments   Assessment[]
   appointments  Appointment[]
   noteEntries   QuickNote[]
+  evaluations   PatientEvaluation[]
   occupationalProfile OccupationalProfile?
 
   @@index([status])
@@ -398,4 +403,30 @@ model QuickNote {
   professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
 
   @@index([patientId, professionalId])
+}
+
+// Valoración escrita (pestaña "Valoración" del usuario/a). Una por fecha:
+// la primera es la valoración inicial y las siguientes son revaloraciones.
+// COMPARTIDA: la ve todo el equipo con acceso clínico al usuario/a. Cada
+// bloque se guarda por separado (HTML de RichTextarea). Los resultados de
+// escalas NO se copian aquí: se leen en vivo de Assessment según la fecha.
+model PatientEvaluation {
+  id           String   @id @default(cuid())
+  patientId    String
+  authorId     String
+  date         DateTime
+  generalData  String   @default("") // Datos generales: entorno, ocupación, dificultades, diagnóstico…
+  adl          String   @default("") // Área funcional — ABVDs
+  iadl         String   @default("") // Área funcional — AIVDs
+  physical     String   @default("") // Área física y motora
+  routines     String   @default("") // Rutinas e intereses
+  other        String   @default("") // Otros
+  updatedById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  author       Professional @relation(fields: [authorId], references: [id])
+
+  @@index([patientId, date])
 }

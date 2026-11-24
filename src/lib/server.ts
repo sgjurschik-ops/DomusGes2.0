@@ -228,6 +228,7 @@ export function mapPatient(
     quickNotes: p.quickNotes ?? null,
     restricted: (p as any).restricted ?? false,
     informedConsent: (p as any).informedConsent ?? false,
+    occupationalProfileEnabled: (p as any).occupationalProfileEnabled ?? false,
     therapistIds: p.therapists.map((t) => t.id),
     therapistNames: p.therapists.map((t) => t.name),
     totalVisits: p._count.visits,
