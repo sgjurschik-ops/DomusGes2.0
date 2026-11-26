@@ -55,7 +55,7 @@ import { OccupationalProfileTab, getProfileCompletion } from "./occupational-pro
 import { InterventionPlanTab } from "./intervention-plan-tab";
 import { EvaluationTab } from "./evaluation-tab";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ListPlus, EyeOff, Lock, ChevronDown, ChevronRight, Flag, ClipboardPen } from "lucide-react";
+import { ListPlus, EyeOff, Lock, ChevronDown, ChevronRight, ChevronUp, Flag, ClipboardPen } from "lucide-react";
 import type { PatientEvaluationDTO } from "@/lib/evaluations";
 import { ClinicalNotes } from "@/components/clinical-notes";
 import { Mic, MicOff } from "lucide-react";
@@ -102,7 +102,14 @@ export function PatientDetailView() {
   const deletePatient = useDeletePatient();
   const updatePatient = useUpdatePatient();
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTabState] = useState("overview");
+  // Cabecera desplegada manualmente estando en una pestaña (se vuelve a
+  // comprimir al cambiar de pestaña).
+  const [headerExpanded, setHeaderExpanded] = useState(false);
+  function setActiveTab(tab: string) {
+    setActiveTabState(tab);
+    setHeaderExpanded(false);
+  }
   // Sub-pestaña dentro de "Valoración": valoración escrita | escalas | evolución.
   const [assessmentSubTab, setAssessmentSubTab] = useState("evaluation");
   const queryClient = useQueryClient();
@@ -174,7 +181,8 @@ export function PatientDetailView() {
   const TAB_BASE = "shrink-0 px-3 py-1.5 rounded-md font-medium data-[state=active]:shadow-sm";
   const TAB_ENTRY = "text-slate-600 hover:bg-slate-200/60 data-[state=active]:bg-slate-700 data-[state=active]:text-white";
   const TAB_DAILY = "text-[#1a5c58] hover:bg-[#1a5c58]/10 data-[state=active]:bg-[#1a5c58] data-[state=active]:text-white";
-  const TAB_DOC = "text-indigo-600 hover:bg-indigo-100/70 data-[state=active]:bg-indigo-600 data-[state=active]:text-white";
+  // Documentación en índigo APAGADO (antes índigo vivo, demasiado llamativo).
+  const TAB_DOC = "text-[#56608a] hover:bg-[#56608a]/10 data-[state=active]:bg-[#56608a] data-[state=active]:text-white";
   // Medición en morado APAGADO (gris-violeta), menos llamativo que el violeta puro.
   const TAB_MEASURE = "text-[#6e6587] hover:bg-[#6e6587]/10 data-[state=active]:bg-[#6e6587] data-[state=active]:text-white";
   const SUBTAB = "px-4 text-[#6e6587] data-[state=active]:bg-[#6e6587] data-[state=active]:text-white data-[state=active]:shadow-sm";
@@ -263,7 +271,20 @@ export function PatientDetailView() {
         <ArrowLeft className="w-4 h-4" /> Volver
       </button>
 
-      {/* Header card */}
+      {/* Header card. Dentro de cualquier pestaña que no sea Resumen se
+          comprime a una sola línea con el nombre, para dejar más espacio;
+          "Ver ficha" la despliega entera. */}
+      {activeTab !== "overview" && !headerExpanded ? (
+        <div className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2">
+          <Avatar name={patient.fullName} color={patient.color} size={26} />
+          <h2 className="text-base font-bold leading-tight truncate flex-1">{patient.fullName}</h2>
+          <button type="button" onClick={() => setHeaderExpanded(true)}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground shrink-0">
+            <ChevronDown className="w-3.5 h-3.5" />Ver ficha
+          </button>
+        </div>
+      ) : (
+      <div className="space-y-1">
       <Card>
         <CardContent className="p-5">
           <div className="flex flex-col lg:flex-row gap-4 lg:gap-0">
@@ -422,6 +443,16 @@ export function PatientDetailView() {
           </div>
         </CardContent>
       </Card>
+      {activeTab !== "overview" && (
+        <div className="flex justify-end">
+          <button type="button" onClick={() => setHeaderExpanded(false)}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <ChevronUp className="w-3.5 h-3.5" />Ocultar ficha
+          </button>
+        </div>
+      )}
+      </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="inline-flex w-full max-w-4xl items-center gap-1 overflow-x-auto bg-muted/60 py-1">
@@ -442,7 +473,7 @@ export function PatientDetailView() {
               type="button"
               onClick={() => setOccupationalProfileEnabled(true)}
               disabled={togglingProfile}
-              className="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-indigo-500 hover:bg-indigo-100/70 disabled:opacity-50"
+              className="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-[#56608a] hover:bg-[#56608a]/10 disabled:opacity-50"
               title={`Activar la pestaña ${isDayCenter ? "Historia de Vida" : "Perfil ocupacional"} para este/a usuario/a (opcional)`}
             >
               <Plus className="w-3 h-3" />{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
