@@ -482,6 +482,20 @@ export interface RoutineRecordSummary {
   createdAt: string;
 }
 
+// ─── Perfil ocupacional (incluye los objetivos del Plan de intervención) ─────
+// Una sola fuente compartida: la ficha (Resumen, seguimientos) la lee de aquí,
+// y las pestañas Perfil ocupacional / Plan de intervención la invalidan al
+// guardar, así todas las vistas se actualizan a la vez sin recargar.
+export const occupationalProfileKey = (patientId: string) => ["occupational-profile", patientId] as const;
+
+export function useOccupationalProfile(patientId: string | null | undefined) {
+  return useQuery<Record<string, any> | null>({
+    queryKey: occupationalProfileKey(patientId ?? ""),
+    queryFn: () => fetcher(`/api/patients/${patientId}/occupational-profile`),
+    enabled: !!patientId,
+  });
+}
+
 export function useRoutineRecords(patientId: string) {
   return useQuery<RoutineRecordSummary[]>({
     queryKey: ["routine-records", patientId],

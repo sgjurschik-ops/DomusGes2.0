@@ -15,8 +15,10 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { FileText, Download } from "lucide-react";
 
-const SECTION_OPTIONS: { key: "summary" | "visits" | "assessments"; label: string }[] = [
+const SECTION_OPTIONS: { key: "summary" | "goals" | "evaluation" | "visits" | "assessments"; label: string }[] = [
   { key: "summary", label: "Resumen y datos del/de la usuario/a" },
+  { key: "goals", label: "Objetivos" },
+  { key: "evaluation", label: "Valoración (la más reciente)" },
   { key: "visits", label: "Historial de seguimientos" },
   { key: "assessments", label: "Evaluaciones y escalas" },
 ];
@@ -33,7 +35,7 @@ export function PatientReportDialog({
   patientName: string;
 }) {
   const [sections, setSections] = useState<Set<string>>(
-    new Set(["summary", "visits", "assessments"]),
+    new Set(["summary", "goals", "evaluation", "visits", "assessments"]),
   );
   const [format, setFormat] = useState<"word" | "pdf">("word");
   const [audience, setAudience] = useState<"professional" | "family">("professional");

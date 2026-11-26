@@ -39,7 +39,8 @@ import {
   type RoutineCell,
   WeeklyRoutineEditor,
 } from "./weekly-routine-editor";
-import { useRoutineRecords, usePatient } from "@/hooks/api";
+import { useRoutineRecords, usePatient, occupationalProfileKey } from "@/hooks/api";
+import { useQueryClient } from "@tanstack/react-query";
 import { RichTextarea } from "@/components/rich-textarea";
 
 type Profile = Record<string, any>;
@@ -234,6 +235,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
   const [editingSections, setEditingSections] = useState<Record<string, boolean>>({});
 
   const routineRecords = useRoutineRecords(patientId);
+  const queryClient = useQueryClient();
 
   function toggleEditing(key: string) {
     setEditingSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -340,6 +342,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
             }))
           : [],
       });
+      queryClient.invalidateQueries({ queryKey: occupationalProfileKey(patientId) });
       toast({ title: "Perfil ocupacional guardado", description: "La información se ha actualizado correctamente." });
     } catch {
       toast({ title: "Error", description: "No se ha podido guardar el perfil ocupacional.", variant: "destructive" });
@@ -376,6 +379,7 @@ export function OccupationalProfileTab({ patientId }: { patientId: string }) {
             }))
           : [],
       });
+      queryClient.invalidateQueries({ queryKey: occupationalProfileKey(patientId) });
       window.open(`/api/patients/${patientId}/occupational-profile/report`, "_blank");
       toast({ title: "Informe generado", description: "Se ha abierto en una nueva pestana. Usa Cmd+P para guardar como PDF." });
     } catch {

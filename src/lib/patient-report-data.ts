@@ -4,8 +4,10 @@
 // in which fields they show.
 
 import { db } from "@/lib/db";
+import { scalesForRole } from "@/lib/schemas";
+import { EVALUATION_SECTIONS } from "@/lib/evaluations";
 
-export const REPORT_SECTIONS = ["summary", "visits", "assessments"] as const;
+export const REPORT_SECTIONS = ["summary", "goals", "evaluation", "visits", "assessments"] as const;
 export type ReportSection = typeof REPORT_SECTIONS[number];
 
 export function parseSections(raw: string | null): ReportSection[] {
@@ -33,6 +35,36 @@ function splitScoreText(score: string): { numeric: string; interpretation: strin
   return { numeric: score.slice(0, sepIndex), interpretation: score.slice(sepIndex + 3) };
 }
 
+// Notas y valoraciones se guardan como HTML (RichTextarea). En el informe
+// van como texto plano, conservando los saltos de línea.
+export function htmlToPlainText(html: string | null | undefined): string {
+  if (!html) return "";
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(div|p|li|h[1-6])>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function parseSpecificGoals(raw: string | null | undefined): { text: string; status: string }[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
 export interface PatientReportData {
   audience: ReportAudience;
   patient: {
@@ -47,6 +79,18 @@ export interface PatientReportData {
     startDate: Date;
     therapistNames: string[];
   };
+  goals: {
+    text: string;
+    status: string;
+    targetDate: Date | null;
+    metas: { text: string; status: string }[];
+  }[];
+  evaluation: {
+    date: Date;
+    isInitial: boolean;
+    authorName: string;
+    blocks: { title: string; text: string }[];
+  } | null;
   visits: { date: Date; title: string | null; therapistName: string; durationMin: number; notes: string }[];
   assessments: {
     date: Date;
@@ -62,6 +106,9 @@ export async function gatherPatientReportData(
   patientId: string,
   sections: ReportSection[],
   audienceRaw: string | null = null,
+  // Perfil del profesional que genera el informe: solo se incluyen las
+  // escalas de su profesión (igual que lo que ve en la app).
+  professionalRole: string | null = null,
 ): Promise<PatientReportData | null> {
   const audience = parseAudience(audienceRaw);
   const patient = await db.patient.findUnique({
@@ -70,22 +117,67 @@ export async function gatherPatientReportData(
   });
   if (!patient) return null;
 
-  const [visits, assessments] = await Promise.all([
+  const allowedScales = scalesForRole(professionalRole);
+
+  const [visits, assessments, profile, evaluations] = await Promise.all([
     sections.includes("visits")
       ? db.visit.findMany({
-          where: { patientId },
+          // Solo seguimientos COMPARTIDOS: las "intervenciones" son privadas
+          // de cada profesional y nunca salen en el informe.
+          where: { patientId, kind: "seguimiento" },
           orderBy: { date: "desc" },
           include: { therapist: { select: { name: true } } },
         })
       : Promise.resolve([]),
     sections.includes("assessments")
       ? db.assessment.findMany({
-          where: { patientId },
+          where: { patientId, scale: { in: [...allowedScales] } },
           orderBy: { date: "desc" },
           include: { therapist: { select: { name: true } } },
         })
       : Promise.resolve([]),
+    sections.includes("goals")
+      ? db.occupationalProfile.findUnique({
+          where: { patientId },
+          include: { goals: { orderBy: { createdAt: "asc" } } },
+        })
+      : Promise.resolve(null),
+    sections.includes("evaluation")
+      ? db.patientEvaluation.findMany({
+          where: { patientId },
+          orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+          include: { author: { select: { name: true } } },
+        })
+      : Promise.resolve([]),
   ]);
+
+  // Objetivos: en curso y conseguidos (los abandonados no aportan al informe).
+  const goals = (profile?.goals ?? [])
+    .filter((g) => g.status !== "Abandonado")
+    .map((g) => ({
+      text: g.text,
+      status: g.status,
+      targetDate: g.targetDate,
+      metas: parseSpecificGoals(g.specificGoals).map((m) => ({ text: m.text, status: m.status })),
+    }));
+
+  // Valoración: la más reciente, con todos sus bloques rellenos.
+  const latest = evaluations[0];
+  const evaluation = latest
+    ? {
+        date: latest.date,
+        isInitial: evaluations.length === 1,
+        authorName: latest.author.name,
+        blocks: EVALUATION_SECTIONS.flatMap((section) =>
+          section.fields
+            .map((f) => ({
+              title: f.label ? `${section.title} — ${f.label}` : section.title,
+              text: htmlToPlainText(latest[f.field]),
+            }))
+            .filter((b) => b.text.length > 0),
+        ),
+      }
+    : null;
 
   return {
     audience,
@@ -104,12 +196,14 @@ export async function gatherPatientReportData(
       startDate: patient.startDate,
       therapistNames: patient.therapists.map((t) => t.name),
     },
+    goals,
+    evaluation,
     visits: visits.map((v) => ({
       date: v.date,
       title: v.title,
       therapistName: v.therapist.name,
       durationMin: v.durationMin,
-      notes: v.notes,
+      notes: htmlToPlainText(v.notes),
     })),
     assessments: assessments.map((a) => {
       const { numeric, interpretation } = splitScoreText(a.score);

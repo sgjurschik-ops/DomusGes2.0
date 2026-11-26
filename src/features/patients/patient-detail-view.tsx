@@ -1,6 +1,6 @@
 "use client";
 
-import { usePatient, useVisits, useAssessments, useProfessionals, useCreateAssessment, useDeletePatient, useUpdatePatient, useMe } from "@/hooks/api";
+import { usePatient, useVisits, useAssessments, useProfessionals, useCreateAssessment, useDeletePatient, useUpdatePatient, useMe, useOccupationalProfile, fetcher } from "@/hooks/api";
 import { useNav } from "@/store/nav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -54,8 +54,9 @@ import { toast } from "@/hooks/use-toast";
 import { OccupationalProfileTab, getProfileCompletion } from "./occupational-profile-tab";
 import { InterventionPlanTab } from "./intervention-plan-tab";
 import { EvaluationTab } from "./evaluation-tab";
-import { useQueryClient } from "@tanstack/react-query";
-import { ListPlus, EyeOff } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ListPlus, EyeOff, Lock, ChevronDown, ChevronRight, Flag, ClipboardPen } from "lucide-react";
+import type { PatientEvaluationDTO } from "@/lib/evaluations";
 import { ClinicalNotes } from "@/components/clinical-notes";
 import { Mic, MicOff } from "lucide-react";
 
@@ -73,6 +74,9 @@ function shortenAddress(full: string): string {
   if (isNum && street) return `${street} ${num}, ${city}`;
   return `${parts[0]}, ${city}`;
 }
+
+// Seguimientos que se muestran completos; los anteriores aparecen plegados.
+const VISITS_OPEN_COUNT = 5;
 
 // Separador visual entre grupos de pestañas (definido fuera del render para
 // que React no lo recree en cada pintado).
@@ -105,10 +109,33 @@ export function PatientDetailView() {
   const [togglingProfile, setTogglingProfile] = useState(false);
   const [openVisitId, setOpenVisitId] = useState<string | null>(null);
   const [newVisitOpen, setNewVisitOpen] = useState(false);
-  const [problemsUser, setProblemsUser] = useState<string>("");
-  const [profileCompletion, setProfileCompletion] = useState<{ filled: number; total: number } | null>(null);
+  // Datos de contacto plegados por defecto (cabecera más limpia).
+  const [showContact, setShowContact] = useState(false);
+  // Seguimientos: filtro por profesional y cuáles de los antiguos están desplegados.
+  const [visitsTherapist, setVisitsTherapist] = useState<string>("all");
+  const [expandedVisitIds, setExpandedVisitIds] = useState<Set<string>>(new Set());
 
-  const [patientGoals, setPatientGoals] = useState<{ id: string; text: string; area: string }[]>([]);
+  // Perfil ocupacional + objetivos: fuente COMPARTIDA (React Query). Cuando se
+  // guarda en Perfil ocupacional o Plan de intervención, esto se actualiza solo.
+  const { data: occProfile } = useOccupationalProfile(selectedPatientId);
+  const problemsUser: string = occProfile?.problemsUser ?? "";
+  const profileCompletion = useMemo(
+    () => (occProfile ? getProfileCompletion(occProfile) : null),
+    [occProfile],
+  );
+  // TODOS los objetivos (cualquier estado): los seguimientos antiguos pueden
+  // referenciar objetivos ya conseguidos.
+  const patientGoals = useMemo<{ id: string; text: string; status: string; specificGoals: unknown }[]>(
+    () => (Array.isArray(occProfile?.goals) ? occProfile.goals : []),
+    [occProfile],
+  );
+
+  // Valoraciones escritas (misma caché que la pestaña Valoración).
+  const { data: evaluations } = useQuery<PatientEvaluationDTO[]>({
+    queryKey: ["evaluations", selectedPatientId],
+    queryFn: () => fetcher(`/api/patients/${selectedPatientId}/evaluations`),
+    enabled: !!selectedPatientId && !isAdmin,
+  });
 
   // Mapa profesional → profesión, para mostrar autor + profesión en los
   // seguimientos (compartidos) y en la exportación.
@@ -120,6 +147,18 @@ export function PatientDetailView() {
   const assessments = useMemo(
     () => (assessmentsRaw ?? []).filter((a) => allowedScales.includes(a.scale)),
     [assessmentsRaw, allowedScales],
+  );
+
+  // Seguimientos: profesionales que han escrito alguno (para el filtro) y la
+  // lista ya filtrada.
+  const visitTherapists = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const v of visits ?? []) m.set(v.therapistId, v.therapistName);
+    return [...m.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [visits]);
+  const filteredVisits = useMemo(
+    () => (visits ?? []).filter((v) => visitsTherapist === "all" || v.therapistId === visitsTherapist),
+    [visits, visitsTherapist],
   );
 
   const roleById = useMemo(
@@ -166,22 +205,6 @@ export function PatientDetailView() {
     });
   }
 
-  // Fetch patient-reported problems, profile completion, and goals from occupational profile
-  useEffect(() => {
-    if (!selectedPatientId) return;
-    fetch(`/api/patients/${selectedPatientId}/occupational-profile`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.problemsUser) setProblemsUser(data.problemsUser);
-        setProfileCompletion(getProfileCompletion(data ?? {}));
-        // Used only to render the "Objetivos" badges on past seguimientos —
-        // must include ALL goals regardless of status, otherwise a goal
-        // that's since moved to "Conseguido" (or any other status) vanishes
-        // from visits that already reference it.
-        setPatientGoals(data?.goals ?? []);
-      })
-      .catch(() => {});
-  }, [selectedPatientId]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [evolutionView, setEvolutionView] = useState<"chart" | "table">("table");
@@ -243,7 +266,7 @@ export function PatientDetailView() {
       {/* Header card */}
       <Card>
         <CardContent className="p-5">
-          <div className="flex gap-0">
+          <div className="flex flex-col lg:flex-row gap-4 lg:gap-0">
             {/* Left: patient info */}
             <div className="flex-1 min-w-0 space-y-2.5">
               {/* Row 1: Identity + action buttons */}
@@ -302,14 +325,12 @@ export function PatientDetailView() {
                   solo Centro de día — el diagnóstico se estrecha para dejarle
                   sitio y así no queda hueco muerto abajo). */}
               <div className="flex flex-wrap gap-3 items-start">
-                <div className="flex-1 min-w-[220px] rounded-md bg-accent/40 px-3 py-2 space-y-0.5">
+                {/* El "Objetivo" general se muestra ahora en el Resumen, junto
+                    a los objetivos del plan (antes se repetía aquí). */}
+                <div className="flex-1 min-w-[220px] rounded-md bg-accent/40 px-3 py-2">
                   <div className="flex items-start gap-2">
                     <Stethoscope className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
                     <p className="text-xs"><span className="text-muted-foreground">Diagnóstico: </span><span className="font-medium">{patient.diagnosis ?? "—"}</span></p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Target className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                    <p className="text-xs"><span className="text-muted-foreground">Objetivo: </span><span className="font-medium">{patient.objective ?? "—"}</span></p>
                   </div>
                 </div>
 
@@ -339,23 +360,9 @@ export function PatientDetailView() {
                 )}
               </div>
 
-              {/* Row 4: Contact & scheduling — smaller text */}
-              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Teléfono:</span>
-                  <span className="font-medium">{patient.phone ?? "—"}</span>
-                </div>
-                <div className="flex items-start gap-1.5">
-                  <MapPin className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
-                  <span className="text-muted-foreground">Dirección:</span>
-                  <span className="font-medium">{patient.address ? shortenAddress(patient.address) : "—"}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <User2 className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Familiar de referencia:</span>
-                  <span className="font-medium">{patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"}</span>
-                </div>
+              {/* Row 4: lo que se consulta a diario siempre visible (próxima
+                  cita y terapeutas); los datos de contacto, plegados. */}
+              <div className="flex items-center gap-x-4 gap-y-1.5 flex-wrap text-xs">
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-3 h-3 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground">Próxima cita:</span>
@@ -367,21 +374,50 @@ export function PatientDetailView() {
                     <span className="font-medium">Sin cita</span>
                   )}
                 </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-muted-foreground">Terapeutas:</span>
+                  {patient.therapistNames.length === 0 ? (
+                    <span className="text-muted-foreground italic">Sin asignar</span>
+                  ) : (
+                    patient.therapistNames.map((n) => (<Badge key={n} variant="secondary" className="text-[11px] py-0">{n}</Badge>))
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowContact((v) => !v)}
+                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                  aria-expanded={showContact}
+                >
+                  {showContact ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                  Datos de contacto
+                </button>
               </div>
 
-              {/* Row 5: Terapeutas */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] text-muted-foreground">Terapeutas:</span>
-                {patient.therapistNames.length === 0 ? (
-                  <span className="text-[11px] text-muted-foreground italic">Sin asignar</span>
-                ) : (
-                  patient.therapistNames.map((n) => (<Badge key={n} variant="secondary" className="text-[11px] py-0">{n}</Badge>))
-                )}
-              </div>
+              {showContact && (
+                <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs rounded-md border bg-muted/20 px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground">Teléfono:</span>
+                    <span className="font-medium">{patient.phone ?? "—"}</span>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <MapPin className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
+                    <span className="text-muted-foreground">Dirección:</span>
+                    <span className="font-medium">{patient.address ? shortenAddress(patient.address) : "—"}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 sm:col-span-2">
+                    <User2 className="w-3 h-3 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground">Familiar de referencia:</span>
+                    <span className="font-medium">{patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Divider */}
+            {/* Divider (vertical en pantalla ancha; en pantallas medianas las
+                notas van debajo, separadas por una línea) */}
             {!isAdmin && <div className="w-px bg-border mx-4 self-stretch hidden lg:block" />}
+            {!isAdmin && <div className="h-px bg-border lg:hidden" />}
             {!isAdmin && <QuickNotes patientId={patient.id} />}
           </div>
         </CardContent>
@@ -393,7 +429,7 @@ export function PatientDetailView() {
 
           {!isAdmin && <TabSep />}
           {!isAdmin && <TabsTrigger value="visits" className={cn(TAB_BASE, TAB_DAILY)}>Seguimientos</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="interventions" className={cn(TAB_BASE, TAB_DAILY)}>Intervenciones</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="interventions" className={cn(TAB_BASE, TAB_DAILY, "gap-1")} title="Privadas: solo las ves tú">Intervenciones <Lock className="w-3 h-3 opacity-70" /></TabsTrigger>}
 
           {!isAdmin && <TabSep />}
           {!isAdmin && <TabsTrigger value="assessments" className={cn(TAB_BASE, TAB_MEASURE)}>Valoración</TabsTrigger>}
@@ -462,6 +498,22 @@ export function PatientDetailView() {
               <p>Como administrador/a, no tienes acceso a la información clínica del paciente.</p>
               <p className="mt-1">Puedes gestionar citas desde la <button type="button" onClick={() => navigate("calendar")} className="text-primary hover:underline font-medium">Agenda</button>.</p>
             </Card>
+          )}
+
+          {/* Objetivos que se plantean con la persona + última valoración */}
+          {!isAdmin && (
+            <div className="grid lg:grid-cols-2 gap-4">
+              <GoalsSummaryCard
+                generalObjective={patient.objective}
+                goals={patientGoals}
+                onOpenPlan={() => setActiveTab("intervention-plan")}
+                planLabel={isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}
+              />
+              <EvaluationSummaryCard
+                evaluations={evaluations ?? []}
+                onOpen={() => { setActiveTab("assessments"); setAssessmentSubTab("evaluation"); }}
+              />
+            </div>
           )}
 
           {!isAdmin && (
@@ -621,7 +673,20 @@ export function PatientDetailView() {
 
         {/* Visits — hidden for admin */}
         {!isAdmin && <TabsContent value="visits" className="mt-4 space-y-3">
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2 flex-wrap">
+            {visitTherapists.length > 1 && (
+              <Select value={visitsTherapist} onValueChange={setVisitsTherapist}>
+                <SelectTrigger className="h-8 w-52 text-xs mr-auto" aria-label="Filtrar por profesional">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los profesionales</SelectItem>
+                  {visitTherapists.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -640,8 +705,29 @@ export function PatientDetailView() {
               <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-50" />
               No hay seguimientos registrados todavía.
             </Card>
+          ) : filteredVisits.length === 0 ? (
+            <Card className="p-6 text-center text-sm text-muted-foreground">No hay seguimientos de este/a profesional.</Card>
           ) : (
-            visits.map((v, idx) => (
+            filteredVisits.map((v, idx) => {
+              // Los 5 más recientes se ven completos; los anteriores, plegados
+              // en una línea (clic para desplegar), para no hacer scroll eterno.
+              const isOld = idx >= VISITS_OPEN_COUNT;
+              const expanded = !isOld || expandedVisitIds.has(v.id);
+              if (!expanded) {
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setExpandedVisitIds((prev) => new Set(prev).add(v.id))}
+                    className="w-full flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-left hover:bg-muted/40 transition-colors"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-sm font-medium truncate">{v.title ?? "Seguimiento"}</span>
+                    <span className="text-xs text-muted-foreground truncate">· {formatDate(v.date)} · {v.therapistName}</span>
+                  </button>
+                );
+              }
+              return (
               <Card key={v.id} className="overflow-hidden" style={{ borderLeftWidth: "4px", borderLeftColor: idx === 0 ? "var(--chip-blue-text)" : "var(--border)" }}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3 mb-2">
@@ -653,6 +739,12 @@ export function PatientDetailView() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      {isOld && (
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground"
+                          onClick={() => setExpandedVisitIds((prev) => { const next = new Set(prev); next.delete(v.id); return next; })}>
+                          <ChevronDown className="w-3 h-3 mr-1" /> Plegar
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setOpenVisitId(v.id)}>
                         <Pencil className="w-3 h-3 mr-1" /> Editar
                       </Button>
@@ -703,7 +795,8 @@ export function PatientDetailView() {
                   )}
                 </CardContent>
               </Card>
-            ))
+              );
+            })
           )}
         </TabsContent>}
 
@@ -881,6 +974,124 @@ export function PatientDetailView() {
   );
 }
 
+function htmlToText(html: string | null | undefined): string {
+  return (html ?? "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+}
+
+type SummaryGoal = { id: string; text: string; status: string; specificGoals: unknown; targetDate?: string | null };
+
+function parseSpecificGoals(raw: unknown): { status: string }[] {
+  if (Array.isArray(raw)) return raw as { status: string }[];
+  if (typeof raw === "string" && raw) {
+    try { const v = JSON.parse(raw); return Array.isArray(v) ? v : []; } catch { return []; }
+  }
+  return [];
+}
+
+// Resumen → objetivos planteados con la persona (los "En curso" del Plan de
+// intervención) más el objetivo general de su ficha, si lo tiene.
+function GoalsSummaryCard({
+  generalObjective,
+  goals,
+  onOpenPlan,
+  planLabel,
+}: {
+  generalObjective: string | null;
+  goals: SummaryGoal[];
+  onOpenPlan: () => void;
+  planLabel: string;
+}) {
+  const active = goals.filter((g) => g.status === "En curso");
+  const achieved = goals.filter((g) => g.status === "Conseguido").length;
+  return (
+    <Card className="border-l-4" style={{ borderLeftColor: "#1a5c58" }}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2"><Flag className="w-4 h-4 text-[#1a5c58]" />Objetivos</span>
+          <button type="button" className="text-xs font-normal text-primary hover:underline" onClick={onOpenPlan}>
+            {planLabel} →
+          </button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2.5">
+        {generalObjective && (
+          <p className="text-xs rounded-md bg-accent/40 px-2.5 py-1.5">
+            <span className="text-muted-foreground">Objetivo general: </span>
+            <span className="font-medium">{generalObjective}</span>
+          </p>
+        )}
+        {active.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sin objetivos en curso.</p>
+        ) : (
+          <ol className="space-y-1.5">
+            {active.map((g, i) => {
+              const metas = parseSpecificGoals(g.specificGoals);
+              const done = metas.filter((m) => m.status === "Conseguido").length;
+              return (
+                <li key={g.id} className="flex items-start gap-2 text-sm">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0 mt-0.5 bg-[#1a5c58]/10 text-[#1a5c58]">{i + 1}</span>
+                  <span className="flex-1 leading-snug">{g.text || <span className="italic text-muted-foreground">Sin título</span>}</span>
+                  {metas.length > 0 && (
+                    <span className="text-[11px] text-muted-foreground shrink-0 mt-0.5" title="Metas funcionales conseguidas">
+                      {done}/{metas.length} metas
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        {achieved > 0 && (
+          <p className="text-[11px] text-emerald-700">✓ {achieved} objetivo{achieved === 1 ? "" : "s"} conseguido{achieved === 1 ? "" : "s"}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Resumen → la valoración escrita más reciente (fecha, autor/a y un extracto
+// de los datos generales: entorno, dificultades actuales…).
+function EvaluationSummaryCard({
+  evaluations,
+  onOpen,
+}: {
+  evaluations: PatientEvaluationDTO[];
+  onOpen: () => void;
+}) {
+  const latest = evaluations[0];
+  const excerpt = latest ? htmlToText(latest.generalData) : "";
+  return (
+    <Card className="border-l-4" style={{ borderLeftColor: "#6e6587" }}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2"><ClipboardPen className="w-4 h-4 text-[#6e6587]" />Valoración</span>
+          <button type="button" className="text-xs font-normal text-primary hover:underline" onClick={onOpen}>
+            {latest ? "Abrir →" : "Crear valoración →"}
+          </button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-1.5">
+        {!latest ? (
+          <p className="text-sm text-muted-foreground">Todavía no hay valoración.</p>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{evaluations.length === 1 ? "Valoración inicial" : "Revaloración"}</span>
+              {" · "}{formatDate(latest.date)} · {latest.authorName}
+              {evaluations.length > 1 && <> · {evaluations.length} valoraciones</>}
+            </p>
+            {excerpt ? (
+              <p className="text-sm leading-snug line-clamp-4">{excerpt}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Datos generales sin completar.</p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 type ChipColor = "blue" | "green" | "orange" | "purple" | "yellow";
 
 const CHIP_VARS: Record<ChipColor, { bg: string; text: string }> = {
@@ -928,16 +1139,23 @@ function QuickNotes({ patientId }: { patientId: string }) {
   // Notas privadas del profesional de la sesión. Se cargan desde el servidor
   // (que ya filtra por profesional) y se crean/editan/borran contra los
   // endpoints /api/patients/[id]/quick-notes. Cada profesional solo ve las suyas.
+  // Se muestran en todas las pantallas (antes solo en las muy anchas) y avisan
+  // si no se han podido guardar, para no perder nada sin darse cuenta.
   const [notes, setNotes] = useState<QuickNote[]>([]);
+  const [saveState, setSaveState] = useState<Record<string, "saving" | "saved" | "error">>({});
 
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/patients/${patientId}/quick-notes`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => { if (!cancelled) setNotes(Array.isArray(data) ? data : []); })
-      .catch(() => { /* silent */ });
+      .catch(() => { /* sin notas: se muestra vacío */ });
     return () => { cancelled = true; };
   }, [patientId]);
+
+  function notifyError(action: string) {
+    toast({ title: "Nota rápida no guardada", description: `No se ha podido ${action}. Revisa la conexión e inténtalo de nuevo.`, variant: "destructive" });
+  }
 
   async function addNote() {
     const colorIdx = notes.length % NOTE_COLORS.length;
@@ -947,11 +1165,12 @@ function QuickNotes({ patientId }: { patientId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: "", colorIdx }),
       });
-      if (r.ok) {
-        const created = await r.json();
-        setNotes((prev) => [...prev, created]);
-      }
-    } catch { /* silent */ }
+      if (!r.ok) throw new Error(String(r.status));
+      const created = await r.json();
+      setNotes((prev) => [...prev, created]);
+    } catch {
+      notifyError("crear la nota");
+    }
   }
   function updateNote(id: string, text: string) {
     setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, text } : n)));
@@ -959,26 +1178,38 @@ function QuickNotes({ patientId }: { patientId: string }) {
   async function saveNote(id: string) {
     const note = notes.find((n) => n.id === id);
     if (!note) return;
+    setSaveState((p) => ({ ...p, [id]: "saving" }));
     try {
-      await fetch(`/api/patients/${patientId}/quick-notes/${id}`, {
+      const r = await fetch(`/api/patients/${patientId}/quick-notes/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: note.text, colorIdx: note.colorIdx }),
       });
-    } catch { /* silent */ }
+      if (!r.ok) throw new Error(String(r.status));
+      setSaveState((p) => ({ ...p, [id]: "saved" }));
+    } catch {
+      setSaveState((p) => ({ ...p, [id]: "error" }));
+      notifyError("guardar la nota");
+    }
   }
   async function removeNote(id: string) {
+    const previous = notes;
     setNotes((prev) => prev.filter((n) => n.id !== id));
     try {
-      await fetch(`/api/patients/${patientId}/quick-notes/${id}`, { method: "DELETE" });
-    } catch { /* silent */ }
+      const r = await fetch(`/api/patients/${patientId}/quick-notes/${id}`, { method: "DELETE" });
+      if (!r.ok) throw new Error(String(r.status));
+    } catch {
+      setNotes(previous);
+      notifyError("borrar la nota");
+    }
   }
 
+  const wide = notes.length > 3;
   return (
-    <div className="shrink-0 hidden lg:flex flex-col gap-1.5" style={{ width: notes.length > 3 ? "28rem" : "14rem", transition: "width 0.2s" }}>
+    <div className={cn("shrink-0 flex flex-col gap-1.5 w-full transition-[width]", wide ? "lg:w-[28rem]" : "lg:w-56")}>
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-wide font-bold text-muted-foreground flex items-center gap-1" title="Privadas: solo tú las ves">
-          <StickyNote className="w-3 h-3" /> Notas rápidas
+          <StickyNote className="w-3 h-3" /> Notas rápidas <Lock className="w-2.5 h-2.5" />
         </span>
         <button type="button" onClick={addNote} className="text-xs text-primary hover:underline">+ Añadir</button>
       </div>
@@ -986,28 +1217,32 @@ function QuickNotes({ patientId }: { patientId: string }) {
         <p className="text-[11px] text-muted-foreground italic">Sin notas.</p>
       )}
       <div
-        className="overflow-y-auto"
-        style={{
-          display: "grid",
-          gridTemplateColumns: notes.length > 3 ? "1fr 1fr" : "1fr",
-          gap: "6px",
-          maxHeight: "260px",
-        }}
+        className={cn("overflow-y-auto grid gap-1.5 grid-cols-1 sm:grid-cols-2", wide ? "lg:grid-cols-2" : "lg:grid-cols-1")}
+        style={{ maxHeight: "260px" }}
       >
         {notes.map((note) => {
           const c = NOTE_COLORS[note.colorIdx % NOTE_COLORS.length];
+          const st = saveState[note.id];
           return (
             <div key={note.id} className="rounded-md p-2 relative group" style={{ backgroundColor: c.bg, borderLeft: `3px solid ${c.border}` }}>
               <textarea
                 value={note.text}
-                onChange={(e) => updateNote(note.id, e.target.value)}
+                onChange={(e) => {
+                  updateNote(note.id, e.target.value);
+                  setSaveState((p) => { const next = { ...p }; delete next[note.id]; return next; });
+                }}
                 onBlur={() => saveNote(note.id)}
                 placeholder="Escribe una nota…"
                 className="w-full bg-transparent text-xs resize-none outline-none min-h-[2rem] leading-relaxed"
                 rows={2}
               />
-              <button type="button" onClick={() => removeNote(note.id)}
-                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
+              {st && (
+                <span className={cn("absolute bottom-1 right-1.5 text-[9px]", st === "error" ? "text-destructive font-semibold" : "text-muted-foreground")}>
+                  {st === "saving" ? "Guardando…" : st === "saved" ? "✓ Guardada" : "No guardada"}
+                </span>
+              )}
+              <button type="button" onClick={() => removeNote(note.id)} aria-label="Borrar nota"
+                className="absolute top-1 right-1 opacity-60 lg:opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
                 <Trash2 className="w-3 h-3" />
               </button>
             </div>

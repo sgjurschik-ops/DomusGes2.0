@@ -14,21 +14,20 @@ import {
 import {
   Save, Plus, Trash2, X, ClipboardCheck, Pencil, Eye, ChevronDown, ChevronUp, FileDown,
 } from "lucide-react";
-import { usePatient, useGasAssessments, useCreateGasAssessments, useDeleteGasAssessment } from "@/hooks/api";
+import { usePatient, useGasAssessments, useCreateGasAssessments, useDeleteGasAssessment, occupationalProfileKey } from "@/hooks/api";
+import { useQueryClient } from "@tanstack/react-query";
 import type { GasAssessmentDTO } from "@/hooks/api";
 import { toast } from "@/hooks/use-toast";
 import { RichTextarea } from "@/components/rich-textarea";
 
 // ─── Types & constants ───────────────────────────────────────────────────────
 
-const GOAL_AREAS = ["Cuidado de sí mismo", "Productividad", "Ocio", ""] as const;
-type GoalArea = typeof GOAL_AREAS[number];
-const GOAL_AREA_COLORS: Record<GoalArea, string> = {
-  "Cuidado de sí mismo": "#5DCAA5",
-  "Productividad": "#EF9F27",
-  "Ocio": "#8b5cf6",
-  "": "#9CA3AF",
-};
+// Los objetivos YA NO se clasifican por área ocupacional (Cuidado de sí
+// mismo / Productividad / Ocio). El campo `area` se conserva en la base de
+// datos solo para no perder datos antiguos, pero no se muestra ni se pide;
+// los objetivos nuevos se guardan con área vacía. Todos usan el color de marca.
+type GoalArea = string;
+const GOAL_ACCENT = "#1a5c58";
 
 const GOAL_SCOPES = ["Con el paciente", "Con la familia/entorno", "Coordinación profesional"] as const;
 type GoalScope = typeof GOAL_SCOPES[number];
@@ -101,61 +100,53 @@ const GAS_SCORE_COLORS: Record<number, string> = {
   "2": "#059669",
 };
 
-const PREDEFINED_OBJECTIVES: { text: string; area: GoalArea }[] = [
-  { text: "Mejorar la autonomía en actividades de la vida diaria", area: "Cuidado de sí mismo" },
-  { text: "Incrementar la participación en actividades significativas", area: "Ocio" },
-  { text: "Promover la gestión del hogar de forma independiente", area: "Productividad" },
-  { text: "Fomentar las relaciones sociales y la participación comunitaria", area: "Ocio" },
-  { text: "Mejorar las habilidades de organización y planificación", area: "Productividad" },
-  { text: "Favorecer la gestión emocional y el bienestar", area: "Cuidado de sí mismo" },
-  { text: "Potenciar las habilidades cognitivas funcionales", area: "Cuidado de sí mismo" },
-  { text: "Mejorar la movilidad funcional y el equilibrio", area: "Cuidado de sí mismo" },
-  { text: "Promover hábitos de vida saludables", area: "Cuidado de sí mismo" },
-  { text: "Facilitar la integración laboral o formativa", area: "Productividad" },
-  { text: "Mejorar la coordinación y destreza manual", area: "Cuidado de sí mismo" },
-  { text: "Favorecer la adaptación al entorno y uso de productos de apoyo", area: "Productividad" },
+const PREDEFINED_OBJECTIVES: { text: string }[] = [
+  { text: "Mejorar la autonomía en actividades de la vida diaria" },
+  { text: "Incrementar la participación en actividades significativas" },
+  { text: "Promover la gestión del hogar de forma independiente" },
+  { text: "Fomentar las relaciones sociales y la participación comunitaria" },
+  { text: "Mejorar las habilidades de organización y planificación" },
+  { text: "Favorecer la gestión emocional y el bienestar" },
+  { text: "Potenciar las habilidades cognitivas funcionales" },
+  { text: "Mejorar la movilidad funcional y el equilibrio" },
+  { text: "Promover hábitos de vida saludables" },
+  { text: "Facilitar la integración laboral o formativa" },
+  { text: "Mejorar la coordinación y destreza manual" },
+  { text: "Favorecer la adaptación al entorno y uso de productos de apoyo" },
 ];
 
 // Plantillas específicas para Asociación EM con niveles GAS pre-rellenados
-const EM_PREDEFINED_OBJECTIVES: { text: string; area: GoalArea; gasLevels: GasLevels }[] = [
+const EM_PREDEFINED_OBJECTIVES: { text: string; gasLevels: GasLevels }[] = [
   {
     text: "Mantener la destreza manual funcional",
-    area: "Cuidado de sí mismo",
     gasLevels: { "-2": "Pérdida significativa de destreza que impide AVD básicas", "-1": "Disminución leve de destreza respecto al nivel inicial", "0": "Mantiene el nivel de destreza actual", "1": "Mejora leve en velocidad o precisión manipulativa", "2": "Mejora significativa que permite nuevas actividades" },
   },
   {
     text: "Gestionar la fatiga en actividades de la vida diaria",
-    area: "Cuidado de sí mismo",
     gasLevels: { "-2": "La fatiga impide realizar AVD básicas de forma autónoma", "-1": "Aumento de la fatiga que reduce la participación en alguna AVD", "0": "Mantiene las estrategias de gestión de la fatiga actuales", "1": "Aplica nuevas estrategias que aumentan su participación", "2": "Gestiona la fatiga de forma autónoma y amplía actividades" },
   },
   {
     text: "Mejorar la autonomía en el autocuidado",
-    area: "Cuidado de sí mismo",
     gasLevels: { "-2": "Necesita ayuda total en más de 2 actividades de autocuidado", "-1": "Ha perdido autonomía en alguna actividad de autocuidado", "0": "Mantiene el nivel actual de autonomía", "1": "Recupera autonomía en al menos una actividad", "2": "Realiza de forma independiente todas las actividades de autocuidado" },
   },
   {
     text: "Mejorar el equilibrio y la movilidad funcional",
-    area: "Cuidado de sí mismo",
     gasLevels: { "-2": "Aumento significativo de caídas o necesidad de ayuda para deambular", "-1": "Ligero empeoramiento del equilibrio o la marcha", "0": "Mantiene el nivel de equilibrio y movilidad actual", "1": "Mejora en equilibrio estático o dinámico medible en escalas", "2": "Mejora significativa: reduce ayudas técnicas o amplia distancias" },
   },
   {
     text: "Favorecer la participación social y comunitaria",
-    area: "Ocio",
     gasLevels: { "-2": "Aislamiento social completo, no sale del domicilio", "-1": "Reducción de actividades sociales respecto al nivel previo", "0": "Mantiene la frecuencia actual de participación social", "1": "Incorpora al menos una actividad social nueva", "2": "Participación social activa y autónoma en la comunidad" },
   },
   {
     text: "Mejorar las funciones cognitivas aplicadas a la vida diaria",
-    area: "Cuidado de sí mismo",
     gasLevels: { "-2": "Deterioro cognitivo que impide la planificación de actividades cotidianas", "-1": "Olvidos o dificultades atencionales que afectan a alguna actividad", "0": "Mantiene el rendimiento cognitivo funcional actual", "1": "Aplica estrategias compensatorias que mejoran su organización", "2": "Mejora cognitiva funcional que permite mayor independencia" },
   },
   {
     text: "Adaptar el entorno domiciliario a las necesidades funcionales",
-    area: "Productividad",
     gasLevels: { "-2": "El entorno supone un riesgo de seguridad evidente", "-1": "Existen barreras identificadas pero sin resolver", "0": "Se han implementado las adaptaciones prioritarias", "1": "El entorno está adaptado y el usuario lo utiliza correctamente", "2": "Entorno óptimo: adaptaciones integradas, sin barreras" },
   },
   {
     text: "Mantener o mejorar la capacidad de gestión del hogar",
-    area: "Productividad",
     gasLevels: { "-2": "Incapaz de realizar tareas domésticas básicas sin ayuda", "-1": "Ha dejado de realizar alguna tarea que antes hacía", "0": "Mantiene el nivel actual de gestión doméstica", "1": "Recupera alguna tarea doméstica o la realiza con menos ayuda", "2": "Gestiona el hogar de forma independiente con estrategias compensatorias" },
   },
 ];
@@ -168,6 +159,7 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
   const isDayCenter = patient?.resource === "Asociación EM" && patient?.emCategory === "Centro de día";
   const gasEnabled = patient?.resource === "Asociación EM";
   const { data: gasAssessments } = useGasAssessments(patientId);
+  const queryClient = useQueryClient();
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -267,6 +259,8 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
           })),
         );
       }
+      // Avisa al resto de la ficha (Resumen, seguimientos) de que han cambiado los objetivos.
+      queryClient.invalidateQueries({ queryKey: occupationalProfileKey(patientId) });
       toast({ title: "Plan de intervención guardado" });
       setEditingDesc(false);
       setEditingGoalIdx(null);
@@ -285,14 +279,14 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
     setGoals((prev) => prev.filter((_, idx) => idx !== i));
     setEditingGoalIdx(null);
   }
-  function addFromPredefined(obj: { text: string; area: GoalArea; gasLevels?: GasLevels | null }) {
-    const newGoals = [...goals, { text: obj.text, area: obj.area, scope: "Con el paciente" as GoalScope, status: "En curso" as GoalStatus, specificGoals: [], startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "", gasLevels: obj.gasLevels ?? null }];
+  function addFromPredefined(obj: { text: string; gasLevels?: GasLevels | null }) {
+    const newGoals = [...goals, { text: obj.text, area: "" as GoalArea, scope: "Con el paciente" as GoalScope, status: "En curso" as GoalStatus, specificGoals: [], startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "", gasLevels: obj.gasLevels ?? null }];
     setGoals(newGoals);
     setEditingGoalIdx(newGoals.length - 1);
     setShowPicker(false);
   }
   function addCustom() {
-    const newGoals = [...goals, { text: "", area: "Cuidado de sí mismo" as GoalArea, scope: "Con el paciente" as GoalScope, status: "En curso" as GoalStatus, specificGoals: [], startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "", gasLevels: null }];
+    const newGoals = [...goals, { text: "", area: "" as GoalArea, scope: "Con el paciente" as GoalScope, status: "En curso" as GoalStatus, specificGoals: [], startDate: new Date().toISOString().slice(0, 10), targetDate: null, evaluation: "", gasLevels: null }];
     setGoals(newGoals);
     setEditingGoalIdx(newGoals.length - 1);
   }
@@ -361,7 +355,7 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
         {goals.length === 0 && <p className="text-sm text-muted-foreground italic border border-dashed border-muted-foreground/40 rounded-md px-3 py-2">Sin objetivos añadidos.</p>}
 
         {goals.map((goal, i) => {
-          const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
+          const areaColor = GOAL_ACCENT;
           const isEditing = editingGoalIdx === i;
           const goalHistory = goal.id ? (gasByGoal[goal.id] ?? []) : [];
 
@@ -392,12 +386,6 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   {isEditing ? (
                     <>
-                      <Select value={goal.area || "_none"} onValueChange={(v) => updateGoal(i, { area: (v === "_none" ? "" : v) as GoalArea })}>
-                        <SelectTrigger className="h-7 text-xs w-auto min-w-[140px]">
-                          <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: areaColor }} /><SelectValue /></div>
-                        </SelectTrigger>
-                        <SelectContent>{GOAL_AREAS.map((a) => (<SelectItem key={a || "_none"} value={a || "_none"}><div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: GOAL_AREA_COLORS[a] }} />{a || "Sin asignar"}</div></SelectItem>))}</SelectContent>
-                      </Select>
                       <Select value={goal.scope ?? "Con el paciente"} onValueChange={(v) => updateGoal(i, { scope: v as GoalScope })}>
                         <SelectTrigger className="h-7 text-xs w-auto min-w-[140px]"><SelectValue /></SelectTrigger>
                         <SelectContent>{GOAL_SCOPES.map((s) => (<SelectItem key={s} value={s}>{SCOPE_DISPLAY[s]}</SelectItem>))}</SelectContent>
@@ -409,7 +397,6 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
                     </>
                   ) : (
                     <>
-                      <span className="text-[11px]" style={{ color: areaColor }}>{goal.area || "Sin asignar"}</span>
                       {goal.scope && goal.scope !== "Con el paciente" && (
                         <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ color: GOAL_SCOPE_COLORS[goal.scope as GoalScope] ?? "#6b7280", backgroundColor: `${GOAL_SCOPE_COLORS[goal.scope as GoalScope] ?? "#6b7280"}18` }}>{SCOPE_DISPLAY[goal.scope as GoalScope] ?? goal.scope}</span>
                       )}
@@ -522,7 +509,6 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
                 {EM_PREDEFINED_OBJECTIVES.filter((o) => !usedTexts.has(o.text)).map((obj) => (
                   <button key={obj.text} type="button" onClick={() => addFromPredefined(obj)}
                     className="w-full text-left px-3 py-2 rounded-md hover:bg-fuchsia-50 text-sm flex items-center gap-2 border border-transparent hover:border-fuchsia-200 transition-colors">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: GOAL_AREA_COLORS[obj.area] }} />
                     <span className="flex-1">{obj.text}</span>
                     <span className="text-[10px] text-fuchsia-600 font-medium shrink-0">GAS</span>
                   </button>
@@ -537,9 +523,7 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
             {PREDEFINED_OBJECTIVES.filter((o) => !usedTexts.has(o.text)).map((obj) => (
               <button key={obj.text} type="button" onClick={() => addFromPredefined(obj)}
                 className="w-full text-left px-3 py-2 rounded-md hover:bg-muted text-sm flex items-center gap-2 border border-transparent hover:border-border transition-colors">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: GOAL_AREA_COLORS[obj.area] }} />
                 <span className="flex-1">{obj.text}</span>
-                <span className="text-[10px] text-muted-foreground">{obj.area}</span>
               </button>
             ))}
             {PREDEFINED_OBJECTIVES.filter((o) => !usedTexts.has(o.text)).length === 0 && (
@@ -640,7 +624,7 @@ function GasAssessmentSheet({
 
             <div className="space-y-3">
               {goals.map((goal, idx) => {
-                const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
+                const areaColor = GOAL_ACCENT;
                 const goalId = goal.id;
                 if (!goalId) return null;
                 return (
@@ -649,7 +633,6 @@ function GasAssessmentSheet({
                       <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold mr-1.5" style={{ backgroundColor: `${areaColor}20`, color: areaColor }}>{idx + 1}</span>
                       {goal.text}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">{goal.area || "Sin área"}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {([-2, -1, 0, 1, 2] as const).map((s) => {
                         const selected = scores[goalId] === s;
@@ -701,7 +684,7 @@ function GasAssessmentSheet({
               if (!goalId) return null;
               const history = byGoal[goalId] ?? [];
               if (history.length === 0) return null;
-              const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
+              const areaColor = GOAL_ACCENT;
               return (
                 <div key={goalId} className="rounded-md border p-3 space-y-2" style={{ borderLeftWidth: "3px", borderLeftColor: areaColor }}>
                   <p className="text-sm font-medium">
@@ -831,7 +814,7 @@ td.goal{text-align:left;font-weight:500}
                         const history = goal.id ? (byGoal[goal.id] ?? []) : [];
                         const scoreByDate: Record<string, GasAssessmentDTO> = {};
                         for (const a of history) scoreByDate[a.date.slice(0, 10)] = a;
-                        const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
+                        const areaColor = GOAL_ACCENT;
                         return (
                           <tr key={goal.id ?? idx}>
                             <td className="text-left border border-border px-2 py-1.5 font-medium" style={{ borderLeft: `3px solid ${areaColor}` }}>
@@ -862,7 +845,7 @@ td.goal{text-align:left;font-weight:500}
                 {goals.map((goal, idx) => {
                   const history = goal.id ? (byGoal[goal.id] ?? []) : [];
                   if (history.length === 0) return null;
-                  const areaColor = GOAL_AREA_COLORS[goal.area] ?? "#6b7280";
+                  const areaColor = GOAL_ACCENT;
                   const latest = history[history.length - 1];
                   const first = history[0];
                   const trend = latest && first && history.length > 1
@@ -872,8 +855,6 @@ td.goal{text-align:left;font-weight:500}
                     <div key={goal.id} className="rounded-md border p-3 space-y-2 mb-3" style={{ borderLeftWidth: "3px", borderLeftColor: areaColor }}>
                       <p className="text-sm font-medium">{idx + 1}. {goal.text}</p>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>{goal.area}</span>
-                        <span>·</span>
                         <span>{history.length} valoración{history.length > 1 ? "es" : ""}</span>
                         {trend && (
                           <>

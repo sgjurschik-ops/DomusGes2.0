@@ -373,9 +373,9 @@ export function NewVisitForm({ open, patientId, patientName, previousVisit, edit
                                     }} />
                                   <div className="min-w-0">
                                     <p className="text-sm leading-tight">{goal.text}</p>
-                                    <p className="text-[10px] text-muted-foreground">
-                                      {goal.area}{goal.status !== "En curso" ? ` · ${goal.status}` : ""}
-                                    </p>
+                                    {goal.status !== "En curso" && (
+                                      <p className="text-[10px] text-muted-foreground">{goal.status}</p>
+                                    )}
                                   </div>
                                 </label>
                               );
