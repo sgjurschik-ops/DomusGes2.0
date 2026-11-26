@@ -51,7 +51,7 @@ export function InterventionsTab({
         visits.map((v, idx) => (
           <Card
             key={v.id}
-            className="overflow-hidden"
+            className="overflow-hidden py-0 gap-0"
             style={{ borderLeftWidth: "4px", borderLeftColor: idx === 0 ? "var(--chip-blue-text)" : "var(--border)" }}
           >
             <CardContent className="p-4">

@@ -57,6 +57,7 @@ import { EvaluationTab } from "./evaluation-tab";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ListPlus, EyeOff, Lock, ChevronDown, ChevronRight, ChevronUp, Flag, ClipboardPen } from "lucide-react";
 import type { PatientEvaluationDTO } from "@/lib/evaluations";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ClinicalNotes } from "@/components/clinical-notes";
 import { Mic, MicOff } from "lucide-react";
 
@@ -74,6 +75,18 @@ function shortenAddress(full: string): string {
   if (isNum && street) return `${street} ${num}, ${city}`;
   return `${parts[0]}, ${city}`;
 }
+
+// Tarjetas del Resumen: compactas (sin el gran margen por defecto), con
+// borde de color a la izquierda y misma altura dentro de cada fila.
+const SUMMARY_CARD = "py-3 gap-2 h-full border-l-4 rounded-l-none";
+
+// Punto de color del estado del/de la usuario/a en la cabecera.
+const STATUS_DOT: Record<string, string> = {
+  "Activo": "#16a34a",
+  "En seguimiento": "#2563eb",
+  "Pausado": "#d97706",
+  "Alta": "#6b7280",
+};
 
 // Seguimientos que se muestran completos; los anteriores aparecen plegados.
 const VISITS_OPEN_COUNT = 5;
@@ -102,22 +115,15 @@ export function PatientDetailView() {
   const deletePatient = useDeletePatient();
   const updatePatient = useUpdatePatient();
   const [openAssessmentId, setOpenAssessmentId] = useState<string | null>(null);
-  const [activeTab, setActiveTabState] = useState("overview");
-  // Cabecera desplegada manualmente estando en una pestaña (se vuelve a
-  // comprimir al cambiar de pestaña).
-  const [headerExpanded, setHeaderExpanded] = useState(false);
-  function setActiveTab(tab: string) {
-    setActiveTabState(tab);
-    setHeaderExpanded(false);
-  }
+  const [activeTab, setActiveTab] = useState("overview");
+  // Dentro de Seguimientos: los compartidos o mis intervenciones privadas.
+  const [visitsView, setVisitsView] = useState<"shared" | "private">("shared");
   // Sub-pestaña dentro de "Valoración": valoración escrita | escalas | evolución.
   const [assessmentSubTab, setAssessmentSubTab] = useState("evaluation");
   const queryClient = useQueryClient();
   const [togglingProfile, setTogglingProfile] = useState(false);
   const [openVisitId, setOpenVisitId] = useState<string | null>(null);
   const [newVisitOpen, setNewVisitOpen] = useState(false);
-  // Datos de contacto plegados por defecto (cabecera más limpia).
-  const [showContact, setShowContact] = useState(false);
   // Seguimientos: filtro por profesional y cuáles de los antiguos están desplegados.
   const [visitsTherapist, setVisitsTherapist] = useState<string>("all");
   const [expandedVisitIds, setExpandedVisitIds] = useState<Set<string>>(new Set());
@@ -271,188 +277,117 @@ export function PatientDetailView() {
         <ArrowLeft className="w-4 h-4" /> Volver
       </button>
 
-      {/* Header card. Dentro de cualquier pestaña que no sea Resumen se
-          comprime a una sola línea con el nombre, para dejar más espacio;
-          "Ver ficha" la despliega entera. */}
-      {activeTab !== "overview" && !headerExpanded ? (
-        <div className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2">
-          <Avatar name={patient.fullName} color={patient.color} size={26} />
-          <h2 className="text-base font-bold leading-tight truncate flex-1">{patient.fullName}</h2>
-          <button type="button" onClick={() => setHeaderExpanded(true)}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground shrink-0">
-            <ChevronDown className="w-3.5 h-3.5" />Ver ficha
-          </button>
-        </div>
-      ) : (
-      <div className="space-y-1">
-      <Card>
-        <CardContent className="p-5">
-          <div className="flex flex-col lg:flex-row gap-4 lg:gap-0">
-            {/* Left: patient info */}
-            <div className="flex-1 min-w-0 space-y-2.5">
-              {/* Row 1: Identity + action buttons */}
-              <div className="flex items-start gap-3">
-                <Avatar name={patient.fullName} color={patient.color} size={40} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-lg font-bold leading-tight">{patient.fullName}</h2>
-                    <SpecialtyBadge specialty={patient.specialty} />
-                    <StatusBadge status={patient.status} />
-                    <ResourceBadge resource={patient.resource} />
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {patient.totalVisits} seguimientos · Inicio {formatDate(patient.startDate)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" onClick={() => setReportDialogOpen(true)}>
-                    <FileDown className="w-3.5 h-3.5 mr-1" />Informe
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Más acciones"><MoreVertical className="w-3.5 h-3.5" /></Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => navigate("edit-patient")}><Pencil className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
-                      {!isAdmin && isTO && !profileHasData && (
-                        patient.occupationalProfileEnabled ? (
-                          <DropdownMenuItem disabled={togglingProfile} onClick={() => setOccupationalProfileEnabled(false)}>
-                            <EyeOff className="w-4 h-4 mr-2" />Ocultar {isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem disabled={togglingProfile} onClick={() => setOccupationalProfileEnabled(true)}>
-                            <ListPlus className="w-4 h-4 mr-2" />Activar {isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
-                          </DropdownMenuItem>
-                        )
+      {/* Cabecera COMPACTA y FIJA: igual en todas las pestañas (ya no se
+          pliega/despliega). Identidad + datos clave en dos líneas, avisos
+          agrupados en un solo botón, contacto en un desplegable, y las notas
+          rápidas siempre visibles a la derecha. */}
+      <Card className="py-0 gap-0">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col lg:flex-row gap-3 lg:gap-0">
+            <div className="flex-1 min-w-0 flex items-start gap-3">
+              <Avatar name={patient.fullName} color={patient.color} size={40} />
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-x-2.5 gap-y-0.5 flex-wrap">
+                      <h2 className="text-lg font-bold leading-tight">{patient.fullName}</h2>
+                      <span className="text-xs text-muted-foreground">
+                        {[patient.specialty, patient.resource, isEM ? patient.emCategory : null].filter(Boolean).join(" · ")}
+                        {" · "}
+                        <span className="inline-flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: STATUS_DOT[patient.status] ?? "#9ca3af" }} />
+                          {patient.status}
+                        </span>
+                      </span>
+                      {isEM && patient.informedConsent && (
+                        <span className="inline-flex items-center gap-0.5 text-[11px] text-emerald-700" title="Consentimiento informado firmado">
+                          <ShieldCheck className="w-3.5 h-3.5" />Consentimiento
+                        </span>
                       )}
-                      <DropdownMenuItem variant="destructive" onClick={() => setDeleteDialogOpen(true)}><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-
-              {/* Row 2: Alerts (if any) */}
-              {(patient.alerts ?? []).length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {(patient.alerts ?? []).map((alert) => (
-                    <span key={alert} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium" style={{ backgroundColor: "var(--chip-orange-bg)", color: "var(--chip-orange-text)" }}>
-                      <AlertTriangle className="w-3 h-3" />{alert}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Row 3: Clinical info (+ recuadro de Referentes a la derecha,
-                  solo Centro de día — el diagnóstico se estrecha para dejarle
-                  sitio y así no queda hueco muerto abajo). */}
-              <div className="flex flex-wrap gap-3 items-start">
-                {/* El "Objetivo" general se muestra ahora en el Resumen, junto
-                    a los objetivos del plan (antes se repetía aquí). */}
-                <div className="flex-1 min-w-[220px] rounded-md bg-accent/40 px-3 py-2">
-                  <div className="flex items-start gap-2">
-                    <Stethoscope className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                    <p className="text-xs"><span className="text-muted-foreground">Diagnóstico: </span><span className="font-medium">{patient.diagnosis ?? "—"}</span></p>
-                  </div>
-                </div>
-
-                {isDayCenter && (
-                  <div
-                    className="w-full sm:w-[230px] shrink-0 rounded-lg px-3 py-2"
-                    style={{ backgroundColor: "rgba(138,40,70,0.06)", border: "1px solid rgba(138,40,70,0.22)" }}
-                  >
-                    <p className="text-[10px] uppercase tracking-wide font-bold mb-1 flex items-center gap-1" style={{ color: "#8a2846" }}>
-                      <User2 className="w-3 h-3" /> Referentes
-                    </p>
-                    <div className="text-xs space-y-0.5">
-                      <div><span className="text-muted-foreground">Referente:</span> <span className="font-semibold">{patient.referent || "—"}</span></div>
-                      <div><span className="text-muted-foreground">Equipo de cuidados:</span> <span className="font-semibold">{patient.careTeamReferent || "—"}</span></div>
                     </div>
                   </div>
-                )}
-
-                {isEM && patient.informedConsent && (
-                  <div
-                    className="w-full sm:w-[230px] shrink-0 rounded-lg px-3 py-2 flex items-center gap-1.5"
-                    style={{ backgroundColor: "#059669" }}
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5 text-white shrink-0" />
-                    <p className="text-[11px] font-semibold text-white leading-tight">Consentimiento informado firmado</p>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {(patient.alerts ?? []).length > 0 && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button type="button" className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100">
+                            <AlertTriangle className="w-3 h-3" />
+                            {patient.alerts.length} aviso{patient.alerts.length === 1 ? "" : "s"}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-64 p-2">
+                          <ul className="space-y-1">
+                            {patient.alerts.map((alert) => (
+                              <li key={alert} className="flex items-start gap-1.5 text-xs">
+                                <AlertTriangle className="w-3 h-3 text-amber-600 mt-0.5 shrink-0" />{alert}
+                              </li>
+                            ))}
+                          </ul>
+                          <button type="button" onClick={() => navigate("edit-patient")} className="mt-2 text-[11px] text-primary hover:underline">Editar avisos</button>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                    <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" onClick={() => setReportDialogOpen(true)}>
+                      <FileDown className="w-3.5 h-3.5 mr-1" />Informe
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Más acciones"><MoreVertical className="w-3.5 h-3.5" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => navigate("edit-patient")}><Pencil className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
+                        {!isAdmin && isTO && !profileHasData && (
+                          patient.occupationalProfileEnabled ? (
+                            <DropdownMenuItem disabled={togglingProfile} onClick={() => setOccupationalProfileEnabled(false)}>
+                              <EyeOff className="w-4 h-4 mr-2" />Ocultar {isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem disabled={togglingProfile} onClick={() => setOccupationalProfileEnabled(true)}>
+                              <ListPlus className="w-4 h-4 mr-2" />Activar {isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
+                            </DropdownMenuItem>
+                          )
+                        )}
+                        <DropdownMenuItem variant="destructive" onClick={() => setDeleteDialogOpen(true)}><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Row 4: lo que se consulta a diario siempre visible (próxima
-                  cita y terapeutas); los datos de contacto, plegados. */}
-              <div className="flex items-center gap-x-4 gap-y-1.5 flex-wrap text-xs">
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="w-3 h-3 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Próxima cita:</span>
-                  {patient.nextAppointmentDate ? (
-                    <button type="button" onClick={() => navigate("calendar")} className="text-xs text-primary hover:underline font-medium">
-                      {formatDateTime(patient.nextAppointmentDate)}
-                    </button>
-                  ) : (
-                    <span className="font-medium">Sin cita</span>
+                <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 min-w-0">
+                    <Stethoscope className="w-3 h-3 shrink-0" />
+                    <span className="text-foreground font-medium truncate">{patient.diagnosis || "Sin diagnóstico"}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <User2 className="w-3 h-3" />
+                    {patient.therapistNames.length > 0 ? patient.therapistNames.join(", ") : <span className="italic">Sin terapeuta</span>}
+                  </span>
+                  {isDayCenter && (patient.referent || patient.careTeamReferent) && (
+                    <span>Referente: <span className="text-foreground">{patient.referent || "—"}</span> · Cuidados: <span className="text-foreground">{patient.careTeamReferent || "—"}</span></span>
                   )}
+                  <span>Desde {formatDate(patient.startDate)}</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="inline-flex items-center gap-0.5 hover:text-foreground">
+                        <Phone className="w-3 h-3" />Contacto<ChevronDown className="w-3 h-3" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-72 p-3 space-y-1.5 text-xs">
+                      <div className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-muted-foreground shrink-0" /><span className="text-muted-foreground">Teléfono:</span><span className="font-medium">{patient.phone ?? "—"}</span></div>
+                      <div className="flex items-start gap-1.5"><MapPin className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" /><span className="text-muted-foreground">Dirección:</span><span className="font-medium">{patient.address ? shortenAddress(patient.address) : "—"}</span></div>
+                      <div className="flex items-start gap-1.5"><User2 className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" /><span className="text-muted-foreground">Familiar:</span><span className="font-medium">{patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"}</span></div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-muted-foreground">Terapeutas:</span>
-                  {patient.therapistNames.length === 0 ? (
-                    <span className="text-muted-foreground italic">Sin asignar</span>
-                  ) : (
-                    patient.therapistNames.map((n) => (<Badge key={n} variant="secondary" className="text-[11px] py-0">{n}</Badge>))
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowContact((v) => !v)}
-                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                  aria-expanded={showContact}
-                >
-                  {showContact ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                  Datos de contacto
-                </button>
               </div>
-
-              {showContact && (
-                <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs rounded-md border bg-muted/20 px-3 py-2">
-                  <div className="flex items-center gap-1.5">
-                    <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
-                    <span className="text-muted-foreground">Teléfono:</span>
-                    <span className="font-medium">{patient.phone ?? "—"}</span>
-                  </div>
-                  <div className="flex items-start gap-1.5">
-                    <MapPin className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
-                    <span className="text-muted-foreground">Dirección:</span>
-                    <span className="font-medium">{patient.address ? shortenAddress(patient.address) : "—"}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 sm:col-span-2">
-                    <User2 className="w-3 h-3 text-muted-foreground shrink-0" />
-                    <span className="text-muted-foreground">Familiar de referencia:</span>
-                    <span className="font-medium">{patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"}</span>
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Divider (vertical en pantalla ancha; en pantallas medianas las
-                notas van debajo, separadas por una línea) */}
             {!isAdmin && <div className="w-px bg-border mx-4 self-stretch hidden lg:block" />}
             {!isAdmin && <div className="h-px bg-border lg:hidden" />}
             {!isAdmin && <QuickNotes patientId={patient.id} />}
           </div>
         </CardContent>
       </Card>
-      {activeTab !== "overview" && (
-        <div className="flex justify-end">
-          <button type="button" onClick={() => setHeaderExpanded(false)}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-            <ChevronUp className="w-3.5 h-3.5" />Ocultar ficha
-          </button>
-        </div>
-      )}
-      </div>
-      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="inline-flex w-full max-w-4xl items-center gap-1 overflow-x-auto bg-muted/60 py-1">
@@ -460,7 +395,6 @@ export function PatientDetailView() {
 
           {!isAdmin && <TabSep />}
           {!isAdmin && <TabsTrigger value="visits" className={cn(TAB_BASE, TAB_DAILY)}>Seguimientos</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="interventions" className={cn(TAB_BASE, TAB_DAILY, "gap-1")} title="Privadas: solo las ves tú">Intervenciones <Lock className="w-3 h-3 opacity-70" /></TabsTrigger>}
 
           {!isAdmin && <TabSep />}
           {!isAdmin && <TabsTrigger value="assessments" className={cn(TAB_BASE, TAB_MEASURE)}>Valoración</TabsTrigger>}
@@ -468,17 +402,6 @@ export function PatientDetailView() {
           {!isAdmin && <TabSep />}
           {!isAdmin && showOccupationalProfile && <TabsTrigger value="occupational-profile" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="intervention-plan" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}</TabsTrigger>}
-          {!isAdmin && isTO && !showOccupationalProfile && (
-            <button
-              type="button"
-              onClick={() => setOccupationalProfileEnabled(true)}
-              disabled={togglingProfile}
-              className="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-[#56608a] hover:bg-[#56608a]/10 disabled:opacity-50"
-              title={`Activar la pestaña ${isDayCenter ? "Historia de Vida" : "Perfil ocupacional"} para este/a usuario/a (opcional)`}
-            >
-              <Plus className="w-3 h-3" />{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
-            </button>
-          )}
         </TabsList>
 
         {/* Overview */}
@@ -504,10 +427,14 @@ export function PatientDetailView() {
             </div>
           )}
           {!isAdmin && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <button type="button" onClick={() => setActiveTab("visits")} className="text-left">
                 <KpiChip icon={Calendar} color="blue" label="Última visita"
                   value={visits && visits.length > 0 ? formatDate(visits[0].date) : "Sin visitas"} />
+              </button>
+              <button type="button" onClick={() => navigate("calendar")} className="text-left">
+                <KpiChip icon={Calendar} color="orange" label="Próxima cita"
+                  value={patient.nextAppointmentDate ? formatDateTime(patient.nextAppointmentDate) : "Sin cita"} />
               </button>
               <button type="button" onClick={() => setActiveTab("visits")} className="text-left">
                 <KpiChip icon={ClipboardList} color="green" label="Seguimientos"
@@ -517,10 +444,6 @@ export function PatientDetailView() {
                 <KpiChip icon={Activity} color="purple" label="Última evaluación"
                   value={assessments && assessments.length > 0 ? `${assessments[0].scale} · ${formatDate(assessments[0].date)}` : "Sin registrar"} />
               </button>
-              {showOccupationalProfile && <button type="button" onClick={() => setActiveTab("occupational-profile")} className="text-left">
-                <KpiChip icon={ListChecks} color="yellow" label={isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
-                  value={profileCompletion ? `${profileCompletion.filled}/${profileCompletion.total} campos` : "—"} />
-              </button>}
             </div>
           )}
 
@@ -533,7 +456,7 @@ export function PatientDetailView() {
 
           {/* Objetivos que se plantean con la persona + última valoración */}
           {!isAdmin && (
-            <div className="grid lg:grid-cols-2 gap-4">
+            <div className="grid lg:grid-cols-2 gap-4 items-stretch">
               <GoalsSummaryCard
                 generalObjective={patient.objective}
                 goals={patientGoals}
@@ -544,13 +467,8 @@ export function PatientDetailView() {
                 evaluations={evaluations ?? []}
                 onOpen={() => { setActiveTab("assessments"); setAssessmentSubTab("evaluation"); }}
               />
-            </div>
-          )}
-
-          {!isAdmin && (
-            <div className="grid lg:grid-cols-2 gap-4">
               {/* Pending tasks */}
-              <Card className="border-l-4" style={{ borderLeftColor: "var(--chip-blue-text)" }}>
+              <Card className={SUMMARY_CARD} style={{ borderLeftColor: "var(--chip-blue-text)" }}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <ClipboardList className="w-4 h-4 text-primary" />
@@ -575,7 +493,7 @@ export function PatientDetailView() {
                   })()}
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={SUMMARY_CARD} style={{ borderLeftColor: "#6e6587" }}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center justify-between">
                     Últimas evaluaciones
@@ -704,6 +622,20 @@ export function PatientDetailView() {
 
         {/* Visits — hidden for admin */}
         {!isAdmin && <TabsContent value="visits" className="mt-4 space-y-3">
+          {/* Selector: seguimientos compartidos / mis intervenciones privadas */}
+          <div className="inline-flex rounded-md border bg-muted/40 p-0.5">
+            <button type="button" onClick={() => setVisitsView("shared")}
+              className={cn("px-3 py-1.5 text-xs rounded-sm transition-colors", visitsView === "shared" ? "bg-background shadow-sm font-medium text-[#1a5c58]" : "text-muted-foreground hover:text-foreground")}>
+              Seguimientos
+            </button>
+            <button type="button" onClick={() => setVisitsView("private")} title="Privadas: solo las ves tú"
+              className={cn("px-3 py-1.5 text-xs rounded-sm transition-colors inline-flex items-center gap-1", visitsView === "private" ? "bg-background shadow-sm font-medium text-[#1a5c58]" : "text-muted-foreground hover:text-foreground")}>
+              Intervenciones <Lock className="w-3 h-3" />
+            </button>
+          </div>
+          {visitsView === "private" ? (
+            <InterventionsTab patientId={patient.id} patientName={patient.fullName} />
+          ) : (<>
           <div className="flex items-center justify-end gap-2 flex-wrap">
             {visitTherapists.length > 1 && (
               <Select value={visitsTherapist} onValueChange={setVisitsTherapist}>
@@ -759,7 +691,7 @@ export function PatientDetailView() {
                 );
               }
               return (
-              <Card key={v.id} className="overflow-hidden" style={{ borderLeftWidth: "4px", borderLeftColor: idx === 0 ? "var(--chip-blue-text)" : "var(--border)" }}>
+              <Card key={v.id} className="overflow-hidden py-0 gap-0" style={{ borderLeftWidth: "4px", borderLeftColor: idx === 0 ? "var(--chip-blue-text)" : "var(--border)" }}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div>
@@ -829,12 +761,9 @@ export function PatientDetailView() {
               );
             })
           )}
+          </>)}
         </TabsContent>}
 
-        {/* Interventions (private per professional) — hidden for admin */}
-        {!isAdmin && <TabsContent value="interventions" className="mt-4">
-          <InterventionsTab patientId={patient.id} patientName={patient.fullName} />
-        </TabsContent>}
 
 {/* Occupational profile — hidden for admin */}
 {!isAdmin && showOccupationalProfile && <TabsContent value="occupational-profile" className="mt-4">
@@ -1035,7 +964,7 @@ function GoalsSummaryCard({
   const active = goals.filter((g) => g.status === "En curso");
   const achieved = goals.filter((g) => g.status === "Conseguido").length;
   return (
-    <Card className="border-l-4" style={{ borderLeftColor: "#1a5c58" }}>
+    <Card className={SUMMARY_CARD} style={{ borderLeftColor: "#1a5c58" }}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center justify-between gap-2">
           <span className="flex items-center gap-2"><Flag className="w-4 h-4 text-[#1a5c58]" />Objetivos</span>
@@ -1092,7 +1021,7 @@ function EvaluationSummaryCard({
   const latest = evaluations[0];
   const excerpt = latest ? htmlToText(latest.generalData) : "";
   return (
-    <Card className="border-l-4" style={{ borderLeftColor: "#6e6587" }}>
+    <Card className={SUMMARY_CARD} style={{ borderLeftColor: "#6e6587" }}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center justify-between gap-2">
           <span className="flex items-center gap-2"><ClipboardPen className="w-4 h-4 text-[#6e6587]" />Valoración</span>
