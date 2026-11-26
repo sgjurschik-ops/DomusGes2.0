@@ -14,6 +14,7 @@ const SPECIALTY_STYLES: Record<Specialty, string> = {
   "Trabajo Social": "bg-blue-100 text-blue-900 border-blue-200",
   "Terapeuta Petö": "bg-indigo-100 text-indigo-900 border-indigo-200",
   Cuidados: "bg-cyan-100 text-cyan-900 border-cyan-200",
+  Logopedia: "bg-rose-100 text-rose-900 border-rose-200",
 };
 
 // Abreviaturas para sitios con poco espacio (listado de usuarios/as). El
@@ -27,6 +28,7 @@ const SPECIALTY_ABBR: Record<Specialty, string> = {
   "Trabajo Social": "TS",
   "Terapeuta Petö": "PET",
   Cuidados: "CU",
+  Logopedia: "LOG",
 };
 export { SPECIALTY_ABBR };
 

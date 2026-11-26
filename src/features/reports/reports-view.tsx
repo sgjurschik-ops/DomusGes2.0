@@ -33,6 +33,7 @@ const SPECIALTY_COLORS: Record<Specialty, string> = {
   "Trabajo Social": "#1a5c80",
   "Terapeuta Petö": "#4338ca",
   "Cuidados": "#0891b2",
+  "Logopedia": "#be123c",
 };
 const STATUS_COLORS: Record<PatientStatus, string> = {
   "Activo": "#10b981",

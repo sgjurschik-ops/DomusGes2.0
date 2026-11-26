@@ -29,6 +29,7 @@ const ALL_SPECIALTIES: Specialty[] = [
   "Trabajo Social",
   "Terapeuta Petö",
   "Cuidados",
+  "Logopedia",
 ];
 const STATUS_FILTERS: ("Todos" | PatientStatus)[] = ["Todos", "Activo", "En seguimiento", "Alta", "Pausado"];
 const RESOURCE_FILTERS: ("Todos" | (typeof RESOURCE_KEYS)[number])[] = ["Todos", ...RESOURCE_KEYS];

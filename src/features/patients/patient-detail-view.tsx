@@ -54,6 +54,8 @@ import { toast } from "@/hooks/use-toast";
 import { OccupationalProfileTab, getProfileCompletion } from "./occupational-profile-tab";
 import { InterventionPlanTab } from "./intervention-plan-tab";
 import { EvaluationTab } from "./evaluation-tab";
+import { PiaiTab } from "./piai-tab";
+import { PIAI_SECTIONS, type PiaiDTO } from "@/lib/piai";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ListPlus, EyeOff, Lock, ChevronDown, ChevronRight, ChevronUp, Flag, ClipboardPen } from "lucide-react";
 import type { PatientEvaluationDTO } from "@/lib/evaluations";
@@ -142,6 +144,14 @@ export function PatientDetailView() {
     () => (Array.isArray(occProfile?.goals) ? occProfile.goals : []),
     [occProfile],
   );
+
+  // PIAI (solo Centro de día; misma caché que la pestaña PIAI) → el Resumen
+  // muestra sus objetivos generales y los de cada profesional.
+  const { data: piais } = useQuery<PiaiDTO[]>({
+    queryKey: ["piai", selectedPatientId],
+    queryFn: () => fetcher(`/api/patients/${selectedPatientId}/piai`),
+    enabled: !!selectedPatientId && !isAdmin && isDayCenter,
+  });
 
   // Valoraciones escritas (misma caché que la pestaña Valoración).
   const { data: evaluations } = useQuery<PatientEvaluationDTO[]>({
@@ -412,7 +422,7 @@ export function PatientDetailView() {
 
           {!isAdmin && <TabSep />}
           {!isAdmin && showOccupationalProfile && <TabsTrigger value="occupational-profile" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}</TabsTrigger>}
-          {!isAdmin && <TabsTrigger value="intervention-plan" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}</TabsTrigger>}
+          {!isAdmin && <TabsTrigger value="intervention-plan" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "PIAI" : "Plan de intervención"}</TabsTrigger>}
         </TabsList>
 
         {/* Overview */}
@@ -471,8 +481,9 @@ export function PatientDetailView() {
               <GoalsSummaryCard
                 generalObjective={patient.objective}
                 goals={patientGoals}
+                piai={isDayCenter ? piais?.[0] ?? null : null}
                 onOpenPlan={() => setActiveTab("intervention-plan")}
-                planLabel={isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}
+                planLabel={isDayCenter ? "PIAI" : "Plan de intervención"}
               />
               <EvaluationSummaryCard
                 evaluations={evaluations ?? []}
@@ -782,7 +793,9 @@ export function PatientDetailView() {
 </TabsContent>}
 
 {!isAdmin && <TabsContent value="intervention-plan" className="mt-4">
-  <InterventionPlanTab patientId={patient.id} />
+  {/* Centro de día: el PIAI de equipo (los objetivos de TO del plan van
+      dentro, en su apartado). Resto: el Plan de intervención de siempre. */}
+  {isDayCenter ? <PiaiTab patientId={patient.id} /> : <InterventionPlanTab patientId={patient.id} />}
 </TabsContent>}
 
         {/* Assessments — hidden for admin */}
@@ -964,15 +977,62 @@ function parseSpecificGoals(raw: unknown): { status: string }[] {
 function GoalsSummaryCard({
   generalObjective,
   goals,
+  piai,
   onOpenPlan,
   planLabel,
 }: {
   generalObjective: string | null;
   goals: SummaryGoal[];
+  // Centro de día: objetivos del PIAI más reciente (generales + por profesional).
+  piai?: PiaiDTO | null;
   onOpenPlan: () => void;
   planLabel: string;
 }) {
   const active = goals.filter((g) => g.status === "En curso");
+  if (piai) {
+    const general = piai.generalObjectives.filter((o) => o.text.trim());
+    const byProfession = PIAI_SECTIONS.map((def) => ({
+      title: def.title,
+      items: def.objectivesFromPlan
+        ? active.map((g) => g.text).filter(Boolean)
+        : (piai.sections[def.key]?.content.objectives ?? []).filter((o) => o.trim()),
+    })).filter((x) => x.items.length > 0);
+    return (
+      <Card className={SUMMARY_CARD} style={{ borderLeftColor: "#1a5c58" }}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2"><Flag className="w-4 h-4 text-[#1a5c58]" />Objetivos</span>
+            <button type="button" className="text-xs font-normal text-primary hover:underline" onClick={onOpenPlan}>
+              PIAI · {formatDate(piai.date)} →
+            </button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2.5">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Generales</p>
+            {general.length === 0 ? <p className="text-sm text-muted-foreground">Sin objetivos generales.</p> : (
+              <ol className="space-y-1">
+                {general.map((o, i) => (
+                  <li key={o.id} className="flex items-start gap-2 text-sm">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0 bg-[#1a5c58]/10 text-[#1a5c58]">{i + 1}</span>
+                    <span className="leading-snug">{o.text}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+          {byProfession.map((p) => (
+            <div key={p.title}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">{p.title}</p>
+              <ul className="space-y-0.5">
+                {p.items.map((t, i) => <li key={i} className="text-sm leading-snug">· {t}</li>)}
+              </ul>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
   const achieved = goals.filter((g) => g.status === "Conseguido").length;
   return (
     <Card className={SUMMARY_CARD} style={{ borderLeftColor: "#1a5c58" }}>

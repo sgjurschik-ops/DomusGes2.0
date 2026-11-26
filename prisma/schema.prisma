@@ -39,6 +39,7 @@ model Professional {
   noteEntries      QuickNote[]
   tasks            Task[]
   evaluations      PatientEvaluation[]
+  piais            Piai[]
 
   @@index([isActive])
 }
@@ -86,6 +87,7 @@ model Patient {
   appointments  Appointment[]
   noteEntries   QuickNote[]
   evaluations   PatientEvaluation[]
+  piais         Piai[]
   occupationalProfile OccupationalProfile?
 
   @@index([status])
@@ -429,4 +431,44 @@ model PatientEvaluation {
   author       Professional @relation(fields: [authorId], references: [id])
 
   @@index([patientId, date])
+}
+
+// PIAI — Plan de Atención Individualizada (solo usuarios/as de Centro de día).
+// Documento de EQUIPO: información general + objetivos generales de la
+// persona + un apartado por profesión (ver PiaiSection) + revisiones.
+// Lo ve todo el equipo con acceso clínico. Puede haber varios (uno por año).
+model Piai {
+  id                String   @id @default(cuid())
+  patientId         String
+  createdById       String
+  date              DateTime // Fecha del PIA
+  status            String   @default("En elaboración") // En elaboración | Reunión | Devolución | Cerrado
+  general           String   @default("{}") // JSON: fechas, dependencia, servicio, prestaciones, descripción, aceptación…
+  generalObjectives String   @default("[]") // JSON: { id, text, actions: string[] }[]
+  reviews           String   @default("[]") // JSON: revisiones del PIA (ver src/lib/piai.ts)
+  updatedById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  patient   Patient        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdBy Professional   @relation(fields: [createdById], references: [id])
+  sections  PiaiSection[]
+
+  @@index([patientId, date])
+}
+
+// Apartado de UNA profesión dentro de un PIAI (Trabajo social, Terapia
+// ocupacional, Logopedia, Fisioterapia, Psicología, Neuropsicología,
+// Cuidados). Solo lo edita un/a profesional de esa profesión; lo leen todos.
+model PiaiSection {
+  id          String   @id @default(cuid())
+  piaiId      String
+  sectionKey  String   // ver PIAI_SECTIONS en src/lib/piai.ts
+  content     String   @default("{}") // JSON: responsable, valoración, objetivos, comentarios, sesiones, campos propios
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  piai Piai @relation(fields: [piaiId], references: [id], onDelete: Cascade)
+
+  @@unique([piaiId, sectionKey])
 }

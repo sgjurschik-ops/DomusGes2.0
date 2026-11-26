@@ -190,7 +190,19 @@ function fmtShortDate(d: string | null): string {
   return new Date(`${d}T00:00:00`).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export function InterventionPlanTab({ patientId }: { patientId: string }) {
+export function InterventionPlanTab({
+  patientId,
+  embedded = false,
+  readOnly = false,
+}: {
+  patientId: string;
+  // Dentro del PIAI (apartado de Terapia ocupacional): sin título propio ni
+  // descripción del plan; solo los objetivos.
+  embedded?: boolean;
+  // Solo lectura (p. ej. otros profesionales viendo el PIAI): sin añadir,
+  // editar ni marcar metas.
+  readOnly?: boolean;
+}) {
   const { data: patient } = usePatient(patientId);
   // Para usuarios/as de Centro de día esta pestaña se llama "Objetivos PIAI".
   const isDayCenter = patient?.resource === "Asociación EM" && patient?.emCategory === "Centro de día";
@@ -345,16 +357,16 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
               )}
             </div>
           </div>
-          <button type="button" onClick={() => setDialogTarget(i)} className="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted shrink-0" title="Editar objetivo">
+          <button type="button" hidden={readOnly} onClick={() => setDialogTarget(i)} className="text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted shrink-0" title="Editar objetivo">
             <Pencil className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Metas funcionales: se marcan con un clic y se guardan al momento */}
-        {(metas.length > 0 || !closed) && (
+        {(metas.length > 0 || (!closed && !readOnly)) && (
           <div className="pl-8 space-y-1">
             {metas.map((m) => (
-              <button key={m.id} type="button" disabled={saving} onClick={() => toggleMeta(i, m.id)}
+              <button key={m.id} type="button" disabled={saving || readOnly} onClick={() => toggleMeta(i, m.id)}
                 className="w-full flex items-center gap-2 text-left text-xs group">
                 <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${m.status === "Conseguido" ? "bg-green-100 border-green-400 text-green-600" : "border-muted-foreground/40 group-hover:border-foreground/60"}`}>
                   {m.status === "Conseguido" && <span className="text-[10px]">✓</span>}
@@ -362,7 +374,7 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
                 <span className={m.status === "Conseguido" ? "line-through text-muted-foreground" : ""}>{m.text}</span>
               </button>
             ))}
-            {!closed && (
+            {!closed && !readOnly && (
               <div className="flex items-center gap-1.5">
                 <Plus className="w-3 h-3 text-muted-foreground shrink-0" />
                 <input
@@ -387,7 +399,7 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
       {/* Barra superior: título + acciones */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="text-sm font-semibold">
-          {isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}
+          {embedded ? "Objetivos de terapia ocupacional" : isDayCenter ? "Objetivos PIAI" : "Plan de intervención"}
           {saving && <span className="ml-2 text-[11px] font-normal text-muted-foreground">Guardando…</span>}
         </h3>
         <div className="flex gap-2 flex-wrap">
@@ -396,19 +408,21 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
               <Button type="button" variant="ghost" size="sm" className="h-8 px-2.5 text-xs" onClick={() => setGasReportOpen(true)}>
                 <FileDown className="w-3.5 h-3.5 mr-1" />Informe GAS
               </Button>
-              <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" onClick={() => setGasSheetOpen(true)}>
+              <Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" hidden={readOnly} onClick={() => setGasSheetOpen(true)}>
                 <ClipboardCheck className="w-3.5 h-3.5 mr-1" />Valorar (GAS)
               </Button>
             </>
           )}
-          <Button type="button" size="sm" className="h-8 px-3 text-xs" onClick={() => setDialogTarget("new")}>
-            <Plus className="w-3.5 h-3.5 mr-1" />Añadir objetivo
-          </Button>
+          {!readOnly && (
+            <Button type="button" size="sm" className="h-8 px-3 text-xs" onClick={() => setDialogTarget("new")}>
+              <Plus className="w-3.5 h-3.5 mr-1" />Añadir objetivo
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Descripción del plan: discreta; solo ocupa sitio si tiene contenido */}
-      {editingDesc ? (
+      {embedded ? null : editingDesc ? (
         <div className="space-y-2 rounded-lg border p-3">
           <p className="text-xs font-semibold text-muted-foreground">Descripción del plan</p>
           <RichTextarea rows={3} tone="filled" value={descDraft} onChange={setDescDraft} />
@@ -423,12 +437,12 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
       ) : hasDesc ? (
         <div className="group relative rounded-lg bg-muted/30 px-3 py-2">
           <div className="text-sm prose prose-sm max-w-none pr-6" dangerouslySetInnerHTML={{ __html: desiredImprovements }} />
-          <button type="button" onClick={() => { setDescDraft(desiredImprovements); setEditingDesc(true); }}
+          <button type="button" hidden={readOnly} onClick={() => { setDescDraft(desiredImprovements); setEditingDesc(true); }}
             className="absolute top-2 right-2 text-muted-foreground hover:text-foreground" title="Editar descripción">
             <Pencil className="w-3.5 h-3.5" />
           </button>
         </div>
-      ) : (
+      ) : readOnly ? null : (
         <button type="button" onClick={() => { setDescDraft(""); setEditingDesc(true); }} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
           + Añadir una descripción del plan (opcional)
         </button>
@@ -438,7 +452,7 @@ export function InterventionPlanTab({ patientId }: { patientId: string }) {
       {goals.length === 0 ? (
         <div className="rounded-lg border border-dashed px-4 py-8 text-center space-y-2">
           <p className="text-sm text-muted-foreground">Todavía no hay objetivos.</p>
-          <Button type="button" size="sm" variant="outline" onClick={() => setDialogTarget("new")}>
+          <Button type="button" size="sm" variant="outline" hidden={readOnly} onClick={() => setDialogTarget("new")}>
             <Plus className="w-3.5 h-3.5 mr-1" />Añadir el primer objetivo
           </Button>
         </div>

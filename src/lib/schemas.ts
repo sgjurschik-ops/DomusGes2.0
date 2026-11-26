@@ -5,7 +5,7 @@ import { z } from "zod";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-export const SPECIALTIES = ["Fisioterapia", "Psicología", "Neuropsicología", "T. Ocupacional", "Trabajo Social", "Terapeuta Petö", "Cuidados"] as const;
+export const SPECIALTIES = ["Fisioterapia", "Psicología", "Neuropsicología", "T. Ocupacional", "Trabajo Social", "Terapeuta Petö", "Cuidados", "Logopedia"] as const;
 export const PATIENT_STATUSES = ["Activo", "En seguimiento", "Alta", "Pausado"] as const;
 
 // Recurso/centro de procedencia del/de la usuario/a. Extensible a propósito: para
@@ -59,6 +59,7 @@ export const PROFESSIONAL_ROLES = [
   "Trabajo Social",
   "Terapeuta Petö",
   "Cuidados",
+  "Logopedia",
   "Administrador",
 ] as const;
 export const APPOINTMENT_STATUSES = [
@@ -133,6 +134,7 @@ export const PROFESSION_SCALES: Record<string, readonly string[]> = {
   "Neuropsicología": [],
   "Trabajo Social": [],
   "Terapeuta Petö": [],
+  "Logopedia": [],
   "Cuidados": [],
   "Administrador": [],
 };
