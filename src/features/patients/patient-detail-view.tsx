@@ -136,8 +136,9 @@ export function PatientDetailView() {
   const TAB_ENTRY = "text-slate-600 hover:bg-slate-200/60 data-[state=active]:bg-slate-700 data-[state=active]:text-white";
   const TAB_DAILY = "text-[#1a5c58] hover:bg-[#1a5c58]/10 data-[state=active]:bg-[#1a5c58] data-[state=active]:text-white";
   const TAB_DOC = "text-indigo-600 hover:bg-indigo-100/70 data-[state=active]:bg-indigo-600 data-[state=active]:text-white";
-  const TAB_MEASURE = "text-violet-600 hover:bg-violet-100/70 data-[state=active]:bg-violet-600 data-[state=active]:text-white";
-  const SUBTAB = "px-4 text-violet-600 data-[state=active]:bg-violet-600 data-[state=active]:text-white data-[state=active]:shadow-sm";
+  // Medición en morado APAGADO (gris-violeta), menos llamativo que el violeta puro.
+  const TAB_MEASURE = "text-[#6e6587] hover:bg-[#6e6587]/10 data-[state=active]:bg-[#6e6587] data-[state=active]:text-white";
+  const SUBTAB = "px-4 text-[#6e6587] data-[state=active]:bg-[#6e6587] data-[state=active]:text-white data-[state=active]:shadow-sm";
 
   // Exporta a PDF imprimible todos los seguimientos de este/a usuario/a,
   // reutilizando los datos ya cargados (no vuelve a pedir nada al servidor).

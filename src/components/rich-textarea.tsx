@@ -9,9 +9,13 @@ interface RichTextareaProps {
   onChange: (html: string) => void;
   rows?: number;
   placeholder?: string;
+  // "filled": zona de escritura sombreada (más contraste sobre fondo blanco).
+  // Por defecto "plain", igual que siempre, para no cambiar el resto de pantallas.
+  tone?: "plain" | "filled";
 }
 
-export function RichTextarea({ value, onChange, rows = 3, placeholder }: RichTextareaProps) {
+export function RichTextarea({ value, onChange, rows = 3, placeholder, tone = "plain" }: RichTextareaProps) {
+  const filled = tone === "filled";
   const ref = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -102,8 +106,8 @@ export function RichTextarea({ value, onChange, rows = 3, placeholder }: RichTex
   useEffect(() => { return () => { recognitionRef.current?.stop(); }; }, []);
 
   return (
-    <div className={`rounded-md border ${focused ? "ring-2 ring-ring" : ""} ${!value ? "border-dashed border-muted-foreground/40" : ""}`}>
-      <div className="flex items-center gap-0.5 px-2 py-1 border-b bg-muted/30">
+    <div className={`rounded-md border overflow-hidden ${focused ? "ring-2 ring-ring" : ""} ${filled ? "border-slate-300 shadow-sm" : !value ? "border-dashed border-muted-foreground/40" : ""}`}>
+      <div className={`flex items-center gap-0.5 px-2 border-b ${filled ? "py-0.5 bg-slate-100" : "py-1 bg-muted/30"}`}>
         <button type="button" className="px-1.5 py-0.5 rounded text-xs font-bold hover:bg-muted" onClick={() => handleFormat("bold")} title="Negrita"><b>N</b></button>
         <button type="button" className="px-1.5 py-0.5 rounded text-xs italic hover:bg-muted" onClick={() => handleFormat("italic")} title="Cursiva"><i>K</i></button>
         <button type="button" className="px-1.5 py-0.5 rounded text-xs underline hover:bg-muted" onClick={() => handleFormat("underline")} title="Subrayado"><u>S</u></button>
@@ -114,7 +118,7 @@ export function RichTextarea({ value, onChange, rows = 3, placeholder }: RichTex
         </button>
       </div>
       <div ref={ref} contentEditable suppressContentEditableWarning
-        className="px-3 py-2 text-sm outline-none min-h-[2.5rem] [&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-muted-foreground"
+        className={`px-3 py-2 text-sm outline-none min-h-[2.5rem] [&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-muted-foreground ${filled ? (focused ? "bg-white" : "bg-slate-50") : ""}`}
         style={{ minHeight: `${rows * 1.5}rem` }}
         data-placeholder={placeholder ?? ""}
         onFocus={() => setFocused(true)}

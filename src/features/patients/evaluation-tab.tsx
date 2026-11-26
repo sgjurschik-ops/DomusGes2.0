@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetcher, useMe } from "@/hooks/api";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,7 +37,7 @@ import {
   type PatientEvaluationDTO,
 } from "@/lib/evaluations";
 import type { AssessmentDTO } from "@/types/domain";
-import { ClipboardList, Copy, FilePlus2, FileText, Gauge, Save, Trash2, Check } from "lucide-react";
+import { ClipboardList, Copy, FilePlus2, Gauge, Save, Trash2, Check } from "lucide-react";
 
 type Drafts = Record<EvaluationTextField, string>;
 
@@ -263,82 +263,84 @@ export function EvaluationTab({
         </Card>
       ) : (
         <>
-          {/* Cabecera: selector de valoración, fecha y acciones */}
-          <Card>
-            <CardContent className="p-4 flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Valoración</Label>
-                <Select value={selected.id} onValueChange={requestSwitch}>
-                  <SelectTrigger className="h-8 w-64 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {list.map((e, i) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {i === list.length - 1 ? "Valoración inicial" : "Revaloración"} · {formatDate(e.date)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="evaluation-date" className="text-xs text-muted-foreground">Fecha</Label>
-                <Input
-                  id="evaluation-date"
-                  type="date"
-                  className="h-8 w-40 text-sm"
-                  value={selected.date}
-                  disabled={changeDate.isPending}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (/^\d{4}-\d{2}-\d{2}$/.test(v) && v !== selected.date) {
-                      changeDate.mutate({ id: selected.id, date: v });
-                    }
-                  }}
-                />
-              </div>
-              <div className="flex-1 min-w-[180px] text-[11px] text-muted-foreground pb-1.5">
-                <span className="font-medium text-foreground">{isInitial ? "Valoración inicial" : "Revaloración"}</span>
-                {" · "}creada por {selected.authorName}
-                {selected.updatedByName && <> · última edición: {selected.updatedByName}, {formatDate(selected.updatedAt)}</>}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onGoToScales}>
-                  <Gauge className="w-3.5 h-3.5 mr-1" />Ir a escalas
-                </Button>
-                <Button size="sm" className="h-8 text-xs" onClick={openNewDialog}>
-                  <FilePlus2 className="w-3.5 h-3.5 mr-1" />Nueva valoración
-                </Button>
-                {me?.id === selected.authorId && (
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    aria-label="Eliminar valoración" onClick={() => setDeleteOpen(true)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Cabecera compacta: selector de valoración, fecha, autoría y acciones */}
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2">
+            <Select value={selected.id} onValueChange={requestSwitch}>
+              <SelectTrigger className="h-8 w-60 text-sm font-medium" aria-label="Valoración">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {list.map((e, i) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {i === list.length - 1 ? "Valoración inicial" : "Revaloración"} · {formatDate(e.date)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              type="date"
+              aria-label="Fecha de la valoración"
+              className="h-8 w-36 text-sm"
+              value={selected.date}
+              disabled={changeDate.isPending}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (/^\d{4}-\d{2}-\d{2}$/.test(v) && v !== selected.date) {
+                  changeDate.mutate({ id: selected.id, date: v });
+                }
+              }}
+            />
+            <span className="flex-1 min-w-[160px] text-[11px] text-muted-foreground leading-tight">
+              {isInitial ? "Valoración inicial" : "Revaloración"} · {selected.authorName}
+              {selected.updatedByName && <> · editada por {selected.updatedByName}, {formatDate(selected.updatedAt)}</>}
+            </span>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onGoToScales}>
+              <Gauge className="w-3.5 h-3.5 mr-1" />Escalas
+            </Button>
+            <Button size="sm" className="h-8 text-xs" onClick={openNewDialog}>
+              <FilePlus2 className="w-3.5 h-3.5 mr-1" />Nueva valoración
+            </Button>
+            {me?.id === selected.authorId && (
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                aria-label="Eliminar valoración" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
 
-          {/* Bloques */}
-          {EVALUATION_SECTIONS.map((section) => {
-            const dirty = isSectionDirty(section);
-            const saving = saveFields.isPending && saveFields.variables?.sectionKey === section.key;
-            return (
-              <Card key={section.key} className={cn(dirty && "border-amber-300")}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-3">
+          {/* Bloques: todos en una sola tarjeta, separados por líneas, con el
+              título a la izquierda en pantallas anchas para ahorrar altura. */}
+          <Card className="overflow-hidden py-0 gap-0">
+            {EVALUATION_SECTIONS.map((section, idx) => {
+              const dirty = isSectionDirty(section);
+              const saving = saveFields.isPending && saveFields.variables?.sectionKey === section.key;
+              const sectionScales = section.scales.filter((sc) => allowedScales.includes(sc));
+              return (
+                <section
+                  key={section.key}
+                  className={cn(
+                    "grid gap-x-4 gap-y-2 px-4 py-3 lg:grid-cols-[11rem_1fr]",
+                    idx > 0 && "border-t",
+                    dirty && "bg-amber-50/60",
+                  )}
+                >
+                  {/* Título + guardar */}
+                  <div className="flex lg:flex-col items-start justify-between lg:justify-start gap-1.5">
                     <div>
-                      <CardTitle className="text-sm">{section.title}</CardTitle>
-                      <CardDescription className="text-xs">{section.hint}</CardDescription>
+                      <h3 className="text-sm font-semibold leading-tight">{section.title}</h3>
+                      <p className="hidden lg:block text-[11px] text-muted-foreground leading-snug mt-0.5">{section.hint}</p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Button size="sm" variant={dirty ? "default" : "outline"} className="h-7 px-2.5 text-xs" disabled={!dirty || saving}
+                        onClick={() => {
+                          const fields: Partial<Drafts> = {};
+                          for (const x of section.fields) fields[x.field] = normalizeHtml(drafts[x.field]);
+                          saveFields.mutate({ id: selected.id, fields, sectionKey: section.key });
+                        }}>
+                        <Save className="w-3 h-3 mr-1" />{saving ? "Guardando…" : "Guardar"}
+                      </Button>
                       {dirty ? (
-                        <span className="text-[11px] text-amber-700">Cambios sin guardar</span>
-                      ) : savedSection === section.key ? (
-                        <span className="text-[11px] text-emerald-700 inline-flex items-center gap-0.5"><Check className="w-3 h-3" />Guardado</span>
-                      ) : null}
-                      {dirty && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs"
+                        <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
                           onClick={() => setDrafts((d) => {
                             if (!d) return d;
                             const next = { ...d };
@@ -346,49 +348,46 @@ export function EvaluationTab({
                             return next;
                           })}>
                           Descartar
-                        </Button>
-                      )}
-                      <Button size="sm" className="h-7 text-xs" disabled={!dirty || saving}
-                        onClick={() => {
-                          const fields: Partial<Drafts> = {};
-                          for (const x of section.fields) fields[x.field] = normalizeHtml(drafts[x.field]);
-                          saveFields.mutate({ id: selected.id, fields, sectionKey: section.key });
-                        }}>
-                        <Save className="w-3.5 h-3.5 mr-1" />{saving ? "Guardando…" : "Guardar"}
-                      </Button>
+                        </button>
+                      ) : savedSection === section.key ? (
+                        <span className="text-[11px] text-emerald-700 inline-flex items-center gap-0.5"><Check className="w-3 h-3" />Guardado</span>
+                      ) : null}
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {section.scales.some((sc) => allowedScales.includes(sc)) && (
-                    <ScaleResultsBox
-                      scales={section.scales.filter((sc) => allowedScales.includes(sc))}
-                      latestByScale={latestByScale}
-                      onGoToScales={onGoToScales}
-                      onOpenAssessment={onOpenAssessment}
-                    />
-                  )}
-                  <div className={cn("grid gap-3", section.fields.length > 1 && "lg:grid-cols-2")}>
-                    {section.fields.map((x) => (
-                      <div key={x.field} className="space-y-1">
-                        {x.label && <Label className="text-xs font-semibold">{x.label}</Label>}
-                        <RichTextarea
-                          key={`${selected.id}-${x.field}`}
-                          value={drafts[x.field]}
-                          onChange={(html) => {
-                            setSavedSection(null);
-                            setDrafts((d) => (d ? { ...d, [x.field]: html } : d));
-                          }}
-                          rows={4}
-                          placeholder={x.placeholder}
-                        />
-                      </div>
-                    ))}
+
+                  {/* Escalas + texto */}
+                  <div className="space-y-2 min-w-0">
+                    {sectionScales.length > 0 && (
+                      <ScaleResultsRow
+                        scales={sectionScales}
+                        latestByScale={latestByScale}
+                        onGoToScales={onGoToScales}
+                        onOpenAssessment={onOpenAssessment}
+                      />
+                    )}
+                    <div className={cn("grid gap-3", section.fields.length > 1 && "md:grid-cols-2")}>
+                      {section.fields.map((x) => (
+                        <div key={x.field} className="space-y-1 min-w-0">
+                          {x.label && <p className="text-xs font-semibold text-muted-foreground">{x.label}</p>}
+                          <RichTextarea
+                            key={`${selected.id}-${x.field}`}
+                            tone="filled"
+                            value={drafts[x.field]}
+                            onChange={(html) => {
+                              setSavedSection(null);
+                              setDrafts((d) => (d ? { ...d, [x.field]: html } : d));
+                            }}
+                            rows={3}
+                            placeholder={x.placeholder}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                </section>
+              );
+            })}
+          </Card>
         </>
       )}
 
@@ -451,7 +450,10 @@ function sortEvaluations(list: PatientEvaluationDTO[]): PatientEvaluationDTO[] {
   return [...list].sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt.localeCompare(a.updatedAt));
 }
 
-function ScaleResultsBox({
+// Resultados de escalas del bloque en una sola línea de "fichas" compactas
+// (escala · resultado · fecha). Clic en una ficha → abre la evaluación.
+// Tono gris-violeta apagado, a juego con las pestañas de Valoración.
+function ScaleResultsRow({
   scales,
   latestByScale,
   onGoToScales,
@@ -466,40 +468,33 @@ function ScaleResultsBox({
   const isQualitative = (scale: string) => (QUALITATIVE_SCALES as readonly string[]).includes(scale);
 
   return (
-    <div className="rounded-md border border-violet-200 bg-violet-50/50 dark:bg-violet-950/20 px-3 py-2">
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-[10px] uppercase tracking-wide font-bold text-violet-700 dark:text-violet-300 flex items-center gap-1">
-          <Gauge className="w-3 h-3" /> Resultados de escalas
-        </span>
-        <button type="button" onClick={onGoToScales} className="text-[11px] text-violet-700 dark:text-violet-300 hover:underline">
-          Pasar escala →
-        </button>
-      </div>
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#6e6587]">
+        <Gauge className="w-3 h-3" />Escalas:
+      </span>
       {items.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground italic">Sin escalas registradas en esta área.</p>
+        <span className="text-[11px] text-muted-foreground italic">sin registrar</span>
       ) : (
-        <ul className="divide-y divide-violet-100 dark:divide-violet-900">
-          {items.map((a) => (
-            <li key={a.id}>
-              <button
-                type="button"
-                onClick={() => onOpenAssessment(a.id)}
-                className="w-full flex items-start gap-2 py-1 text-left hover:bg-violet-100/60 dark:hover:bg-violet-900/30 rounded-sm px-1 -mx-1"
-                title="Ver evaluación"
-              >
-                <FileText className="w-3 h-3 mt-1 text-violet-500 shrink-0" />
-                <span className="text-xs font-medium w-32 shrink-0">{a.scale}</span>
-                {isQualitative(a.scale) ? (
-                  <span className="text-xs text-muted-foreground flex-1 line-clamp-2">{a.notes || a.score}</span>
-                ) : (
-                  <span className="text-xs font-mono flex-1">{a.score}</span>
-                )}
-                <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">{formatDate(a.date)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        items.map((a) => {
+          const value = isQualitative(a.scale) ? (a.notes || a.score) : a.score;
+          return (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => onOpenAssessment(a.id)}
+              title={`${a.scale}: ${value} (${formatDate(a.date)}) — ver evaluación`}
+              className="inline-flex items-center gap-1 max-w-[22rem] rounded-full border border-[#ddd8e6] bg-[#f5f3f8] px-2 py-0.5 text-[11px] text-slate-700 hover:bg-[#ebe7f1] transition-colors"
+            >
+              <span className="font-semibold text-[#5b536f] shrink-0">{a.scale}</span>
+              <span className="truncate font-mono">{value}</span>
+              <span className="text-muted-foreground shrink-0">· {formatDate(a.date)}</span>
+            </button>
+          );
+        })
       )}
+      <button type="button" onClick={onGoToScales} className="text-[11px] text-[#6e6587] hover:underline ml-0.5">
+        + Pasar escala
+      </button>
     </div>
   );
 }
