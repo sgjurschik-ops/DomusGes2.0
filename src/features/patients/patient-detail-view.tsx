@@ -285,13 +285,13 @@ export function PatientDetailView() {
         <CardContent className="p-3 sm:p-4">
           <div className="flex flex-col lg:flex-row gap-3 lg:gap-0">
             <div className="flex-1 min-w-0 flex items-start gap-3">
-              <Avatar name={patient.fullName} color={patient.color} size={40} />
-              <div className="min-w-0 flex-1 space-y-1">
+              <Avatar name={patient.fullName} color={patient.color} size={48} />
+              <div className="min-w-0 flex-1 space-y-2">
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-x-2.5 gap-y-0.5 flex-wrap">
-                      <h2 className="text-lg font-bold leading-tight">{patient.fullName}</h2>
-                      <span className="text-xs text-muted-foreground">
+                      <h2 className="text-xl font-bold leading-tight">{patient.fullName}</h2>
+                      <span className="text-sm text-muted-foreground">
                         {[patient.specialty, patient.resource, isEM ? patient.emCategory : null].filter(Boolean).join(" · ")}
                         {" · "}
                         <span className="inline-flex items-center gap-1">
@@ -353,23 +353,34 @@ export function PatientDetailView() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1 min-w-0">
-                    <Stethoscope className="w-3 h-3 shrink-0" />
-                    <span className="text-foreground font-medium truncate">{patient.diagnosis || "Sin diagnóstico"}</span>
+                {/* Datos clave: diagnóstico destacado y, debajo, el resto en
+                    etiqueta + valor, con texto más grande y más contraste. */}
+                <div className="rounded-md bg-accent/40 px-3 py-1.5 flex items-start gap-2 text-sm">
+                  <Stethoscope className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <span className="text-muted-foreground shrink-0">Diagnóstico:</span>
+                  <span className="font-medium">{patient.diagnosis || <span className="italic font-normal text-muted-foreground">sin indicar</span>}</span>
+                </div>
+                <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-[13px]">
+                  <span className="inline-flex items-center gap-1.5">
+                    <User2 className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">Terapeutas:</span>
+                    <span className="font-medium">{patient.therapistNames.length > 0 ? patient.therapistNames.join(", ") : "Sin asignar"}</span>
                   </span>
-                  <span className="inline-flex items-center gap-1">
-                    <User2 className="w-3 h-3" />
-                    {patient.therapistNames.length > 0 ? patient.therapistNames.join(", ") : <span className="italic">Sin terapeuta</span>}
-                  </span>
-                  {isDayCenter && (patient.referent || patient.careTeamReferent) && (
-                    <span>Referente: <span className="text-foreground">{patient.referent || "—"}</span> · Cuidados: <span className="text-foreground">{patient.careTeamReferent || "—"}</span></span>
+                  {isDayCenter && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="text-muted-foreground">Referente:</span><span className="font-medium">{patient.referent || "—"}</span>
+                      <span className="text-muted-foreground ml-1.5">Cuidados:</span><span className="font-medium">{patient.careTeamReferent || "—"}</span>
+                    </span>
                   )}
-                  <span>Desde {formatDate(patient.startDate)}</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">Desde:</span>
+                    <span className="font-medium">{formatDate(patient.startDate)}</span>
+                  </span>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button type="button" className="inline-flex items-center gap-0.5 hover:text-foreground">
-                        <Phone className="w-3 h-3" />Contacto<ChevronDown className="w-3 h-3" />
+                      <button type="button" className="inline-flex items-center gap-1 text-primary hover:underline">
+                        <Phone className="w-3.5 h-3.5" />Contacto<ChevronDown className="w-3.5 h-3.5" />
                       </button>
                     </PopoverTrigger>
                     <PopoverContent align="start" className="w-72 p-3 space-y-1.5 text-xs">
