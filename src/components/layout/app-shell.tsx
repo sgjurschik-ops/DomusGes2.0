@@ -8,7 +8,7 @@ import { useCenter } from "@/store/center";
 import { RESOURCES } from "@/lib/schemas";
 import { Sidebar, SidebarToggle } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
-import { Plus, Clock, Activity } from "lucide-react";
+import { ArrowLeft, Plus, Clock, Activity } from "lucide-react";
 import { MessagingTrigger } from "@/components/messaging-panel";
 import { TasksTrigger } from "@/components/tasks-panel";
 
@@ -77,7 +77,7 @@ function useIdleTimeout() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { status, isLoading } = useCurrentSession();
-  const { view, navigate } = useNav();
+  const { view, navigate, back } = useNav();
   const { showWarning, dismissWarning } = useIdleTimeout();
   const { activeResource, setActiveResource } = useCenter();
 
@@ -134,8 +134,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-20 bg-background/80 backdrop-blur border-b border-border">
-          <div className="flex items-center gap-3 px-4 lg:px-6 py-3">
+          <div className="flex items-center gap-3 px-4 lg:px-6 py-2.5">
             <SidebarToggle />
+            {/* En la ficha del/de la usuario/a, "Volver" va aquí arriba (antes
+                ocupaba una línea propia dentro de la página). */}
+            {view === "patient-detail" && (
+              <button type="button" onClick={back} aria-label="Volver"
+                className="inline-flex items-center justify-center w-8 h-8 -ml-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted">
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
             <h1 className="text-lg font-semibold text-foreground flex-1 truncate">{title}</h1>
             {showNewPatient && (
               <Button size="sm" onClick={() => navigate("new-patient")}>

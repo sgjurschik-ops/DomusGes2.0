@@ -203,30 +203,27 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
     <div className="space-y-4">
       {/* ── Cabecera única: qué PIA es, su estado y el historial ── */}
       <Card className="py-0 gap-0">
-        <div className="flex items-start gap-3 px-4 pt-3 pb-2.5">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold leading-tight">PIA general · {formatDate(piai.date)}</h3>
-            {/* Entregado a la persona: un clic para marcar/desmarcar */}
-            <button type="button" disabled={patchQuiet.isPending}
-              onClick={() => {
-                const delivered = !!piai.general.deliveredDate;
-                if (delivered && !confirm("¿Quitar la marca de entregado?")) return;
-                patchQuiet.mutate({ general: { ...piai.general, deliveredDate: delivered ? "" : todayStr() } },
-                  { onSuccess: () => toast({ title: delivered ? "Marcado como no entregado" : "Marcado como entregado a la persona" }) });
-              }}
-              className={cn("mt-1.5 inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-sm transition-colors",
-                piai.general.deliveredDate ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100" : "border-dashed hover:bg-muted text-muted-foreground")}>
-              <span className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0",
-                piai.general.deliveredDate ? "bg-emerald-600 border-emerald-600 text-white" : "border-muted-foreground/50 bg-background")}>
-                {piai.general.deliveredDate && <Check className="w-3 h-3" strokeWidth={3} />}
-              </span>
-              {piai.general.deliveredDate ? `Entregado a la persona el ${formatDate(piai.general.deliveredDate)}` : "Marcar como entregado a la persona"}
-            </button>
-            <div className="flex items-center gap-1.5 flex-wrap mt-1.5 text-xs">
-              <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 font-medium", STATUS_STYLE[piai.status])}>{piai.status}</span>
-              <span className="text-muted-foreground">· modificado {lastEdited}{piai.lastEditedByName ? ` por ${piai.lastEditedByName}` : ""}</span>
-            </div>
-          </div>
+        {/* Todo en una fila: título · estado · entregado · modificado */}
+        <div className="flex items-center gap-x-3 gap-y-1.5 flex-wrap px-4 py-2">
+          <h3 className="text-base font-semibold leading-tight">PIA general · {formatDate(piai.date)}</h3>
+          <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium", STATUS_STYLE[piai.status])}>{piai.status}</span>
+          {/* Entregado a la persona: un clic para marcar/desmarcar */}
+          <button type="button" disabled={patchQuiet.isPending}
+            onClick={() => {
+              const delivered = !!piai.general.deliveredDate;
+              if (delivered && !confirm("¿Quitar la marca de entregado?")) return;
+              patchQuiet.mutate({ general: { ...piai.general, deliveredDate: delivered ? "" : todayStr() } },
+                { onSuccess: () => toast({ title: delivered ? "Marcado como no entregado" : "Marcado como entregado a la persona" }) });
+            }}
+            className={cn("inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs transition-colors",
+              piai.general.deliveredDate ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100" : "border-dashed hover:bg-muted text-muted-foreground")}>
+            <span className={cn("w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0",
+              piai.general.deliveredDate ? "bg-emerald-600 border-emerald-600 text-white" : "border-muted-foreground/50 bg-background")}>
+              {piai.general.deliveredDate && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
+            </span>
+            {piai.general.deliveredDate ? `Entregado el ${formatDate(piai.general.deliveredDate)}` : "Marcar como entregado"}
+          </button>
+          <span className="text-[11px] text-muted-foreground flex-1 min-w-[140px]">modificado {lastEdited}{piai.lastEditedByName ? ` por ${piai.lastEditedByName}` : ""}</span>
           <Button size="sm" variant="outline" className="h-8 text-xs shrink-0" asChild>
             <a href={`/api/patients/${patientId}/piai/${piai.id}/word`}><FileDown className="w-3.5 h-3.5 mr-1" />Word</a>
           </Button>
@@ -248,7 +245,7 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
         </div>
 
         {/* Historial como línea de tiempo */}
-        <div className="flex items-center gap-y-2 flex-wrap px-4 py-2.5 border-t text-xs">
+        <div className="flex items-center gap-y-1 flex-wrap px-4 py-1.5 border-t text-xs">
           <span className="text-muted-foreground mr-3 inline-flex items-center gap-1"><History className="w-3.5 h-3.5" />Historial</span>
           {history.map((h, i) => {
             const active = h.piaiId === piai.id && (h.kind === "pia" ? !highlightReview : highlightReview === h.reviewId);

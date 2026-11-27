@@ -278,29 +278,23 @@ export function PatientDetailView() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Back */}
-      <button
-        onClick={back}
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="w-4 h-4" /> Volver
-      </button>
+    <div className="space-y-3">
+      {/* "Volver" está en la barra superior de la app (ahorra una línea). */}
 
       {/* Cabecera COMPACTA y FIJA: igual en todas las pestañas (ya no se
           pliega/despliega). Identidad + datos clave en dos líneas, avisos
           agrupados en un solo botón, contacto en un desplegable, y las notas
           rápidas siempre visibles a la derecha. */}
       <Card className="py-0 gap-0">
-        <CardContent className="p-3 sm:p-4">
+        <CardContent className="px-3 py-2.5 sm:px-4">
           <div className="flex flex-col lg:flex-row gap-3 lg:gap-0">
             <div className="flex-1 min-w-0 flex items-start gap-3">
-              <Avatar name={patient.fullName} color={patient.color} size={48} />
-              <div className="min-w-0 flex-1 space-y-2">
+              <Avatar name={patient.fullName} color={patient.color} size={40} />
+              <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-x-2.5 gap-y-0.5 flex-wrap">
-                      <h2 className="text-xl font-bold leading-tight">{patient.fullName}</h2>
+                      <h2 className="text-lg font-bold leading-tight">{patient.fullName}</h2>
                       <span className="text-sm text-muted-foreground">
                         {[patient.specialty, patient.resource, isEM ? patient.emCategory : null].filter(Boolean).join(" · ")}
                         {" · "}
@@ -363,14 +357,14 @@ export function PatientDetailView() {
                   </div>
                 </div>
 
-                {/* Datos clave: diagnóstico destacado y, debajo, el resto en
-                    etiqueta + valor, con texto más grande y más contraste. */}
-                <div className="rounded-md bg-accent/40 px-3 py-1.5 flex items-start gap-2 text-sm">
-                  <Stethoscope className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-                  <span className="text-muted-foreground shrink-0">Diagnóstico:</span>
-                  <span className="font-medium">{patient.diagnosis || <span className="italic font-normal text-muted-foreground">sin indicar</span>}</span>
-                </div>
+                {/* Datos clave en UNA línea (se parte sola si no cabe):
+                    diagnóstico resaltado, terapeutas, referentes, inicio, contacto. */}
                 <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-[13px]">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-accent/50 px-2 py-0.5">
+                    <Stethoscope className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground">Diagnóstico:</span>
+                    <span className="font-medium">{patient.diagnosis || <span className="italic font-normal text-muted-foreground">sin indicar</span>}</span>
+                  </span>
                   <span className="inline-flex items-center gap-1.5">
                     <User2 className="w-3.5 h-3.5 text-muted-foreground" />
                     <span className="text-muted-foreground">Terapeutas:</span>
@@ -426,7 +420,7 @@ export function PatientDetailView() {
         </TabsList>
 
         {/* Overview */}
-        <TabsContent value="overview" className="mt-4 space-y-4">
+        <TabsContent value="overview" className="mt-3 space-y-4">
           {!patient.resource && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
               <p className="text-sm text-amber-900 flex-1">
@@ -643,7 +637,7 @@ export function PatientDetailView() {
         </TabsContent>
 
         {/* Visits — hidden for admin */}
-        {!isAdmin && <TabsContent value="visits" className="mt-4 space-y-3">
+        {!isAdmin && <TabsContent value="visits" className="mt-3 space-y-3">
           {/* Selector: seguimientos compartidos / mis intervenciones privadas */}
           <div className="inline-flex rounded-md border bg-muted/40 p-0.5">
             <button type="button" onClick={() => setVisitsView("shared")}
@@ -788,18 +782,18 @@ export function PatientDetailView() {
 
 
 {/* Occupational profile — hidden for admin */}
-{!isAdmin && showOccupationalProfile && <TabsContent value="occupational-profile" className="mt-4">
+{!isAdmin && showOccupationalProfile && <TabsContent value="occupational-profile" className="mt-3">
   <OccupationalProfileTab patientId={patient.id} />
 </TabsContent>}
 
-{!isAdmin && <TabsContent value="intervention-plan" className="mt-4">
+{!isAdmin && <TabsContent value="intervention-plan" className="mt-3">
   {/* Centro de día: el PIAI de equipo (los objetivos de TO del plan van
       dentro, en su apartado). Resto: el Plan de intervención de siempre. */}
   {isDayCenter ? <PiaiTab patientId={patient.id} referent={patient.referent} careTeamReferent={patient.careTeamReferent} /> : <InterventionPlanTab patientId={patient.id} />}
 </TabsContent>}
 
         {/* Assessments — hidden for admin */}
-        {!isAdmin && <TabsContent value="assessments" className="mt-4">
+        {!isAdmin && <TabsContent value="assessments" className="mt-3">
           <Tabs value={assessmentSubTab} onValueChange={setAssessmentSubTab} className="w-full">
             <TabsList className="inline-flex gap-1 bg-muted/60">
               <TabsTrigger value="evaluation" className={SUBTAB}>Valoración</TabsTrigger>
@@ -1249,7 +1243,7 @@ function QuickNotes({ patientId }: { patientId: string }) {
       )}
       <div
         className={cn("overflow-y-auto grid gap-1.5 grid-cols-1 sm:grid-cols-2", wide ? "lg:grid-cols-2" : "lg:grid-cols-1")}
-        style={{ maxHeight: "260px" }}
+        style={{ maxHeight: "116px" }}
       >
         {notes.map((note) => {
           const c = NOTE_COLORS[note.colorIdx % NOTE_COLORS.length];
