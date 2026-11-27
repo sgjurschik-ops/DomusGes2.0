@@ -205,7 +205,7 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
       <Card className="py-0 gap-0">
         {/* Todo en una fila: título · estado · entregado · modificado */}
         <div className="flex items-center gap-x-3 gap-y-1.5 flex-wrap px-4 py-2">
-          <h3 className="text-base font-semibold leading-tight">PIA general · {formatDate(piai.date)}</h3>
+          <h3 className="text-base font-semibold leading-tight">PIAI interdisciplinar · {formatDate(piai.date)}</h3>
           <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium", STATUS_STYLE[piai.status])}>{piai.status}</span>
           {/* Entregado a la persona: un clic para marcar/desmarcar */}
           <button type="button" disabled={patchQuiet.isPending}
@@ -233,7 +233,7 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setMetaOpen(true)}><Pencil className="w-4 h-4 mr-2" />Fecha, estado y entrega</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setNewOpen(true)}><FilePlus2 className="w-4 h-4 mr-2" />Nuevo PIA</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setNewOpen(true)}><FilePlus2 className="w-4 h-4 mr-2" />Nuevo PIAI interdisciplinar</DropdownMenuItem>
               {canDelete && (
                 <DropdownMenuItem variant="destructive"
                   onClick={() => { if (confirm("¿Eliminar este PIA con todos sus apartados? No se puede deshacer.")) remove.mutate(piai.id); }}>
@@ -258,7 +258,7 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
                   <span className={cn("rounded-full shrink-0",
                     h.kind === "pia" ? "w-2.5 h-2.5" : "w-2 h-2 border-[1.5px] border-muted-foreground bg-background",
                     h.kind === "pia" && (active ? "bg-[#56608a]" : "bg-muted-foreground/60"))} />
-                  {h.kind === "pia" ? "PIA" : "Revisión"} {formatDate(h.date)}
+                  {h.kind === "pia" ? "PIAI" : "Revisión"} {formatDate(h.date)}
                   {h.kind === "pia" && h.delivered && <CheckCircle2 className="w-3 h-3 text-emerald-600" aria-label="Entregado" />}
                 </button>
               </span>
@@ -266,7 +266,7 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
           })}
           <span className="flex-1" />
           <button type="button" onClick={() => setNewOpen(true)} className="text-primary hover:underline inline-flex items-center gap-1">
-            <Plus className="w-3 h-3" />Nuevo PIA
+            <Plus className="w-3 h-3" />Nuevo PIAI
           </button>
         </div>
       </Card>
@@ -771,7 +771,7 @@ function ReviewsBlock({ piai, saving, onSave, highlightId }: {
 
   return (
     <BlockCard id="piai-revisiones" icon={History} title="Revisión de objetivos"
-      subtitle={reviews.length ? `${reviews.length} revisión${reviews.length === 1 ? "" : "es"} · última ${fmt(reviews[0].date)}` : "cada 6 meses, entre PIA y PIA"}
+      subtitle={reviews.length ? `${reviews.length} revisión${reviews.length === 1 ? "" : "es"} · última ${fmt(reviews[0].date)}` : "cada 6 meses, entre PIAI y PIAI"}
       editing={false} canEdit={false} onEdit={() => {}}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">Marca para cada objetivo general si se ha conseguido, se mantiene o no se ha conseguido.</p>

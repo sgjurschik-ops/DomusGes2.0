@@ -125,7 +125,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
     const blocks: (Paragraph | Table)[] = [
       new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 }, children: [
-        new TextRun({ text: "Plan de Atención Individualizada (PIA)", bold: true, size: 32, color: BRAND }),
+        new TextRun({ text: "Plan de Atención Individualizada (PIAI) interdisciplinar", bold: true, size: 32, color: BRAND }),
       ] }),
       h1("1. INFORMACIÓN GENERAL"),
       h2("1.1 Datos generales"),
