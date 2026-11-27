@@ -40,6 +40,12 @@ import {
 
 const ACCENT = "#56608a";
 
+// Mensaje real del servidor (p. ej. "tabla no existe") para poder diagnosticar.
+function errDetail(e: unknown): string {
+  const body = (e as { body?: { detail?: string; error?: string } })?.body;
+  return body?.detail || body?.error || (e instanceof Error ? e.message : "Error desconocido");
+}
+
 const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -79,14 +85,14 @@ export function PiaiTab({ patientId }: { patientId: string }) {
     mutationFn: (body: Record<string, unknown>) =>
       fetcher<PiaiDTO>(`/api/patients/${patientId}/piai/${piai!.id}`, { method: "PATCH", body: JSON.stringify(body) }),
     onSuccess: (u) => { setCached(u); toast({ title: "PIAI guardado" }); },
-    onError: () => toast({ title: "Error al guardar", description: "No se ha podido guardar el PIAI.", variant: "destructive" }),
+    onError: (e) => toast({ title: "No se ha podido guardar el PIAI", description: errDetail(e), variant: "destructive" }),
   });
 
   const saveSection = useMutation({
     mutationFn: ({ key, content }: { key: string; content: PiaiSectionContent }) =>
       fetcher<PiaiDTO>(`/api/patients/${patientId}/piai/${piai!.id}/sections/${key}`, { method: "PUT", body: JSON.stringify({ content }) }),
     onSuccess: (u) => { setCached(u); toast({ title: "Apartado guardado" }); },
-    onError: () => toast({ title: "Error al guardar", description: "No se ha podido guardar el apartado.", variant: "destructive" }),
+    onError: (e) => toast({ title: "No se ha podido guardar el apartado", description: errDetail(e), variant: "destructive" }),
   });
 
   const create = useMutation({
@@ -99,7 +105,7 @@ export function PiaiTab({ patientId }: { patientId: string }) {
       setNewOpen(false);
       toast({ title: "PIAI creado" });
     },
-    onError: () => toast({ title: "Error", description: "No se ha podido crear el PIAI.", variant: "destructive" }),
+    onError: (e) => toast({ title: "No se ha podido crear el PIAI", description: errDetail(e), variant: "destructive" }),
   });
 
   const remove = useMutation({
@@ -110,7 +116,7 @@ export function PiaiTab({ patientId }: { patientId: string }) {
       setSelectedId(null);
       toast({ title: "PIAI eliminado" });
     },
-    onError: () => toast({ title: "Error", description: "No se ha podido eliminar el PIAI.", variant: "destructive" }),
+    onError: (e) => toast({ title: "No se ha podido eliminar el PIAI", description: errDetail(e), variant: "destructive" }),
   });
 
   if (isLoading) return <div className="space-y-3"><Skeleton className="h-14 w-full" /><Skeleton className="h-64 w-full" /></div>;
