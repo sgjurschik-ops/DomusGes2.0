@@ -20,12 +20,12 @@ export interface PiaiGeneral {
   publicFunding?: string; // Financiación pública
   objectivesSheetDelivered?: string; // Ficha objetivos generales entregada
   description?: string; // Breve descripción de la persona (HTML)
-  acceptanceDate?: string; // Fecha y aceptación de la persona usuaria
+  acceptanceDate?: string; // (ya no se muestra; se conserva si existía)
   acceptanceNotes?: string;
+  deliveredDate?: string; // Fecha en que se entregó el PIA a la persona usuaria ("" = no entregado)
 }
 
 export const PIAI_GENERAL_FIELDS: { key: keyof PiaiGeneral; label: string; type: "date" | "text" }[] = [
-  { key: "meetingDate", label: "Fecha reunión PPUU / equipo técnico", type: "date" },
   { key: "admissionDate", label: "Fecha de alta", type: "date" },
   { key: "dischargeDate", label: "Fecha de baja", type: "date" },
   { key: "dependencyGrade", label: "Grado y nivel de dependencia", type: "text" },
@@ -33,7 +33,6 @@ export const PIAI_GENERAL_FIELDS: { key: keyof PiaiGeneral; label: string; type:
   { key: "service", label: "Servicio aplicable", type: "text" },
   { key: "benefits", label: "Servicios y prestaciones", type: "text" },
   { key: "publicFunding", label: "Financiación pública", type: "text" },
-  { key: "objectivesSheetDelivered", label: "Ficha de objetivos generales entregada", type: "text" },
 ];
 
 export interface PiaiGeneralObjective {

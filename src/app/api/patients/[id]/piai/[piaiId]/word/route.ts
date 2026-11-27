@@ -131,7 +131,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       h2("1.1 Datos generales"),
       kv([
         ["Fecha del PIA", fmt(piai.date)],
-        ["Fecha reunión PPUU/equipo técnico", fmt(g.meetingDate)],
+        ["Entregado a la persona usuaria", g.deliveredDate ? `Sí, el ${fmt(g.deliveredDate)}` : "No"],
         ["Nombre de usuario/a", fullName],
         ["Estado del PIA", piai.status],
         ["Fecha de alta", fmt(g.admissionDate)],
@@ -142,7 +142,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         ["Referente técnico/a", patient.referent ?? ""],
         ["Referente de cuidados", patient.careTeamReferent ?? ""],
         ...PIAI_GENERAL_FIELDS
-          .filter((f) => ["service", "benefits", "publicFunding", "objectivesSheetDelivered"].includes(f.key))
+          .filter((f) => ["service", "benefits", "publicFunding"].includes(f.key))
           .map((f) => [f.label, g[f.key]] as [string, string | undefined]),
       ]),
       h2("1.2 Características de la persona"),
@@ -183,7 +183,6 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       }
     });
 
-    blocks.push(label("Fecha y aceptación de la persona usuaria"), ...body([fmt(g.acceptanceDate), g.acceptanceNotes].filter(Boolean).join(" — ")));
 
     blocks.push(h1("2. REVISIÓN DE OBJETIVOS"));
     if (piai.reviews.length === 0) blocks.push(...body("", "Sin revisiones."));

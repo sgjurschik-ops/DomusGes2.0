@@ -106,6 +106,13 @@ export function cleanGeneral(v: unknown): PiaiGeneral {
   if (acceptanceDate !== undefined) out.acceptanceDate = acceptanceDate;
   const acceptanceNotes = str(o.acceptanceNotes, 2000);
   if (acceptanceNotes !== undefined) out.acceptanceNotes = acceptanceNotes;
+  const deliveredDate = str(o.deliveredDate, 20);
+  if (deliveredDate !== undefined) out.deliveredDate = deliveredDate;
+  // Campos que ya no se muestran pero pueden existir en PIAs antiguos.
+  for (const k of ["meetingDate", "objectivesSheetDelivered"] as const) {
+    const val = str(o[k], 2000);
+    if (val !== undefined) out[k] = val;
+  }
   return out;
 }
 

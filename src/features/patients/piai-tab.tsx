@@ -180,8 +180,15 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
         {/* Fecha y estado NO se guardan solos: se cambian en una ventana con
             "Guardar", para no modificar un PIAI por error. */}
         <span className={cn("h-8 inline-flex items-center rounded-md border px-2.5 text-xs font-medium", STATUS_STYLE[piai.status])}>{piai.status}</span>
+        {piai.general.deliveredDate ? (
+          <span className="h-8 inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-medium text-emerald-800">
+            <CheckCircle2 className="w-3.5 h-3.5" />Entregado {formatDate(piai.general.deliveredDate)}
+          </span>
+        ) : (
+          <span className="h-8 inline-flex items-center rounded-md border border-dashed px-2.5 text-xs text-muted-foreground">No entregado</span>
+        )}
         <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setMetaOpen(true)}>
-          <Pencil className="w-3 h-3 mr-1" />Fecha y estado
+          <Pencil className="w-3 h-3 mr-1" />Fecha, estado y entrega
         </Button>
         <span className="flex-1 min-w-[180px] text-[11px] text-muted-foreground leading-tight">
           Creado por {piai.createdByName}
@@ -225,6 +232,7 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
               )}>
               {h.kind === "pia" ? <ClipboardList className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
               {h.kind === "pia" ? "PIA" : "Revisión"} {formatDate(h.date)}
+              {h.kind === "pia" && h.delivered && <span title="Entregado a la persona usuaria" className={active ? "text-white" : "text-emerald-600"}>✓</span>}
             </button>
           );
         })}
@@ -282,7 +290,10 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
           piai={piai}
           saving={patchPiai.isPending}
           onClose={() => setMetaOpen(false)}
-          onSave={async (body) => { await patchPiai.mutateAsync(body); setMetaOpen(false); }}
+          onSave={async ({ date, status, deliveredDate }) => {
+            await patchPiai.mutateAsync({ date, status, general: { ...piai.general, deliveredDate } });
+            setMetaOpen(false);
+          }}
         />
       )}
     </div>
@@ -291,16 +302,18 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
 
 // Cambiar fecha / estado de un PIAI: solo al pulsar "Guardar".
 function PiaiMetaDialog({ piai, saving, onClose, onSave }: {
-  piai: PiaiDTO; saving: boolean; onClose: () => void; onSave: (b: { date: string; status: string }) => Promise<void>;
+  piai: PiaiDTO; saving: boolean; onClose: () => void; onSave: (b: { date: string; status: string; deliveredDate: string }) => Promise<void>;
 }) {
   const [date, setDate] = useState(piai.date);
   const [status, setStatus] = useState(piai.status);
+  const [delivered, setDelivered] = useState(!!piai.general.deliveredDate);
+  const [deliveredDate, setDeliveredDate] = useState(piai.general.deliveredDate || todayStr());
   const valid = /^\d{4}-\d{2}-\d{2}$/.test(date);
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Fecha y estado del PIAI</DialogTitle>
+          <DialogTitle>Fecha, estado y entrega del PIAI</DialogTitle>
           <DialogDescription>Los cambios solo se guardan al pulsar Guardar.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -315,10 +328,24 @@ function PiaiMetaDialog({ piai, saving, onClose, onSave }: {
               <SelectContent>{PIAI_STATUSES.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}</SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5 rounded-md border p-2.5">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={delivered} onChange={(e) => setDelivered(e.target.checked)} />
+              Entregado a la persona usuaria
+            </label>
+            {delivered && (
+              <div className="flex items-center gap-2 pl-6">
+                <Label className="text-xs text-muted-foreground">Fecha de entrega</Label>
+                <Input type="date" className="w-40 h-8 text-sm" value={deliveredDate} onChange={(e) => setDeliveredDate(e.target.value)} />
+              </div>
+            )}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button disabled={!valid || saving || (date === piai.date && status === piai.status)} onClick={() => onSave({ date, status })}>
+          <Button
+            disabled={!valid || saving || (delivered && !/^\d{4}-\d{2}-\d{2}$/.test(deliveredDate))}
+            onClick={() => onSave({ date, status, deliveredDate: delivered ? deliveredDate : "" })}>
             <Save className="w-3.5 h-3.5 mr-1" />{saving ? "Guardando…" : "Guardar"}
           </Button>
         </DialogFooter>
@@ -458,14 +485,6 @@ function GeneralBlock({ piai, saving, onSave, referent, careTeamReferent }: {
           ? <RichTextarea tone="filled" rows={3} value={draft.description ?? ""} onChange={(v) => set("description", v)} placeholder="Edad, con quién vive, situación familiar…" />
           : hasHtmlText(g.description) ? <ClinicalNotes html={g.description!} /> : <ReadValue value="" />}
       </Field>
-      <div className="grid sm:grid-cols-[12rem_1fr] gap-x-6 gap-y-2.5">
-        <Field label="Fecha de aceptación de la persona usuaria">
-          {editing ? <Input type="date" className="h-8 text-sm" value={draft.acceptanceDate ?? ""} onChange={(e) => set("acceptanceDate", e.target.value)} /> : <ReadValue value={g.acceptanceDate ? fmt(g.acceptanceDate) : ""} />}
-        </Field>
-        <Field label="Observaciones de la aceptación">
-          {editing ? <Input className="h-8 text-sm" value={draft.acceptanceNotes ?? ""} onChange={(e) => set("acceptanceNotes", e.target.value)} /> : <ReadValue value={g.acceptanceNotes} />}
-        </Field>
-      </div>
       {editing && <EditActions saving={saving} onCancel={() => setEditing(false)} onSave={async () => { await onSave(draft); setEditing(false); }} />}
     </BlockCard>
   );
@@ -802,9 +821,9 @@ function ReviewDialog({ initial, objectives, saving, onClose, onSave, onDelete }
 
 // Historial cronológico: cada PIA general seguido de sus revisiones.
 function historyEntries(piais: PiaiDTO[]) {
-  const out: { key: string; kind: "pia" | "review"; date: string; piaiId: string; reviewId?: string }[] = [];
+  const out: { key: string; kind: "pia" | "review"; date: string; piaiId: string; reviewId?: string; delivered?: boolean }[] = [];
   for (const p of piais) {
-    out.push({ key: `p-${p.id}`, kind: "pia", date: p.date, piaiId: p.id });
+    out.push({ key: `p-${p.id}`, kind: "pia", date: p.date, piaiId: p.id, delivered: !!p.general.deliveredDate });
     for (const r of p.reviews) {
       if (r.date) out.push({ key: `r-${r.id}`, kind: "review", date: r.date, piaiId: p.id, reviewId: r.id });
     }
@@ -818,31 +837,48 @@ function NewPiaiDialog({ open, onOpenChange, previous, pending, onCreate }: {
   open: boolean; onOpenChange: (o: boolean) => void; previous: PiaiDTO[]; pending: boolean;
   onCreate: (p: { date: string; copyFromId?: string }) => void;
 }) {
+  return open ? <NewPiaiDialogInner onOpenChange={onOpenChange} previous={previous} pending={pending} onCreate={onCreate} /> : null;
+}
+
+// Se monta de nuevo cada vez que se abre: fecha de hoy y, si hay PIAs
+// anteriores, "Copiar del anterior" marcado por defecto.
+function NewPiaiDialogInner({ onOpenChange, previous, pending, onCreate }: {
+  onOpenChange: (o: boolean) => void; previous: PiaiDTO[]; pending: boolean;
+  onCreate: (p: { date: string; copyFromId?: string }) => void;
+}) {
   const [date, setDate] = useState(todayStr());
-  const [copy, setCopy] = useState(true);
-  const last = previous[0];
+  const [source, setSource] = useState<string>(previous[0]?.id ?? "blank");
+  const optionCls = (active: boolean) => cn("w-full rounded-md border px-3 py-2 text-left text-sm transition-colors",
+    active ? "border-[#56608a] bg-[#56608a]/5" : "hover:bg-muted");
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (o) { setDate(todayStr()); setCopy(true); } onOpenChange(o); }}>
+    <Dialog open onOpenChange={(o) => { if (!o) onOpenChange(false); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{last ? "Nuevo PIAI" : "Crear PIAI"}</DialogTitle>
-          <DialogDescription>Fecha del PIA{last ? " y si quieres partir del anterior." : "."}</DialogDescription>
+          <DialogTitle>{previous.length ? "Nuevo PIAI" : "Crear PIAI"}</DialogTitle>
+          <DialogDescription>Elige la fecha y si quieres partir de un PIA anterior.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label className="text-xs">Fecha del PIA</Label>
             <Input type="date" className="w-44" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
-          {last && (
-            <label className="flex items-start gap-2 text-sm cursor-pointer">
-              <input type="checkbox" className="mt-1" checked={copy} onChange={(e) => setCopy(e.target.checked)} />
-              <span>Copiar la información general, los objetivos generales y los apartados de los profesionales del PIAI del {formatDate(last.date)}</span>
-            </label>
-          )}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Contenido</Label>
+            {previous.map((p) => (
+              <button key={p.id} type="button" onClick={() => setSource(p.id)} className={optionCls(source === p.id)}>
+                <span className="flex items-center gap-2 font-medium"><Copy className="w-3.5 h-3.5" />Copiar datos del PIA del {formatDate(p.date)}</span>
+                <span className="block text-[11px] text-muted-foreground pl-5.5">Información general, objetivos generales y los apartados de cada profesional.</span>
+              </button>
+            ))}
+            <button type="button" onClick={() => setSource("blank")} className={optionCls(source === "blank")}>
+              <span className="flex items-center gap-2 font-medium"><FilePlus2 className="w-3.5 h-3.5" />Empezar en blanco</span>
+            </button>
+            {previous.length === 0 && <p className="text-[11px] text-muted-foreground">Es el primer PIA de esta persona; no hay datos anteriores que copiar.</p>}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button disabled={pending || !/^\d{4}-\d{2}-\d{2}$/.test(date)} onClick={() => onCreate(last && copy ? { date, copyFromId: last.id } : { date })}>
+          <Button disabled={pending || !/^\d{4}-\d{2}-\d{2}$/.test(date)} onClick={() => onCreate(source !== "blank" ? { date, copyFromId: source } : { date })}>
             {pending ? "Creando…" : "Crear PIAI"}
           </Button>
         </DialogFooter>
