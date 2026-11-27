@@ -10,7 +10,7 @@
 //   4. Revisiones del PIA
 // Todo se ve en modo lectura y cada bloque tiene su botón "Editar".
 
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetcher, useMe } from "@/hooks/api";
 import { Card } from "@/components/ui/card";
@@ -36,6 +36,7 @@ import { EVALUATION_SECTIONS } from "@/lib/evaluations";
 import { InterventionPlanTab } from "./intervention-plan-tab";
 import {
   ClipboardList, Copy, FileDown, FilePlus2, Lock, Pencil, Plus, Save, Trash2, X, Users, Flag, History, CheckCircle2,
+  ChevronDown, ChevronRight,
 } from "lucide-react";
 
 const ACCENT = "#56608a";
@@ -52,6 +53,24 @@ const todayStr = () => {
 };
 const fmt = (d?: string | null) => (d ? formatDate(d) : "—");
 const hasHtmlText = (html?: string) => !!html && html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
+
+// Color suave por profesión: solo para las pestañas del índice de arriba.
+const SECTION_CHIP: Record<string, string> = {
+  "trabajo-social": "bg-sky-50 border-sky-200 text-sky-900 hover:bg-sky-100",
+  "terapia-ocupacional": "bg-orange-50 border-orange-200 text-orange-900 hover:bg-orange-100",
+  "logopedia": "bg-rose-50 border-rose-200 text-rose-900 hover:bg-rose-100",
+  "fisioterapia": "bg-emerald-50 border-emerald-200 text-emerald-900 hover:bg-emerald-100",
+  "psicologia": "bg-violet-50 border-violet-200 text-violet-900 hover:bg-violet-100",
+  "neuropsicologia": "bg-fuchsia-50 border-fuchsia-200 text-fuchsia-900 hover:bg-fuchsia-100",
+  "cuidados": "bg-cyan-50 border-cyan-200 text-cyan-900 hover:bg-cyan-100",
+};
+
+// Qué bloques están desplegados. Por defecto solo "Información general";
+// el resto aparecen plegados (solo la cabecera) hasta que se pulsan.
+const CollapseCtx = createContext<{ isOpen: (id: string) => boolean; setOpen: (id: string, open: boolean) => void }>({
+  isOpen: () => true,
+  setOpen: () => {},
+});
 
 const STATUS_STYLE: Record<string, string> = {
   "En elaboración": "bg-amber-50 text-amber-800 border-amber-200",
@@ -70,6 +89,15 @@ export function PiaiTab({ patientId }: { patientId: string }) {
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set(["piai-general"]));
+  const collapse = useMemo(() => ({
+    isOpen: (id: string) => openIds.has(id),
+    setOpen: (id: string, open: boolean) => setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(id); else next.delete(id);
+      return next;
+    }),
+  }), [openIds]);
   const piais = useMemo(() => list ?? [], [list]);
   const piai = piais.find((p) => p.id === selectedId) ?? piais[0] ?? null;
 
@@ -168,22 +196,26 @@ export function PiaiTab({ patientId }: { patientId: string }) {
       {/* Índice rápido */}
       <nav className="flex flex-wrap gap-1.5 text-xs">
         {[
-          { id: "piai-general", label: "Información general" },
-          { id: "piai-objetivos", label: "Objetivos generales" },
-          ...PIAI_SECTIONS.map((s) => ({ id: `piai-${s.key}`, label: s.title, done: hasHtmlText(piai.sections[s.key]?.content.assessment) })),
-          { id: "piai-revisiones", label: "Revisiones" },
+          { id: "piai-general", label: "Información general", cls: "" },
+          { id: "piai-objetivos", label: "Objetivos generales", cls: "" },
+          ...PIAI_SECTIONS.map((s) => ({ id: `piai-${s.key}`, label: s.title, cls: SECTION_CHIP[s.key] ?? "", done: hasHtmlText(piai.sections[s.key]?.content.assessment) })),
+          { id: "piai-revisiones", label: "Revisiones", cls: "" },
         ].map((x) => (
           // Botón (no enlace "#…"): la app usa la dirección para navegar entre
           // pantallas, y un enlace con "#" la mandaba a Inicio.
           <button key={x.id} type="button"
-            onClick={() => document.getElementById(x.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            className="rounded-full border px-2.5 py-1 hover:bg-muted inline-flex items-center gap-1">
+            onClick={() => {
+              collapse.setOpen(x.id, true);
+              setTimeout(() => document.getElementById(x.id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+            }}
+            className={cn("rounded-full border px-2.5 py-1 inline-flex items-center gap-1", x.cls || "hover:bg-muted")}>
             {"done" in x && (x.done ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />)}
             {x.label}
           </button>
         ))}
       </nav>
 
+      <CollapseCtx.Provider value={collapse}>
       <GeneralBlock key={`g-${piai.id}`} piai={piai} saving={patchPiai.isPending} onSave={(general) => patchPiai.mutateAsync({ general })} />
       <GeneralObjectivesBlock key={`o-${piai.id}`} piai={piai} saving={patchPiai.isPending} onSave={(generalObjectives) => patchPiai.mutateAsync({ generalObjectives })} />
 
@@ -205,6 +237,7 @@ export function PiaiTab({ patientId }: { patientId: string }) {
       ))}
 
       <ReviewsBlock key={`r-${piai.id}`} piai={piai} saving={patchPiai.isPending} onSave={(reviews) => patchPiai.mutateAsync({ reviews })} />
+      </CollapseCtx.Provider>
 
       <NewPiaiDialog open={newOpen} onOpenChange={setNewOpen} previous={piais} pending={create.isPending} onCreate={(p) => create.mutate(p)} />
     </div>
@@ -223,20 +256,26 @@ function BlockCard({ id, icon: Icon, title, subtitle, editing, canEdit = true, o
   onEdit: () => void;
   children: React.ReactNode;
 }) {
+  const { isOpen, setOpen } = useContext(CollapseCtx);
+  const open = editing || isOpen(id);
   return (
     <Card id={id} className={cn("py-0 gap-0 scroll-mt-4", editing && "ring-2 ring-[#56608a]/30")}>
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-muted/30">
-        <Icon className="w-4 h-4 shrink-0" style={{ color: ACCENT }} />
-        <h4 className="text-sm font-semibold">{title}</h4>
-        {subtitle && <span className="text-[11px] text-muted-foreground truncate">{subtitle}</span>}
-        <span className="flex-1" />
+      <div className={cn("flex items-center gap-2 px-4 py-2.5 bg-muted/30", open && "border-b")}>
+        {/* Pulsar la cabecera pliega/despliega el bloque */}
+        <button type="button" onClick={() => !editing && setOpen(id, !open)} aria-expanded={open}
+          className="flex items-center gap-2 min-w-0 flex-1 text-left">
+          {open ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+          <Icon className="w-4 h-4 shrink-0" style={{ color: ACCENT }} />
+          <h4 className="text-sm font-semibold shrink-0">{title}</h4>
+          {subtitle && <span className="text-[11px] text-muted-foreground truncate">{subtitle}</span>}
+        </button>
         {!editing && (canEdit ? (
-          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onEdit}><Pencil className="w-3 h-3 mr-1" />Editar</Button>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setOpen(id, true); onEdit(); }}><Pencil className="w-3 h-3 mr-1" />Editar</Button>
         ) : (
-          <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1"><Lock className="w-3 h-3" />Solo lectura</span>
+          <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1 shrink-0"><Lock className="w-3 h-3" />Solo lectura</span>
         ))}
       </div>
-      <div className="px-4 py-3 space-y-3">{children}</div>
+      {open && <div className="px-4 py-3 space-y-3">{children}</div>}
     </Card>
   );
 }
@@ -349,7 +388,7 @@ function GeneralObjectivesBlock({ piai, saving, onSave }: { piai: PiaiDTO; savin
   const update = (i: number, p: Partial<PiaiGeneralObjective>) => setDraft((d) => d.map((o, j) => (j === i ? { ...o, ...p } : o)));
 
   return (
-    <BlockCard id="piai-objetivos" icon={Flag} title="Objetivos generales" subtitle="los que plantea la persona usuaria" editing={editing}
+    <BlockCard id="piai-objetivos" icon={Flag} title="Objetivos generales" subtitle={items.length ? `${items.length} objetivo${items.length === 1 ? "" : "s"} de la persona usuaria` : "los que plantea la persona usuaria"} editing={editing}
       onEdit={() => { setDraft(piai.generalObjectives.length ? piai.generalObjectives : [{ id: newId("go"), text: "", actions: [] }]); setEditing(true); }}>
       {editing ? (
         <div className="space-y-3">
@@ -527,7 +566,7 @@ function ReviewsBlock({ piai, saving, onSave }: { piai: PiaiDTO; saving: boolean
   }
 
   return (
-    <BlockCard id="piai-revisiones" icon={History} title="Revisiones del PIA" editing={editing}
+    <BlockCard id="piai-revisiones" icon={History} title="Revisiones del PIA" subtitle={piai.reviews.length ? `${piai.reviews.length} revisión${piai.reviews.length === 1 ? "" : "es"}` : undefined} editing={editing}
       onEdit={() => { setDraft(piai.reviews); setEditing(true); }}>
       {!editing && piai.reviews.length === 0 && <p className="text-sm text-muted-foreground/70">Sin revisiones todavía.</p>}
       {(editing ? draft : piai.reviews).map((r, i) => (
