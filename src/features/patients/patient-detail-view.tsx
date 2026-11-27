@@ -61,7 +61,7 @@ import { ListPlus, EyeOff, Lock, ChevronDown, ChevronRight, ChevronUp, Flag, Cli
 import type { PatientEvaluationDTO } from "@/lib/evaluations";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ClinicalNotes } from "@/components/clinical-notes";
-import { Mic, MicOff } from "lucide-react";
+import { Mic, MicOff, UserCog, HeartHandshake } from "lucide-react";
 
 /** Reduce a full Nominatim address to "Calle Nº, Ciudad" for display. */
 function shortenAddress(full: string): string {
@@ -281,127 +281,130 @@ export function PatientDetailView() {
     <div className="space-y-3">
       {/* "Volver" está en la barra superior de la app (ahorra una línea). */}
 
-      {/* Cabecera COMPACTA y FIJA: igual en todas las pestañas (ya no se
-          pliega/despliega). Identidad + datos clave en dos líneas, avisos
-          agrupados en un solo botón, contacto en un desplegable, y las notas
-          rápidas siempre visibles a la derecha. */}
-      <Card className="py-0 gap-0">
-        <CardContent className="px-3 py-2.5 sm:px-4">
-          <div className="flex flex-col lg:flex-row gap-3 lg:gap-0">
-            <div className="flex-1 min-w-0 flex items-start gap-3">
-              <Avatar name={patient.fullName} color={patient.color} size={40} />
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-x-2.5 gap-y-0.5 flex-wrap">
-                      <h2 className="text-lg font-bold leading-tight">{patient.fullName}</h2>
-                      <span className="text-sm text-muted-foreground">
-                        {[patient.specialty, patient.resource, isEM ? patient.emCategory : null].filter(Boolean).join(" · ")}
-                        {" · "}
-                        <span className="inline-flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: STATUS_DOT[patient.status] ?? "#9ca3af" }} />
-                          {patient.status}
-                        </span>
-                      </span>
-                      {isEM && patient.informedConsent && (
-                        <span className="inline-flex items-center gap-0.5 text-[11px] text-emerald-700" title="Consentimiento informado firmado">
-                          <ShieldCheck className="w-3.5 h-3.5" />Consentimiento
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {(patient.alerts ?? []).length > 0 && (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button type="button" className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100">
-                            <AlertTriangle className="w-3 h-3" />
-                            {patient.alerts.length} aviso{patient.alerts.length === 1 ? "" : "s"}
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent align="end" className="w-64 p-2">
-                          <ul className="space-y-1">
-                            {patient.alerts.map((alert) => (
-                              <li key={alert} className="flex items-start gap-1.5 text-xs">
-                                <AlertTriangle className="w-3 h-3 text-amber-600 mt-0.5 shrink-0" />{alert}
-                              </li>
-                            ))}
-                          </ul>
-                          <button type="button" onClick={() => navigate("edit-patient")} className="mt-2 text-[11px] text-primary hover:underline">Editar avisos</button>
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                    <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" onClick={() => setReportDialogOpen(true)}>
-                      <FileDown className="w-3.5 h-3.5 mr-1" />Informe
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Más acciones"><MoreVertical className="w-3.5 h-3.5" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => navigate("edit-patient")}><Pencil className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
-                        {!isAdmin && isTO && !profileHasData && (
-                          patient.occupationalProfileEnabled ? (
-                            <DropdownMenuItem disabled={togglingProfile} onClick={() => setOccupationalProfileEnabled(false)}>
-                              <EyeOff className="w-4 h-4 mr-2" />Ocultar {isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem disabled={togglingProfile} onClick={() => setOccupationalProfileEnabled(true)}>
-                              <ListPlus className="w-4 h-4 mr-2" />Activar {isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
-                            </DropdownMenuItem>
-                          )
-                        )}
-                        <DropdownMenuItem variant="destructive" onClick={() => setDeleteDialogOpen(true)}><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-
-                {/* Datos clave en UNA línea (se parte sola si no cabe):
-                    diagnóstico resaltado, terapeutas, referentes, inicio, contacto. */}
-                <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-[13px]">
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-accent/50 px-2 py-0.5">
-                    <Stethoscope className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <span className="text-muted-foreground">Diagnóstico:</span>
-                    <span className="font-medium">{patient.diagnosis || <span className="italic font-normal text-muted-foreground">sin indicar</span>}</span>
+      {/* Cabecera FIJA (igual en todas las pestañas), con aire:
+          - arriba: avatar, nombre grande + estado, servicio/recurso debajo y
+            acciones (avisos agrupados, Informe, ⋯) a la derecha;
+          - separador fino y una sola línea de datos clave con iconos;
+          - a la derecha, panel propio de notas rápidas (siempre visibles). */}
+      <Card className="py-0 gap-0 overflow-hidden">
+        <div className="flex flex-col lg:flex-row">
+          <div className="flex-1 min-w-0 px-4 py-4 sm:px-5">
+            <div className="flex items-center gap-3.5">
+              <Avatar name={patient.fullName} color={patient.color} size={48} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-x-3 gap-y-1 flex-wrap">
+                  <h2 className="text-xl font-semibold leading-tight">{patient.fullName}</h2>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: STATUS_DOT[patient.status] ?? "#9ca3af" }} />
+                    {patient.status}
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <User2 className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-muted-foreground">Terapeutas:</span>
-                    <span className="font-medium">{patient.therapistNames.length > 0 ? patient.therapistNames.join(", ") : "Sin asignar"}</span>
-                  </span>
-                  {isDayCenter && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="text-muted-foreground">Referente técnico/a:</span><span className="font-medium">{patient.referent || "—"}</span>
-                      <span className="text-muted-foreground ml-1.5">Cuidados:</span><span className="font-medium">{patient.careTeamReferent || "—"}</span>
+                  {isEM && patient.informedConsent && (
+                    <span className="inline-flex items-center gap-0.5 text-[11px] text-emerald-700" title="Consentimiento informado firmado">
+                      <ShieldCheck className="w-3.5 h-3.5" />Consentimiento
                     </span>
                   )}
-                  <span className="inline-flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-muted-foreground">Desde:</span>
-                    <span className="font-medium">{formatDate(patient.startDate)}</span>
-                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5 truncate">
+                  {[patient.specialty, patient.resource, isEM ? patient.emCategory : null].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0 self-start">
+                {(patient.alerts ?? []).length > 0 && (
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button type="button" className="inline-flex items-center gap-1 text-primary hover:underline">
-                        <Phone className="w-3.5 h-3.5" />Contacto<ChevronDown className="w-3.5 h-3.5" />
+                      <button type="button" className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        {patient.alerts.length} aviso{patient.alerts.length === 1 ? "" : "s"}
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" className="w-72 p-3 space-y-1.5 text-xs">
-                      <div className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-muted-foreground shrink-0" /><span className="text-muted-foreground">Teléfono:</span><span className="font-medium">{patient.phone ?? "—"}</span></div>
-                      <div className="flex items-start gap-1.5"><MapPin className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" /><span className="text-muted-foreground">Dirección:</span><span className="font-medium">{patient.address ? shortenAddress(patient.address) : "—"}</span></div>
-                      <div className="flex items-start gap-1.5"><User2 className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" /><span className="text-muted-foreground">Familiar:</span><span className="font-medium">{patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"}</span></div>
+                    <PopoverContent align="end" className="w-64 p-2">
+                      <ul className="space-y-1">
+                        {patient.alerts.map((alert) => (
+                          <li key={alert} className="flex items-start gap-1.5 text-xs">
+                            <AlertTriangle className="w-3 h-3 text-amber-600 mt-0.5 shrink-0" />{alert}
+                          </li>
+                        ))}
+                      </ul>
+                      <button type="button" onClick={() => navigate("edit-patient")} className="mt-2 text-[11px] text-primary hover:underline">Editar avisos</button>
                     </PopoverContent>
                   </Popover>
-                </div>
+                )}
+                <Button variant="outline" size="sm" className="h-8 text-xs px-3" onClick={() => setReportDialogOpen(true)}>
+                  <FileDown className="w-3.5 h-3.5 mr-1" />Informe
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Más acciones"><MoreVertical className="w-4 h-4" /></Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => navigate("edit-patient")}><Pencil className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
+                    {!isAdmin && isTO && !profileHasData && (
+                      patient.occupationalProfileEnabled ? (
+                        <DropdownMenuItem disabled={togglingProfile} onClick={() => setOccupationalProfileEnabled(false)}>
+                          <EyeOff className="w-4 h-4 mr-2" />Ocultar {isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem disabled={togglingProfile} onClick={() => setOccupationalProfileEnabled(true)}>
+                          <ListPlus className="w-4 h-4 mr-2" />Activar {isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}
+                        </DropdownMenuItem>
+                      )
+                    )}
+                    <DropdownMenuItem variant="destructive" onClick={() => setDeleteDialogOpen(true)}><Trash2 className="w-4 h-4 mr-2" />Eliminar</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 
-            {!isAdmin && <div className="w-px bg-border mx-4 self-stretch hidden lg:block" />}
-            {!isAdmin && <div className="h-px bg-border lg:hidden" />}
-            {!isAdmin && <QuickNotes patientId={patient.id} />}
+            {/* Datos clave en una línea con iconos, bien espaciados (se parte
+                sola si no cabe). */}
+            <div className="mt-4 pt-3 border-t flex items-center gap-x-7 gap-y-2 flex-wrap text-sm">
+              <span className="inline-flex items-center gap-1.5" title="Diagnóstico">
+                <Stethoscope className="w-4 h-4 text-muted-foreground shrink-0" />
+                {patient.diagnosis
+                  ? <span className="font-medium">{patient.diagnosis}</span>
+                  : <span className="italic text-muted-foreground">Diagnóstico sin indicar</span>}
+              </span>
+              <span className="inline-flex items-center gap-1.5" title="Terapeutas">
+                <User2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                {patient.therapistNames.length > 0 ? patient.therapistNames.join(", ") : <span className="italic text-muted-foreground">Sin terapeuta</span>}
+              </span>
+              {isDayCenter && (
+                <span className="inline-flex items-center gap-1.5">
+                  <UserCog className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Ref. técnico/a</span>{patient.referent || "—"}
+                </span>
+              )}
+              {isDayCenter && (
+                <span className="inline-flex items-center gap-1.5">
+                  <HeartHandshake className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Ref. cuidados</span>{patient.careTeamReferent || "—"}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5" title="Fecha de inicio">
+                <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+                Desde {formatDate(patient.startDate)}
+              </span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button type="button" className="inline-flex items-center gap-1.5 text-primary hover:underline">
+                    <Phone className="w-4 h-4" />Contacto<ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-72 p-3 space-y-1.5 text-xs">
+                  <div className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-muted-foreground shrink-0" /><span className="text-muted-foreground">Teléfono:</span><span className="font-medium">{patient.phone ?? "—"}</span></div>
+                  <div className="flex items-start gap-1.5"><MapPin className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" /><span className="text-muted-foreground">Dirección:</span><span className="font-medium">{patient.address ? shortenAddress(patient.address) : "—"}</span></div>
+                  <div className="flex items-start gap-1.5"><User2 className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" /><span className="text-muted-foreground">Familiar:</span><span className="font-medium">{patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"}</span></div>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
-        </CardContent>
+
+          {!isAdmin && (
+            <div className="border-t lg:border-t-0 lg:border-l bg-[#fbf8ef] px-4 py-3.5">
+              <QuickNotes patientId={patient.id} />
+            </div>
+          )}
+        </div>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -1231,7 +1234,7 @@ function QuickNotes({ patientId }: { patientId: string }) {
 
   const wide = notes.length > 3;
   return (
-    <div className={cn("shrink-0 flex flex-col gap-1.5 w-full transition-[width]", wide ? "lg:w-[28rem]" : "lg:w-56")}>
+    <div className={cn("shrink-0 flex flex-col gap-2 w-full transition-[width]", wide ? "lg:w-[32rem]" : "lg:w-80")}>
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-wide font-bold text-muted-foreground flex items-center gap-1" title="Privadas: solo tú las ves">
           <StickyNote className="w-3 h-3" /> Notas rápidas <Lock className="w-2.5 h-2.5" />
@@ -1243,7 +1246,7 @@ function QuickNotes({ patientId }: { patientId: string }) {
       )}
       <div
         className={cn("overflow-y-auto grid gap-1.5 grid-cols-1 sm:grid-cols-2", wide ? "lg:grid-cols-2" : "lg:grid-cols-1")}
-        style={{ maxHeight: "116px" }}
+        style={{ maxHeight: "150px" }}
       >
         {notes.map((note) => {
           const c = NOTE_COLORS[note.colorIdx % NOTE_COLORS.length];
