@@ -173,10 +173,14 @@ export function PiaiTab({ patientId }: { patientId: string }) {
           ...PIAI_SECTIONS.map((s) => ({ id: `piai-${s.key}`, label: s.title, done: hasHtmlText(piai.sections[s.key]?.content.assessment) })),
           { id: "piai-revisiones", label: "Revisiones" },
         ].map((x) => (
-          <a key={x.id} href={`#${x.id}`} className="rounded-full border px-2.5 py-1 hover:bg-muted inline-flex items-center gap-1">
+          // Botón (no enlace "#…"): la app usa la dirección para navegar entre
+          // pantallas, y un enlace con "#" la mandaba a Inicio.
+          <button key={x.id} type="button"
+            onClick={() => document.getElementById(x.id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="rounded-full border px-2.5 py-1 hover:bg-muted inline-flex items-center gap-1">
             {"done" in x && (x.done ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />)}
             {x.label}
-          </a>
+          </button>
         ))}
       </nav>
 
