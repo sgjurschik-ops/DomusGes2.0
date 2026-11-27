@@ -178,7 +178,7 @@ async function buildWord(
       blocks.push(new Paragraph({
         spacing: { after: 140 },
         children: [new TextRun({
-          text: `${ev.isInitial ? "Valoración inicial" : "Revaloración"} · ${fmtDate(ev.date)}${data.audience === "family" ? "" : ` · ${ev.authorName}`}`,
+          text: `${ev.kind} · ${fmtDate(ev.date)}${data.audience === "family" ? "" : ` · ${ev.authorName}`}`,
           size: 19, color: "707070",
         })],
       }));
@@ -519,7 +519,7 @@ async function buildPdf(
     if (!ev) {
       text("Sin valoración registrada.", { size: 10, color: GRAY_RGB });
     } else {
-      text(`${ev.isInitial ? "Valoración inicial" : "Revaloración"} · ${fmtDate(ev.date)}${isFamily ? "" : ` · ${ev.authorName}`}`, { size: 9.5, color: GRAY_RGB, gap: 6 });
+      text(`${ev.kind} · ${fmtDate(ev.date)}${isFamily ? "" : ` · ${ev.authorName}`}`, { size: 9.5, color: GRAY_RGB, gap: 6 });
       if (ev.blocks.length === 0) text("La valoración no tiene texto todavía.", { size: 10, color: GRAY_RGB });
       for (const b of ev.blocks) {
         ensureSpace(30);

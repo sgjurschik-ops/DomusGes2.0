@@ -5,7 +5,7 @@
 
 import { db } from "@/lib/db";
 import { scalesForRole } from "@/lib/schemas";
-import { evaluationSectionsFor } from "@/lib/evaluations";
+import { evaluationSectionsFor, normalizeEvaluationKind } from "@/lib/evaluations";
 
 export const REPORT_SECTIONS = ["summary", "goals", "evaluation", "visits", "assessments"] as const;
 export type ReportSection = typeof REPORT_SECTIONS[number];
@@ -87,7 +87,7 @@ export interface PatientReportData {
   }[];
   evaluation: {
     date: Date;
-    isInitial: boolean;
+    kind: string;
     authorName: string;
     blocks: { title: string; text: string }[];
   } | null;
@@ -167,7 +167,7 @@ export async function gatherPatientReportData(
   const evaluation = latest
     ? {
         date: latest.date,
-        isInitial: evaluations.length === 1,
+        kind: normalizeEvaluationKind(latest.kind),
         authorName: latest.author.name,
         blocks: evaluationSectionsFor(latest.author.role).flatMap((section) =>
           section.fields

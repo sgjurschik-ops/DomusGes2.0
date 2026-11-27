@@ -154,7 +154,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <MessagingTrigger />
           </div>
         </header>
-        <main className="flex-1 p-4 lg:p-6 overflow-x-hidden">{children}</main>
+        <main className="flex-1 p-4 lg:p-6 overflow-x-clip">{children}</main>
       </div>
 
       {/* Idle timeout warning */}

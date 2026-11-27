@@ -1102,7 +1102,7 @@ function EvaluationSummaryCard({
           <>
             <p className="text-xs text-muted-foreground">
               <span className="font-medium text-foreground">{latest.profession}</span>
-              {" · "}{formatDate(latest.date)} · {latest.authorName}
+              {" · "}{latest.kind} · {formatDate(latest.date)} · {latest.authorName}
               {evaluations.length > 1 && <> · {evaluations.length} valoraciones en total</>}
             </p>
             {excerpt ? (

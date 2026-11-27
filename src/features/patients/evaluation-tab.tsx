@@ -1,14 +1,15 @@
 "use client";
 
 // Pestaña "Valoración" → sub-pestaña "Valoración": valoración escrita por
-// bloques, con fecha. La primera es la valoración inicial; las siguientes,
-// revaloraciones (se pueden crear en blanco o copiando el texto de una
-// anterior). Cada bloque se guarda por separado. Dentro de cada bloque se
+// bloques, con fecha y tipo ("Valoración inicial" o "Valoración", lo elige el
+// profesional). Se crean en blanco o copiando el texto de una anterior. Se lee
+// en limpio y con "Editar" se modifican todos los bloques a la vez y se
+// guardan juntos con un solo botón. Dentro de cada bloque se
 // muestra, en solo lectura, el resultado más actual de las escalas de esa
 // área (leído en vivo de las evaluaciones registradas en "Escalas").
 // COMPARTIDA: la ve todo el equipo con acceso clínico al usuario/a.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetcher, useMe } from "@/hooks/api";
 import { Card } from "@/components/ui/card";
@@ -31,23 +32,25 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { QUALITATIVE_SCALES } from "@/lib/schemas";
 import {
-  EVALUATION_SECTIONS,
+  EVALUATION_KINDS,
   OT_PROFESSION,
   evaluationSectionsFor,
   EVALUATION_TEXT_FIELDS,
+  type EvaluationKind,
   type EvaluationSectionDef,
   type EvaluationTextField,
   type PatientEvaluationDTO,
 } from "@/lib/evaluations";
 import type { AssessmentDTO } from "@/types/domain";
-import { ClipboardList, Copy, FilePlus2, Gauge, Save, Trash2, Check, Lock } from "lucide-react";
+import { ClipboardList, Copy, FilePlus2, Gauge, Save, Trash2, Lock, Pencil, X } from "lucide-react";
 
 type Drafts = Record<EvaluationTextField, string>;
+type UnsavedEntry = { fields: Partial<Drafts>; date?: string; kind?: EvaluationKind };
 
 // Borradores SIN GUARDAR de cada valoración (solo los campos modificados),
 // guardados fuera del componente para que no se pierdan al cambiar de
 // sub-pestaña (p. ej. "Ir a escalas") o de pestaña y volver.
-const unsavedDrafts = new Map<string, Partial<Drafts>>();
+const unsavedDrafts = new Map<string, UnsavedEntry>();
 
 const todayStr = () => {
   const d = new Date();
@@ -94,10 +97,18 @@ export function EvaluationTab({
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Drafts | null>(null);
-  const [savedSection, setSavedSection] = useState<string | null>(null);
+  // Modo edición: la valoración se lee "limpia" y, al pulsar Editar, todos
+  // los bloques pasan a ser editables y se guardan juntos con un solo botón.
+  const [editing, setEditing] = useState(false);
+  const [metaDraft, setMetaDraft] = useState<{ date: string; kind: EvaluationKind } | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  // Valoración recién creada: se abre directamente en modo edición.
+  const openInEditRef = useRef<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [pendingSwitchId, setPendingSwitchId] = useState<string | null>(null);
+  // Acción pendiente de confirmar porque hay cambios sin guardar.
+  const [pendingAction, setPendingAction] = useState<
+    { type: "switch"; id: string } | { type: "cancel" } | { type: "profession"; profession: string } | null
+  >(null);
   // Profesión cuyas valoraciones se ven. Por defecto, la mía. Todos pueden
   // LEER las de las demás profesiones, pero solo editar las suyas.
   const [professionChoice, setProfessionChoice] = useState<string | null>(null);
@@ -114,8 +125,7 @@ export function EvaluationTab({
   const list = useMemo(() => (evaluations ?? []).filter((e) => e.profession === profession), [evaluations, profession]);
   const selectedIndex = list.findIndex((e) => e.id === selectedId);
   const selected = selectedIndex >= 0 ? list[selectedIndex] : null;
-  // La más antigua es la valoración inicial; el resto, revaloraciones.
-  const isInitial = selected ? selectedIndex === list.length - 1 : false;
+  const isEditing = editing && canEdit && !!selected;
 
   // Selección por defecto: la más reciente. Si la seleccionada desaparece
   // (borrada), se vuelve a la más reciente.
@@ -129,30 +139,42 @@ export function EvaluationTab({
     }
   }, [list, selectedId]);
 
-  // Al cambiar de valoración se cargan sus textos como borrador.
+  // Al cambiar de valoración se cargan sus textos como borrador. Si había
+  // cambios sin guardar de esa valoración (p. ej. al volver de "Escalas"),
+  // se recuperan y se sigue en modo edición.
   const selectedKey = selected?.id ?? null;
   useEffect(() => {
-    if (!selectedKey) { setDrafts(null); return; }
+    if (!selectedKey) { setDrafts(null); setMetaDraft(null); setEditing(false); return; }
     const ev = list.find((e) => e.id === selectedKey);
-    if (ev) setDrafts({ ...draftsFrom(ev), ...(unsavedDrafts.get(ev.id) ?? {}) });
+    if (!ev) return;
+    const pending = unsavedDrafts.get(ev.id);
+    setDrafts({ ...draftsFrom(ev), ...(pending?.fields ?? {}) });
+    setMetaDraft({ date: pending?.date ?? ev.date, kind: pending?.kind ?? ev.kind });
+    setEditing(!!pending || openInEditRef.current === ev.id);
+    openInEditRef.current = null;
     // Solo al cambiar de valoración: tras guardar, el borrador ya coincide.
   }, [selectedKey]);
 
   const isFieldDirty = (f: EvaluationTextField) =>
     !!selected && !!drafts && normalizeHtml(drafts[f]) !== normalizeHtml(selected[f]);
   const isSectionDirty = (s: EvaluationSectionDef) => s.fields.some((x) => isFieldDirty(x.field));
-  const anyDirty = sections.some(isSectionDirty);
+  const metaDirty = !!selected && !!metaDraft && (metaDraft.date !== selected.date || metaDraft.kind !== selected.kind);
+  const anyDirty = isEditing && (metaDirty || sections.some(isSectionDirty));
 
   // Mantiene al día el almacén de borradores sin guardar.
   useEffect(() => {
-    if (!selected || !drafts) return;
-    const dirtyFields: Partial<Drafts> = {};
+    if (!selected || !drafts || !metaDraft) return;
+    if (!editing) { unsavedDrafts.delete(selected.id); return; }
+    const fields: Partial<Drafts> = {};
     for (const f of EVALUATION_TEXT_FIELDS) {
-      if (normalizeHtml(drafts[f]) !== normalizeHtml(selected[f])) dirtyFields[f] = drafts[f];
+      if (normalizeHtml(drafts[f]) !== normalizeHtml(selected[f])) fields[f] = drafts[f];
     }
-    if (Object.keys(dirtyFields).length > 0) unsavedDrafts.set(selected.id, dirtyFields);
+    const entry: UnsavedEntry = { fields };
+    if (metaDraft.date !== selected.date) entry.date = metaDraft.date;
+    if (metaDraft.kind !== selected.kind) entry.kind = metaDraft.kind;
+    if (Object.keys(fields).length > 0 || entry.date || entry.kind) unsavedDrafts.set(selected.id, entry);
     else unsavedDrafts.delete(selected.id);
-  }, [drafts, selected]);
+  }, [drafts, metaDraft, selected, editing]);
 
   // Aviso del navegador si se intenta cerrar/recargar con cambios sin guardar.
   useEffect(() => {
@@ -168,44 +190,66 @@ export function EvaluationTab({
     );
   }
 
-  const saveFields = useMutation({
-    mutationFn: ({ id, fields }: { id: string; fields: Partial<Drafts>; sectionKey: string }) =>
+  const save = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: { fields?: Partial<Drafts>; date?: string; kind?: EvaluationKind } }) =>
       fetcher<PatientEvaluationDTO>(`/api/patients/${patientId}/evaluations/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ fields }),
+        body: JSON.stringify(body),
       }),
-    onSuccess: (updated, vars) => {
+    onSuccess: (updated) => {
+      unsavedDrafts.delete(updated.id);
       replaceInCache(updated);
-      setSavedSection(vars.sectionKey);
-      toast({ title: "Bloque guardado" });
+      setDrafts(draftsFrom(updated));
+      setMetaDraft({ date: updated.date, kind: updated.kind });
+      setEditing(false);
+      toast({ title: "Valoración guardada" });
     },
-    onError: () => toast({ title: "Error al guardar", description: "No se ha podido guardar el bloque.", variant: "destructive" }),
+    onError: (err) => toast({ title: "Error al guardar", description: errDetail(err, "No se ha podido guardar la valoración."), variant: "destructive" }),
   });
 
-  const changeDate = useMutation({
-    mutationFn: ({ id, date }: { id: string; date: string }) =>
-      fetcher<PatientEvaluationDTO>(`/api/patients/${patientId}/evaluations/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ date }),
-      }),
-    onSuccess: (updated) => { replaceInCache(updated); toast({ title: "Fecha actualizada" }); },
-    onError: () => toast({ title: "Error", description: "No se ha podido cambiar la fecha.", variant: "destructive" }),
-  });
+  function saveAll() {
+    if (!selected || !drafts || !metaDraft) return;
+    if (!anyDirty) { setEditing(false); return; }
+    const body: { fields?: Partial<Drafts>; date?: string; kind?: EvaluationKind } = {};
+    const fields: Partial<Drafts> = {};
+    for (const f of EVALUATION_TEXT_FIELDS) {
+      if (isFieldDirty(f)) fields[f] = normalizeHtml(drafts[f]);
+    }
+    if (Object.keys(fields).length > 0) body.fields = fields;
+    if (metaDraft.date !== selected.date) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(metaDraft.date)) {
+        toast({ title: "Fecha no válida", variant: "destructive" });
+        return;
+      }
+      body.date = metaDraft.date;
+    }
+    if (metaDraft.kind !== selected.kind) body.kind = metaDraft.kind;
+    save.mutate({ id: selected.id, body });
+  }
+
+  function discardEdits() {
+    if (selected) {
+      unsavedDrafts.delete(selected.id);
+      setDrafts(draftsFrom(selected));
+      setMetaDraft({ date: selected.date, kind: selected.kind });
+    }
+    setEditing(false);
+  }
 
   const create = useMutation({
-    mutationFn: (payload: { date: string; copyFromId?: string }) =>
+    mutationFn: (payload: { date: string; kind: EvaluationKind; copyFromId?: string }) =>
       fetcher<PatientEvaluationDTO>(`/api/patients/${patientId}/evaluations`, {
         method: "POST",
         body: JSON.stringify(payload),
       }),
     onSuccess: (created) => {
       qc.setQueryData<PatientEvaluationDTO[]>(queryKey, (old) => sortEvaluations([created, ...(old ?? [])]));
+      openInEditRef.current = created.id;
       setSelectedId(created.id);
-      setDrafts(draftsFrom(created));
       setNewOpen(false);
-      toast({ title: "Valoración creada", description: formatDate(created.date) });
+      toast({ title: "Valoración creada", description: `${created.kind} · ${formatDate(created.date)}` });
     },
-    onError: () => toast({ title: "Error", description: "No se ha podido crear la valoración.", variant: "destructive" }),
+    onError: (err) => toast({ title: "Error", description: errDetail(err, "No se ha podido crear la valoración."), variant: "destructive" }),
   });
 
   const remove = useMutation({
@@ -215,6 +259,7 @@ export function EvaluationTab({
       unsavedDrafts.delete(id);
       qc.setQueryData<PatientEvaluationDTO[]>(queryKey, (old) => (old ?? []).filter((e) => e.id !== id));
       setDeleteOpen(false);
+      setEditing(false);
       toast({ title: "Valoración eliminada" });
     },
     onError: () => toast({ title: "Error", description: "No se ha podido eliminar la valoración.", variant: "destructive" }),
@@ -222,14 +267,37 @@ export function EvaluationTab({
 
   function requestSwitch(id: string) {
     if (id === selectedId) return;
-    if (anyDirty) { setPendingSwitchId(id); return; }
+    if (anyDirty) { setPendingAction({ type: "switch", id }); return; }
+    unsavedDrafts.delete(selectedId ?? "");
+    setEditing(false);
     setSelectedId(id);
-    setSavedSection(null);
+  }
+
+  function requestCancel() {
+    if (anyDirty) { setPendingAction({ type: "cancel" }); return; }
+    discardEdits();
+  }
+
+  function requestProfession(p: string) {
+    if (p === profession) return;
+    if (anyDirty) { setPendingAction({ type: "profession", profession: p }); return; }
+    discardEdits();
+    setProfessionChoice(p);
+    setSelectedId(null);
+  }
+
+  function confirmPending() {
+    const action = pendingAction;
+    setPendingAction(null);
+    if (!action) return;
+    discardEdits();
+    if (action.type === "switch") setSelectedId(action.id);
+    if (action.type === "profession") { setProfessionChoice(action.profession); setSelectedId(null); }
   }
 
   function openNewDialog() {
     if (anyDirty) {
-      toast({ title: "Tienes cambios sin guardar", description: "Guarda o descarta los bloques modificados antes de crear una valoración nueva.", variant: "destructive" });
+      toast({ title: "Tienes cambios sin guardar", description: "Guarda o cancela la edición antes de crear una valoración nueva.", variant: "destructive" });
       return;
     }
     setNewOpen(true);
@@ -261,6 +329,8 @@ export function EvaluationTab({
     );
   }
 
+  const hasText = (h?: string) => !!h && h.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
+
   return (
     <div className="space-y-4">
       {/* Valoraciones de qué profesión se están viendo */}
@@ -269,11 +339,7 @@ export function EvaluationTab({
           <span className="text-muted-foreground mr-1">Profesión:</span>
           {professions.map((p) => (
             <button key={p} type="button"
-              onClick={() => {
-                if (p === profession) return;
-                if (anyDirty) { toast({ title: "Tienes cambios sin guardar", description: "Guarda o descarta antes de cambiar de profesión.", variant: "destructive" }); return; }
-                setProfessionChoice(p); setSelectedId(null); setSavedSection(null);
-              }}
+              onClick={() => requestProfession(p)}
               className={cn("rounded-full border px-2.5 py-1 transition-colors",
                 p === profession ? "bg-[#6e6587] border-[#6e6587] text-white" : "hover:bg-muted text-muted-foreground")}>
               {p}{p === me?.role ? " (tú)" : ""}
@@ -282,14 +348,14 @@ export function EvaluationTab({
         </div>
       )}
 
-      {list.length === 0 || !selected || !drafts ? (
+      {list.length === 0 || !selected || !drafts || !metaDraft ? (
         <Card className="p-8 text-center space-y-3">
           <ClipboardList className="w-8 h-8 mx-auto text-muted-foreground opacity-50" />
           <p className="text-sm text-muted-foreground">Todavía no hay ninguna valoración de {profession} para este/a usuario/a.</p>
           {canEdit && (
             <div className="flex items-center justify-center gap-2">
               <Button size="sm" onClick={() => setNewOpen(true)}>
-                <FilePlus2 className="w-3.5 h-3.5 mr-1" />Crear valoración inicial
+                <FilePlus2 className="w-3.5 h-3.5 mr-1" />Nueva valoración
               </Button>
               {allowedScales.length > 0 && (
                 <Button size="sm" variant="outline" onClick={onGoToScales}>
@@ -301,53 +367,68 @@ export function EvaluationTab({
         </Card>
       ) : (
         <>
-          {/* Cabecera compacta: selector de valoración, fecha, autoría y acciones */}
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2">
+          {/* Cabecera compacta: selector de valoración, tipo, fecha, autoría y acciones */}
+          <div className={cn("flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2", isEditing && "border-[#1a5c58]/40")}>
             <Select value={selected.id} onValueChange={requestSwitch}>
               <SelectTrigger className="h-8 w-60 text-sm font-medium" aria-label="Valoración">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {list.map((e, i) => (
+                {list.map((e) => (
                   <SelectItem key={e.id} value={e.id}>
-                    {i === list.length - 1 ? "Valoración inicial" : "Revaloración"} · {formatDate(e.date)}
+                    {e.kind} · {formatDate(e.date)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Input
-              type="date"
-              aria-label="Fecha de la valoración"
-              className="h-8 w-36 text-sm"
-              value={selected.date}
-              disabled={changeDate.isPending || !canEdit}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (/^\d{4}-\d{2}-\d{2}$/.test(v) && v !== selected.date) {
-                  changeDate.mutate({ id: selected.id, date: v });
-                }
-              }}
-            />
-            <span className="flex-1 min-w-[160px] text-[11px] text-muted-foreground leading-tight">
-              {profession} · {isInitial ? "Valoración inicial" : "Revaloración"} · {selected.authorName}
-              {!canEdit && <> · <span className="inline-flex items-center gap-0.5"><Lock className="w-3 h-3" />solo lectura</span></>}
-              {selected.updatedByName && <> · editada por {selected.updatedByName}, {formatDate(selected.updatedAt)}</>}
-            </span>
-            {allowedScales.length > 0 && canEdit && (
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onGoToScales}>
-                <Gauge className="w-3.5 h-3.5 mr-1" />Escalas
-              </Button>
-            )}
-            {canEdit && (
-              <Button size="sm" className="h-8 text-xs" onClick={openNewDialog}>
-                <FilePlus2 className="w-3.5 h-3.5 mr-1" />Nueva valoración
-              </Button>
-            )}
-            {me?.id === selected.authorId && (
-              <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                aria-label="Eliminar valoración" onClick={() => setDeleteOpen(true)}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
+
+            {isEditing ? (
+              <>
+                <KindToggle value={metaDraft.kind} onChange={(kind) => setMetaDraft((m) => (m ? { ...m, kind } : m))} />
+                <Input
+                  type="date"
+                  aria-label="Fecha de la valoración"
+                  className="h-8 w-36 text-sm"
+                  value={metaDraft.date}
+                  onChange={(e) => { const date = e.target.value; setMetaDraft((m) => (m ? { ...m, date } : m)); }}
+                />
+                <span className="flex-1" />
+                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={requestCancel} disabled={save.isPending}>
+                  <X className="w-3.5 h-3.5 mr-1" />Cancelar
+                </Button>
+                <Button size="sm" className="h-8 text-xs" onClick={saveAll} disabled={save.isPending}>
+                  <Save className="w-3.5 h-3.5 mr-1" />{save.isPending ? "Guardando…" : "Guardar"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 min-w-[160px] text-[11px] text-muted-foreground leading-tight">
+                  {profession} · {selected.authorName}
+                  {!canEdit && <> · <span className="inline-flex items-center gap-0.5"><Lock className="w-3 h-3" />solo lectura</span></>}
+                  {selected.updatedByName && <> · editada por {selected.updatedByName}, {formatDate(selected.updatedAt)}</>}
+                </span>
+                {allowedScales.length > 0 && canEdit && (
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onGoToScales}>
+                    <Gauge className="w-3.5 h-3.5 mr-1" />Escalas
+                  </Button>
+                )}
+                {canEdit && (
+                  <>
+                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={openNewDialog}>
+                      <FilePlus2 className="w-3.5 h-3.5 mr-1" />Nueva valoración
+                    </Button>
+                    <Button size="sm" className="h-8 text-xs" onClick={() => setEditing(true)}>
+                      <Pencil className="w-3.5 h-3.5 mr-1" />Editar
+                    </Button>
+                  </>
+                )}
+                {me?.id === selected.authorId && (
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    aria-label="Eliminar valoración" onClick={() => setDeleteOpen(true)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+              </>
             )}
           </div>
 
@@ -355,8 +436,7 @@ export function EvaluationTab({
               título a la izquierda en pantallas anchas para ahorrar altura. */}
           <Card className="overflow-hidden py-0 gap-0">
             {sections.map((section, idx) => {
-              const dirty = isSectionDirty(section);
-              const saving = saveFields.isPending && saveFields.variables?.sectionKey === section.key;
+              const dirty = isEditing && isSectionDirty(section);
               const sectionScales = section.scales.filter((sc) => allowedScales.includes(sc));
               return (
                 <section
@@ -367,35 +447,10 @@ export function EvaluationTab({
                     dirty && "bg-amber-50/60",
                   )}
                 >
-                  {/* Título + guardar */}
-                  <div className="flex lg:flex-col items-start justify-between lg:justify-start gap-1.5">
-                    <div>
-                      <h3 className="text-sm font-semibold leading-tight">{section.title}</h3>
-                      <p className="hidden lg:block text-[11px] text-muted-foreground leading-snug mt-0.5">{section.hint}</p>
-                    </div>
-                    <div className={cn("flex items-center gap-1.5 flex-wrap", !canEdit && "hidden")}>
-                      <Button size="sm" variant={dirty ? "default" : "outline"} className="h-7 px-2.5 text-xs" disabled={!dirty || saving}
-                        onClick={() => {
-                          const fields: Partial<Drafts> = {};
-                          for (const x of section.fields) fields[x.field] = normalizeHtml(drafts[x.field]);
-                          saveFields.mutate({ id: selected.id, fields, sectionKey: section.key });
-                        }}>
-                        <Save className="w-3 h-3 mr-1" />{saving ? "Guardando…" : "Guardar"}
-                      </Button>
-                      {dirty ? (
-                        <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-                          onClick={() => setDrafts((d) => {
-                            if (!d) return d;
-                            const next = { ...d };
-                            for (const x of section.fields) next[x.field] = selected[x.field];
-                            return next;
-                          })}>
-                          Descartar
-                        </button>
-                      ) : savedSection === section.key ? (
-                        <span className="text-[11px] text-emerald-700 inline-flex items-center gap-0.5"><Check className="w-3 h-3" />Guardado</span>
-                      ) : null}
-                    </div>
+                  <div>
+                    <h3 className="text-sm font-semibold leading-tight">{section.title}</h3>
+                    <p className="hidden lg:block text-[11px] text-muted-foreground leading-snug mt-0.5">{section.hint}</p>
+                    {dirty && <p className="text-[11px] text-amber-700 mt-1">Sin guardar</p>}
                   </div>
 
                   {/* Escalas + texto */}
@@ -412,20 +467,25 @@ export function EvaluationTab({
                       {section.fields.map((x) => (
                         <div key={x.field} className="space-y-1 min-w-0">
                           {x.label && <p className="text-xs font-semibold text-muted-foreground">{x.label}</p>}
-                          {canEdit ? (
+                          {isEditing ? (
                             <RichTextarea
                               key={`${selected.id}-${x.field}`}
                               tone="filled"
                               value={drafts[x.field]}
-                              onChange={(html) => {
-                                setSavedSection(null);
-                                setDrafts((d) => (d ? { ...d, [x.field]: html } : d));
-                              }}
+                              onChange={(html) => setDrafts((d) => (d ? { ...d, [x.field]: html } : d))}
                               rows={section.key === "free" ? 10 : 3}
                               placeholder={x.placeholder}
                             />
+                          ) : hasText(selected[x.field]) ? (
+                            <div
+                              className={cn("rounded-md bg-muted/30 px-3 py-2", canEdit && "cursor-text hover:bg-muted/50 transition-colors")}
+                              title={canEdit ? "Doble clic para editar" : undefined}
+                              onDoubleClick={canEdit ? () => setEditing(true) : undefined}
+                            >
+                              <ClinicalNotes html={selected[x.field]} />
+                            </div>
                           ) : (
-                            <div className="rounded-md bg-muted/30 px-3 py-2"><ClinicalNotes html={selected[x.field] || ""} /></div>
+                            <p className="rounded-md bg-muted/20 px-3 py-2 text-sm text-muted-foreground italic">Sin rellenar</p>
                           )}
                         </div>
                       ))}
@@ -435,6 +495,21 @@ export function EvaluationTab({
               );
             })}
           </Card>
+
+          {/* Barra fija abajo mientras se edita: Guardar siempre a mano */}
+          {isEditing && (
+            <div className="sticky bottom-3 z-10 flex items-center justify-end gap-2 rounded-lg border bg-background/95 backdrop-blur px-3 py-2 shadow-md">
+              <span className="mr-auto text-xs text-muted-foreground">
+                {anyDirty ? <span className="text-amber-700">Hay cambios sin guardar</span> : "Editando valoración"}
+              </span>
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={requestCancel} disabled={save.isPending}>
+                Cancelar
+              </Button>
+              <Button size="sm" className="h-8 text-xs" onClick={saveAll} disabled={save.isPending}>
+                <Save className="w-3.5 h-3.5 mr-1" />{save.isPending ? "Guardando…" : "Guardar valoración"}
+              </Button>
+            </div>
+          )}
         </>
       )}
 
@@ -446,24 +521,18 @@ export function EvaluationTab({
         onCreate={(payload) => create.mutate(payload)}
       />
 
-      {/* Confirmar cambio de valoración con cambios sin guardar */}
-      <AlertDialog open={!!pendingSwitchId} onOpenChange={(o) => { if (!o) setPendingSwitchId(null); }}>
+      {/* Confirmar acción con cambios sin guardar */}
+      <AlertDialog open={!!pendingAction} onOpenChange={(o) => { if (!o) setPendingAction(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Hay cambios sin guardar</AlertDialogTitle>
             <AlertDialogDescription>
-              Si cambias de valoración se perderán los cambios de los bloques que no has guardado.
+              Si continúas se perderán los cambios que no has guardado en esta valoración.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Seguir editando</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (selectedId) unsavedDrafts.delete(selectedId);
-              if (pendingSwitchId) { setSelectedId(pendingSwitchId); setSavedSection(null); }
-              setPendingSwitchId(null);
-            }}>
-              Descartar y cambiar
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmPending}>Descartar cambios</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -491,6 +560,27 @@ export function EvaluationTab({
       </AlertDialog>
     </div>
   );
+}
+
+// Selector "Valoración inicial" / "Valoración" en dos pastillas.
+function KindToggle({ value, onChange }: { value: EvaluationKind; onChange: (k: EvaluationKind) => void }) {
+  return (
+    <div className="inline-flex rounded-md border p-0.5 text-xs" role="radiogroup" aria-label="Tipo de valoración">
+      {EVALUATION_KINDS.map((k) => (
+        <button key={k} type="button" role="radio" aria-checked={value === k}
+          onClick={() => onChange(k)}
+          className={cn("rounded px-2.5 py-1 transition-colors",
+            value === k ? "bg-[#6e6587] text-white" : "text-muted-foreground hover:bg-muted")}>
+          {k}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function errDetail(err: unknown, fallback: string): string {
+  const msg = err instanceof Error ? err.message : "";
+  return msg && msg.length < 200 ? `${fallback} (${msg})` : fallback;
 }
 
 function sortEvaluations(list: PatientEvaluationDTO[]): PatientEvaluationDTO[] {
@@ -557,9 +647,10 @@ function NewEvaluationDialog({
   onOpenChange: (open: boolean) => void;
   previous: PatientEvaluationDTO[];
   pending: boolean;
-  onCreate: (payload: { date: string; copyFromId?: string }) => void;
+  onCreate: (payload: { date: string; kind: EvaluationKind; copyFromId?: string }) => void;
 }) {
   const [date, setDate] = useState(todayStr());
+  const [kind, setKind] = useState<EvaluationKind>("Valoración");
   const [mode, setMode] = useState<"blank" | "copy">("blank");
   const [copyFromId, setCopyFromId] = useState<string>("");
   const isFirst = previous.length === 0;
@@ -569,6 +660,7 @@ function NewEvaluationDialog({
   useEffect(() => {
     if (!open) return;
     setDate(todayStr());
+    setKind(previous.length === 0 ? "Valoración inicial" : "Valoración");
     setMode(previous.length > 0 ? "copy" : "blank");
     setCopyFromId(previous[0]?.id ?? "");
   }, [open, previous]);
@@ -579,18 +671,24 @@ function NewEvaluationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isFirst ? "Valoración inicial" : "Nueva valoración"}</DialogTitle>
+          <DialogTitle>Nueva valoración</DialogTitle>
           <DialogDescription>
             {isFirst
-              ? "Se creará la valoración inicial con la fecha indicada."
-              : "Elige la fecha y si quieres empezar en blanco o partir del texto de una valoración anterior."}
+              ? "Elige el tipo y la fecha de la valoración."
+              : "Elige el tipo, la fecha y si quieres empezar en blanco o partir del texto de una valoración anterior."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="new-evaluation-date" className="text-xs">Fecha</Label>
-            <Input id="new-evaluation-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-44" />
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tipo</Label>
+              <KindToggle value={kind} onChange={setKind} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-evaluation-date" className="text-xs">Fecha</Label>
+              <Input id="new-evaluation-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-8 w-40" />
+            </div>
           </div>
 
           {!isFirst && (
@@ -614,9 +712,9 @@ function NewEvaluationDialog({
                     <SelectValue placeholder="Elige la valoración a copiar" />
                   </SelectTrigger>
                   <SelectContent>
-                    {previous.map((e, i) => (
+                    {previous.map((e) => (
                       <SelectItem key={e.id} value={e.id}>
-                        {i === previous.length - 1 ? "Valoración inicial" : "Revaloración"} · {formatDate(e.date)}
+                        {e.kind} · {formatDate(e.date)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -630,7 +728,7 @@ function NewEvaluationDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button
             disabled={!valid || pending}
-            onClick={() => onCreate(mode === "copy" && copyFromId ? { date, copyFromId } : { date })}
+            onClick={() => onCreate(mode === "copy" && copyFromId ? { date, kind, copyFromId } : { date, kind })}
           >
             {pending ? "Creando…" : "Crear valoración"}
           </Button>

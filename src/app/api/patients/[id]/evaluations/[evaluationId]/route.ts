@@ -1,15 +1,15 @@
-// PATCH  /api/patients/[id]/evaluations/[evaluationId] — guarda UN bloque (o
-//        varios) de la valoración y/o cambia su fecha.
-//        Body: { fields?: { generalData?: string, adl?: string, ... }, date?: "YYYY-MM-DD" }
-//        Puede editarla cualquier profesional con edición clínica sobre el
-//        usuario/a (es un documento compartido, como los seguimientos); queda
-//        registrado quién hizo la última edición.
+// PATCH  /api/patients/[id]/evaluations/[evaluationId] — guarda la valoración
+//        (todos los bloques modificados a la vez), su fecha y/o su tipo.
+//        Body: { fields?: { generalData?: string, adl?: string, ... },
+//                date?: "YYYY-MM-DD", kind?: "Valoración inicial" | "Valoración" }
+//        Solo la edita la misma profesión que la creó; queda registrado quién
+//        hizo la última edición.
 // DELETE /api/patients/[id]/evaluations/[evaluationId] — solo su autor/a.
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireProfessional, canEditClinical, audit } from "@/lib/server";
-import { isEvaluationTextField, type EvaluationTextField } from "@/lib/evaluations";
+import { isEvaluationTextField, normalizeEvaluationKind, type EvaluationTextField } from "@/lib/evaluations";
 import { mapEvaluation, EVALUATION_INCLUDE, parseDateOnly, errorResponse } from "../shared";
 
 type Ctx = { params: Promise<{ id: string; evaluationId: string }> };
@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
     const body = await req.json().catch(() => ({}));
 
-    const data: Partial<Record<EvaluationTextField, string>> & { date?: Date } = {};
+    const data: Partial<Record<EvaluationTextField, string>> & { date?: Date; kind?: string } = {};
     if (body?.fields && typeof body.fields === "object") {
       for (const [key, value] of Object.entries(body.fields as Record<string, unknown>)) {
         if (!isEvaluationTextField(key)) {
@@ -52,6 +52,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       if (!date) return NextResponse.json({ error: "VALIDATION", detail: "Fecha no válida" }, { status: 400 });
       data.date = date;
     }
+    if (body?.kind !== undefined) data.kind = normalizeEvaluationKind(body.kind);
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "VALIDATION", detail: "Nada que guardar" }, { status: 400 });
     }

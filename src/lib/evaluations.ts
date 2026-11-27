@@ -98,11 +98,21 @@ export function evaluationToHtml(ev: PatientEvaluationDTO): string {
     .map((f) => `<p><b>${f.label ? `${sec.title} — ${f.label}` : sec.title}</b></p>${ev[f.field]}`)).join("");
 }
 
+// Tipo de valoración: lo elige el/la profesional (no todas las valoraciones
+// posteriores a la primera son "re"valoraciones, ni la primera siempre es la
+// inicial).
+export const EVALUATION_KINDS = ["Valoración inicial", "Valoración"] as const;
+export type EvaluationKind = (typeof EVALUATION_KINDS)[number];
+export function normalizeEvaluationKind(v: unknown): EvaluationKind {
+  return v === "Valoración inicial" ? "Valoración inicial" : "Valoración";
+}
+
 export interface PatientEvaluationDTO {
   id: string;
   patientId: string;
   // Profesión de quien la creó (Professional.role).
   profession: string;
+  kind: EvaluationKind;
   date: string; // YYYY-MM-DD
   authorId: string;
   authorName: string;

@@ -2,12 +2,14 @@
 //       usuario/a (más reciente primero). COMPARTIDAS: las ve todo el equipo
 //       con acceso clínico.
 // POST /api/patients/[id]/evaluations — crea una valoración nueva con fecha.
-//       Body: { date: "YYYY-MM-DD", copyFromId?: string } — si llega
-//       copyFromId, se copia el texto de esa valoración anterior.
+//       Body: { date: "YYYY-MM-DD", kind?: "Valoración inicial" | "Valoración",
+//       copyFromId?: string } — si llega copyFromId, se copia el texto de esa
+//       valoración anterior. Sin kind: inicial si es la primera de su profesión.
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireProfessional, canViewClinical, canEditClinical, audit } from "@/lib/server";
+import { normalizeEvaluationKind } from "@/lib/evaluations";
 import { mapEvaluation, EVALUATION_INCLUDE, parseDateOnly, errorResponse } from "./shared";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -62,11 +64,18 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       copied = source;
     }
 
+    const kind = body?.kind !== undefined
+      ? normalizeEvaluationKind(body.kind)
+      : (await db.patientEvaluation.count({ where: { patientId, author: { role: prof.role } } })) === 0
+        ? "Valoración inicial"
+        : "Valoración";
+
     const row = await db.patientEvaluation.create({
       data: {
         patientId,
         authorId: prof.id,
         date,
+        kind,
         ...copied,
       },
       include: EVALUATION_INCLUDE,

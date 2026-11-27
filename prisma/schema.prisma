@@ -417,6 +417,7 @@ model PatientEvaluation {
   patientId    String
   authorId     String
   date         DateTime
+  kind         String   @default("Valoración") // "Valoración inicial" | "Valoración"
   generalData  String   @default("") // Datos generales: entorno, ocupación, dificultades, diagnóstico…
   adl          String   @default("") // Área funcional — ABVDs
   iadl         String   @default("") // Área funcional — AIVDs

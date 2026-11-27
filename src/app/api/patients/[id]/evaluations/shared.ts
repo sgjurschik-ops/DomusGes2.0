@@ -3,7 +3,7 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import type { PatientEvaluationDTO } from "@/lib/evaluations";
+import { normalizeEvaluationKind, type PatientEvaluationDTO } from "@/lib/evaluations";
 
 export const EVALUATION_INCLUDE = {
   author: { select: { name: true, role: true } },
@@ -14,6 +14,7 @@ type EvaluationRow = {
   patientId: string;
   authorId: string;
   date: Date;
+  kind: string;
   generalData: string;
   adl: string;
   iadl: string;
@@ -41,6 +42,7 @@ export async function mapEvaluation(row: EvaluationRow): Promise<PatientEvaluati
     authorId: row.authorId,
     authorName: row.author.name,
     profession: row.author.role,
+    kind: normalizeEvaluationKind(row.kind),
     updatedByName,
     updatedAt: row.updatedAt.toISOString(),
     generalData: row.generalData,
