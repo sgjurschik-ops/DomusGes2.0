@@ -652,20 +652,35 @@ function SectionBlock({ def, piai, patientId, canEdit, saving, onSave }: {
   const set = (p: Partial<PiaiSectionContent>) => setDraft((d) => ({ ...d, ...p }));
   const setLeisure = (p: Partial<NonNullable<PiaiSectionContent["leisure"]>>) => setDraft((d) => ({ ...d, leisure: { ...(d.leisure ?? {}), ...p } }));
 
-  // "Copiar de la última valoración": trae el texto de la pestaña Valoración.
-  const { data: evaluations } = useQuery<PatientEvaluationDTO[]>({
+  // "Volcar última valoración": trae el texto de la pestaña Valoración.
+  // Se carga siempre (antes solo al editar, y si se pulsaba muy rápido decía
+  // que no había valoración aunque sí la hubiera).
+  const { data: evaluations, isLoading: loadingEvaluations } = useQuery<PatientEvaluationDTO[]>({
     queryKey: ["evaluations", patientId],
     queryFn: () => fetcher(`/api/patients/${patientId}/evaluations`),
-    enabled: editing,
   });
-  function copyFromEvaluation() {
-    const ev = evaluations?.[0];
-    if (!ev) { toast({ title: "No hay valoración", description: "Este/a usuario/a todavía no tiene ninguna valoración escrita." }); return; }
-    const html = EVALUATION_SECTIONS.flatMap((s) => s.fields
+  const latestEv = evaluations?.[0];
+  const latestEvHasText = !!latestEv && EVALUATION_SECTIONS.some((sec) => sec.fields.some((f) => hasHtmlText(latestEv[f.field])));
+  // ¿La valoración es más reciente que lo guardado en este apartado?
+  const newerEvaluation = latestEvHasText && (!stored || latestEv!.updatedAt > stored.updatedAt);
+
+  function evaluationHtml(ev: PatientEvaluationDTO) {
+    return EVALUATION_SECTIONS.flatMap((sec) => sec.fields
       .filter((f) => hasHtmlText(ev[f.field]))
-      .map((f) => `<p><b>${f.label ? `${s.title} — ${f.label}` : s.title}</b></p>${ev[f.field]}`)).join("");
-    set({ assessment: hasHtmlText(draft.assessment) ? `${draft.assessment}${html}` : html });
-    toast({ title: "Valoración copiada", description: `Del ${formatDate(ev.date)}. Revísala antes de guardar.` });
+      .map((f) => `<p><b>${f.label ? `${sec.title} — ${f.label}` : sec.title}</b></p>${ev[f.field]}`)).join("");
+  }
+  // Abre la edición con la valoración volcada; se guarda al pulsar Guardar.
+  function dumpLatestEvaluation() {
+    if (!latestEv || !latestEvHasText) {
+      toast({ title: "No hay valoración con texto", description: "Escríbela primero en la pestaña Valoración." });
+      return;
+    }
+    const base = editing ? draft : { ...saved, objectives: saved.objectives?.length ? saved.objectives : [""] };
+    const current = base.assessment;
+    if (hasHtmlText(current) && !confirm(`Este apartado ya tiene una valoración escrita.\n\n¿Sustituirla por la valoración del ${formatDate(latestEv.date)}?`)) return;
+    setDraft({ ...base, assessment: evaluationHtml(latestEv), assessedBy: base.assessedBy || latestEv.authorName });
+    setEditing(true);
+    toast({ title: "Valoración volcada", description: `Del ${formatDate(latestEv.date)}. Revísala y pulsa Guardar.` });
   }
 
   const subtitle = stored
@@ -687,14 +702,29 @@ function SectionBlock({ def, piai, patientId, canEdit, saving, onSave }: {
         ))}
       </div>
 
+      {/* Volcar la última valoración de la pestaña Valoración (visible sin
+          tener que pulsar Editar; avisa si hay una más reciente). */}
+      {canEdit && (newerEvaluation || editing) && (
+        <div className={cn("flex items-center gap-2 flex-wrap rounded-md border px-3 py-2 text-xs",
+          newerEvaluation ? "border-sky-200 bg-sky-50 text-sky-900" : "bg-muted/30")}>
+          <Copy className="w-3.5 h-3.5 shrink-0" />
+          <span className="flex-1">
+            {loadingEvaluations ? "Buscando la última valoración…"
+              : latestEvHasText
+                ? <>{newerEvaluation ? "Hay una valoración más reciente" : "Última valoración"}: <b>{formatDate(latestEv!.date)}</b> ({latestEv!.authorName})</>
+                : "No hay ninguna valoración escrita en la pestaña Valoración."}
+          </span>
+          {latestEvHasText && (
+            <Button type="button" size="sm" variant={newerEvaluation ? "default" : "outline"} className="h-7 text-xs" onClick={dumpLatestEvaluation}>
+              Volcar última valoración
+            </Button>
+          )}
+        </div>
+      )}
+
       <Field label={def.assessmentLabel}>
         {editing ? (
-          <div className="space-y-1">
-            <RichTextarea tone="filled" rows={5} value={draft.assessment ?? ""} onChange={(v) => set({ assessment: v })} />
-            <button type="button" onClick={copyFromEvaluation} className="text-[11px] text-primary hover:underline inline-flex items-center gap-1">
-              <Copy className="w-3 h-3" />Copiar de la última valoración
-            </button>
-          </div>
+          <RichTextarea tone="filled" rows={5} value={draft.assessment ?? ""} onChange={(v) => set({ assessment: v })} />
         ) : hasHtmlText(c.assessment) ? (
           <div className="rounded-md bg-muted/30 px-3 py-2"><ClinicalNotes html={c.assessment!} /></div>
         ) : <ReadValue value="" />}
