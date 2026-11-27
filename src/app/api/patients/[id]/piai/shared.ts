@@ -68,7 +68,8 @@ export async function mapPiai(row: PiaiRow): Promise<PiaiDTO> {
     updatedAt: row.updatedAt.toISOString(),
     general: safeJsonObject<PiaiGeneral>(row.general, {}),
     generalObjectives: safeJsonObject<PiaiGeneralObjective[]>(row.generalObjectives, []),
-    reviews: safeJsonObject<PiaiReview[]>(row.reviews, []),
+    // Siempre normalizadas: convierte revisiones guardadas con el formato antiguo.
+    reviews: cleanReviews(safeJsonObject<unknown[]>(row.reviews, [])),
     sections,
   };
 }
