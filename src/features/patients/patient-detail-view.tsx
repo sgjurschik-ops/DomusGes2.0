@@ -329,6 +329,19 @@ export function PatientDetailView() {
                     </PopoverContent>
                   </Popover>
                 )}
+                {/* Contacto: botón fijo arriba, diferenciado del resto */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button type="button" className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium bg-[#1a5c58]/10 text-[#1a5c58] border border-[#1a5c58]/25 hover:bg-[#1a5c58]/15 transition-colors">
+                      <Phone className="w-3.5 h-3.5" />Contacto<ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-72 p-3 space-y-1.5 text-xs">
+                    <div className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-muted-foreground shrink-0" /><span className="text-muted-foreground">Teléfono:</span><span className="font-medium">{patient.phone ?? "—"}</span></div>
+                    <div className="flex items-start gap-1.5"><MapPin className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" /><span className="text-muted-foreground">Dirección:</span><span className="font-medium">{patient.address ? shortenAddress(patient.address) : "—"}</span></div>
+                    <div className="flex items-start gap-1.5"><User2 className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" /><span className="text-muted-foreground">Familiar:</span><span className="font-medium">{patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"}</span></div>
+                  </PopoverContent>
+                </Popover>
                 <Button variant="outline" size="sm" className="h-8 text-xs px-3" onClick={() => setReportDialogOpen(true)}>
                   <FileDown className="w-3.5 h-3.5 mr-1" />Informe
                 </Button>
@@ -384,18 +397,6 @@ export function PatientDetailView() {
                 <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
                 Desde {formatDate(patient.startDate)}
               </span>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button type="button" className="inline-flex items-center gap-1.5 text-primary hover:underline">
-                    <Phone className="w-4 h-4" />Contacto<ChevronDown className="w-3.5 h-3.5" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-72 p-3 space-y-1.5 text-xs">
-                  <div className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-muted-foreground shrink-0" /><span className="text-muted-foreground">Teléfono:</span><span className="font-medium">{patient.phone ?? "—"}</span></div>
-                  <div className="flex items-start gap-1.5"><MapPin className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" /><span className="text-muted-foreground">Dirección:</span><span className="font-medium">{patient.address ? shortenAddress(patient.address) : "—"}</span></div>
-                  <div className="flex items-start gap-1.5"><User2 className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" /><span className="text-muted-foreground">Familiar:</span><span className="font-medium">{patient.referentName ? `${patient.referentName} · ${patient.referentPhone ?? ""}` : "—"}</span></div>
-                </PopoverContent>
-              </Popover>
             </div>
           </div>
 
