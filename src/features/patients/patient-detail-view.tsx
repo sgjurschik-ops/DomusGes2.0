@@ -306,7 +306,23 @@ export function PatientDetailView() {
                 </div>
                 <p className="text-sm text-muted-foreground mt-0.5 truncate">
                   {[patient.specialty, patient.resource, isEM ? patient.emCategory : null].filter(Boolean).join(" · ")}
+                  {" · "}desde {formatDate(patient.startDate)}
                 </p>
+                {/* Diagnóstico: dato clínico principal, con su propio estilo */}
+                <div className="mt-2">
+                  {patient.diagnosis ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-md bg-[#1a5c58]/[0.07] px-2.5 py-1 text-sm">
+                      <Stethoscope className="w-4 h-4 text-[#1a5c58] shrink-0" />
+                      <span className="text-[#1a5c58]/80">Diagnóstico</span>
+                      <span className="font-medium">{patient.diagnosis}</span>
+                    </span>
+                  ) : (
+                    <button type="button" onClick={() => navigate("edit-patient")}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-dashed px-2.5 py-1 text-sm text-muted-foreground hover:bg-muted/50">
+                      <Stethoscope className="w-4 h-4 shrink-0" />Añadir diagnóstico
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0 self-start">
                 {(patient.alerts ?? []).length > 0 && (
@@ -368,35 +384,14 @@ export function PatientDetailView() {
               </div>
             </div>
 
-            {/* Datos clave en una línea con iconos, bien espaciados (se parte
-                sola si no cabe). */}
-            <div className="mt-4 pt-3 border-t flex items-center gap-x-7 gap-y-2 flex-wrap text-sm">
-              <span className="inline-flex items-center gap-1.5" title="Diagnóstico">
-                <Stethoscope className="w-4 h-4 text-muted-foreground shrink-0" />
-                {patient.diagnosis
-                  ? <span className="font-medium">{patient.diagnosis}</span>
-                  : <span className="italic text-muted-foreground">Diagnóstico sin indicar</span>}
-              </span>
-              <span className="inline-flex items-center gap-1.5" title="Terapeutas">
-                <User2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                {patient.therapistNames.length > 0 ? patient.therapistNames.join(", ") : <span className="italic text-muted-foreground">Sin terapeuta</span>}
-              </span>
-              {isDayCenter && (
-                <span className="inline-flex items-center gap-1.5">
-                  <UserCog className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Ref. técnico/a</span>{patient.referent || "—"}
-                </span>
-              )}
-              {isDayCenter && (
-                <span className="inline-flex items-center gap-1.5">
-                  <HeartHandshake className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Ref. cuidados</span>{patient.careTeamReferent || "—"}
-                </span>
-              )}
-              <span className="inline-flex items-center gap-1.5" title="Fecha de inicio">
-                <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
-                Desde {formatDate(patient.startDate)}
-              </span>
+            {/* Equipo: siempre los mismos huecos (vacíos con "—"), para que la
+                cabecera se vea igual de ordenada esté más o menos rellena. */}
+            <div className="mt-4 pt-3 border-t flex items-baseline gap-x-6 gap-y-1.5 flex-wrap text-sm">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Equipo</span>
+              <TeamItem icon={User2} label={patient.therapistNames.length === 1 ? "Terapeuta" : "Terapeutas"}
+                value={patient.therapistNames.join(", ")} />
+              {isDayCenter && <TeamItem icon={UserCog} label="Referente técnico/a" value={patient.referent} />}
+              {isDayCenter && <TeamItem icon={HeartHandshake} label="Referente de cuidados" value={patient.careTeamReferent} />}
             </div>
           </div>
 
@@ -1163,6 +1158,17 @@ const NOTE_COLORS: { bg: string; border: string }[] = [
 ];
 
 interface QuickNote { id: string; text: string; colorIdx: number; }
+
+// Un dato del equipo en la cabecera: icono + etiqueta gris + nombre (o "—").
+function TeamItem({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value?: string | null }) {
+  return (
+    <span className="inline-flex items-baseline gap-1.5">
+      <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0 self-center" />
+      <span className="text-muted-foreground">{label}</span>
+      {value ? <span className="font-medium">{value}</span> : <span className="text-muted-foreground/70">—</span>}
+    </span>
+  );
+}
 
 function QuickNotes({ patientId }: { patientId: string }) {
   // Notas privadas del profesional de la sesión. Se cargan desde el servidor
