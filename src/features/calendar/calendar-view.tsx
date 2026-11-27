@@ -17,6 +17,8 @@ import {
   isSameDay,
   isSameMonth,
   addMinutes,
+  startOfDay,
+  endOfDay,
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Lock, AlertTriangle, Trash2, Copy, Check, UserX, Ban, Calendar as CalendarIcon } from "lucide-react";
@@ -384,7 +386,9 @@ export function CalendarView() {
       const e = endOfWeek(cursor, { weekStartsOn: 1 });
       return { from: s, to: e };
     }
-    return { from: cursor, to: cursor };
+    // Vista día: el día COMPLETO (antes pedía solo el instante actual, así
+    // que "Hoy" no mostraba las citas posteriores a la hora en que se abría).
+    return { from: startOfDay(cursor), to: endOfDay(cursor) };
   }, [view, cursor]);
 
   const { data: appts, isLoading } = useAppointments({
