@@ -304,25 +304,17 @@ export function PatientDetailView() {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground mt-0.5 truncate">
+                <p className="text-sm text-muted-foreground mt-0.5">
                   {[patient.specialty, patient.resource, isEM ? patient.emCategory : null].filter(Boolean).join(" · ")}
                   {" · "}desde {formatDate(patient.startDate)}
                 </p>
-                {/* Diagnóstico: dato clínico principal, con su propio estilo */}
-                <div className="mt-2">
-                  {patient.diagnosis ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-md bg-[#1a5c58]/[0.07] px-2.5 py-1 text-sm">
-                      <Stethoscope className="w-4 h-4 text-[#1a5c58] shrink-0" />
-                      <span className="text-[#1a5c58]/80">Diagnóstico</span>
-                      <span className="font-medium">{patient.diagnosis}</span>
-                    </span>
-                  ) : (
-                    <button type="button" onClick={() => navigate("edit-patient")}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-dashed px-2.5 py-1 text-sm text-muted-foreground hover:bg-muted/50">
-                      <Stethoscope className="w-4 h-4 shrink-0" />Añadir diagnóstico
-                    </button>
-                  )}
-                </div>
+                <p className="text-sm mt-1 flex items-center gap-1.5">
+                  <Stethoscope className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Diagnóstico:</span>
+                  {patient.diagnosis
+                    ? <span>{patient.diagnosis}</span>
+                    : <button type="button" onClick={() => navigate("edit-patient")} className="text-muted-foreground italic hover:text-primary hover:underline">sin indicar</button>}
+                </p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0 self-start">
                 {(patient.alerts ?? []).length > 0 && (
@@ -384,14 +376,21 @@ export function PatientDetailView() {
               </div>
             </div>
 
-            {/* Equipo: siempre los mismos huecos (vacíos con "—"), para que la
-                cabecera se vea igual de ordenada esté más o menos rellena. */}
-            <div className="mt-4 pt-3 border-t flex items-baseline gap-x-6 gap-y-1.5 flex-wrap text-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Equipo</span>
-              <TeamItem icon={User2} label={patient.therapistNames.length === 1 ? "Terapeuta" : "Terapeutas"}
-                value={patient.therapistNames.join(", ")} />
-              {isDayCenter && <TeamItem icon={UserCog} label="Referente técnico/a" value={patient.referent} />}
-              {isDayCenter && <TeamItem icon={HeartHandshake} label="Referente de cuidados" value={patient.careTeamReferent} />}
+            {/* Equipo en bloque: terapeutas en una línea y referentes juntos en
+                otra; huecos fijos (vacíos con "—") para que siempre se vea
+                ordenado. */}
+            <div className="mt-4 pt-3 border-t grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-1.5 text-sm">
+              <span className={cn("text-[10px] font-bold uppercase tracking-wide text-muted-foreground", isDayCenter && "row-span-2")}>Equipo</span>
+              <div className="flex items-baseline gap-x-5 gap-y-1 flex-wrap">
+                <TeamItem icon={User2} label={patient.therapistNames.length === 1 ? "Terapeuta" : "Terapeutas"}
+                  value={patient.therapistNames.join(", ")} />
+              </div>
+              {isDayCenter && (
+                <div className="flex items-baseline gap-x-5 gap-y-1 flex-wrap">
+                  <TeamItem icon={UserCog} label="Referente técnico/a" value={patient.referent} />
+                  <TeamItem icon={HeartHandshake} label="Referente de cuidados" value={patient.careTeamReferent} />
+                </div>
+              )}
             </div>
           </div>
 
