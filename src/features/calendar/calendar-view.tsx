@@ -1080,26 +1080,6 @@ function DayView({
     <Card className="p-2 sm:p-4">
       <div className="overflow-x-auto">
         <div className="min-w-[360px]" role="grid" aria-label="Vista diaria">
-          <div className="grid grid-cols-[64px_1fr]">
-            <div
-              className={`text-center py-2 border-b border-border ${
-                isSameDay(cursor, today) ? "text-primary" : ""
-              }`}
-            >
-              <div className="text-xs font-medium uppercase text-muted-foreground">
-                {format(cursor, "EEE", { locale: es })}
-              </div>
-              <div
-                className={`text-base font-semibold inline-flex items-center justify-center w-8 h-8 rounded-full ${
-                  isSameDay(cursor, today) ? "bg-primary text-primary-foreground" : ""
-                }`}
-              >
-                {format(cursor, "d")}
-              </div>
-            </div>
-            <div className="border-b border-border" />
-          </div>
-
           <div className="grid grid-cols-[64px_1fr] relative">
             <div className="relative">
               {hours.map((h) => (
@@ -1509,20 +1489,48 @@ function DayColumn({
                   position="top"
                   onStart={() => beginResize("appt", a.id, "top", startMins, a.durationMin)}
                 />
-                {a.status === "completada" && (
+                {compact && a.status === "completada" && (
                   <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-green-600 flex items-center justify-center shrink-0 z-10">
                     <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
                   </span>
                 )}
-                <div className="overflow-hidden h-full">
-                  <p className={`text-[11px] text-muted-foreground leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
-                    {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
-                  </p>
-                  <p className={`text-xs font-semibold leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
-                    {a.patientName}
-                  </p>
-                  {!compact && <p className="text-[11px] opacity-80 truncate">{a.type}</p>}
-                </div>
+                {compact ? (
+                  <div className="overflow-hidden h-full">
+                    <p className={`text-[11px] text-muted-foreground leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
+                      {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
+                    </p>
+                    <p className={`text-xs font-semibold leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
+                      {a.patientName}
+                    </p>
+                  </div>
+                ) : (
+                  // Vista día (más ancha): nombre grande + estado, y debajo
+                  // hora · tipo · terapeuta; a la derecha la dirección. Todo en
+                  // dos líneas para que quepa en una cita de 45 min sin cortarse.
+                  <div className="overflow-hidden h-full flex items-start gap-3 px-1">
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-semibold leading-snug truncate flex items-center gap-2 ${a.status === "cancelada" ? "line-through" : ""}`}>
+                        {a.patientName}
+                        {a.status !== "programada" && (
+                          <span className={`no-underline text-[10px] font-medium px-1.5 py-px rounded-full ${
+                            a.status === "completada" ? "bg-green-100 text-green-800" : a.status === "no_show" ? "bg-red-100 text-red-800" : "bg-muted text-muted-foreground"
+                          }`}>
+                            {a.status === "completada" ? "Asistió" : APPOINTMENT_STATUS_LABELS[a.status]}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-snug truncate">
+                        {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")} · {a.type} · {a.therapistName}
+                      </p>
+                    </div>
+                    {a.patientAddress && laneCount === 1 && (
+                      <p className="hidden md:flex items-center gap-1 text-xs text-muted-foreground truncate max-w-[40%] pt-0.5">
+                        <MapPin className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{a.patientAddress}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
                 <ResizeHandle
                   position="bottom"
                   onStart={() => beginResize("appt", a.id, "bottom", startMins, a.durationMin)}
