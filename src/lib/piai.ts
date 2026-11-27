@@ -136,6 +136,9 @@ export interface PiaiDTO {
   createdById: string;
   createdByName: string;
   updatedAt: string;
+  // Última modificación de CUALQUIER parte del PIAI (común o apartados).
+  lastEditedAt: string;
+  lastEditedByName: string | null;
   general: PiaiGeneral;
   generalObjectives: PiaiGeneralObjective[];
   reviews: PiaiReview[];

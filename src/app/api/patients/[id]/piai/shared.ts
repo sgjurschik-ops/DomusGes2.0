@@ -30,12 +30,13 @@ type PiaiRow = {
   generalObjectives: string;
   reviews: string;
   updatedAt: Date;
+  updatedById: string | null;
   createdBy: { name: string };
   sections: { sectionKey: string; content: string; updatedById: string | null; updatedAt: Date }[];
 };
 
 export async function mapPiai(row: PiaiRow): Promise<PiaiDTO> {
-  const editorIds = [...new Set(row.sections.map((s) => s.updatedById).filter((x): x is string => !!x))];
+  const editorIds = [...new Set([row.updatedById, ...row.sections.map((s) => s.updatedById)].filter((x): x is string => !!x))];
   const editors = editorIds.length
     ? await db.professional.findMany({ where: { id: { in: editorIds } }, select: { id: true, name: true } })
     : [];
@@ -48,9 +49,17 @@ export async function mapPiai(row: PiaiRow): Promise<PiaiDTO> {
       updatedAt: s.updatedAt.toISOString(),
     };
   }
+  // Última modificación: la más reciente entre la parte común y los apartados.
+  let lastEditedAt = row.updatedAt;
+  let lastEditedById = row.updatedById;
+  for (const s of row.sections) {
+    if (s.updatedAt > lastEditedAt) { lastEditedAt = s.updatedAt; lastEditedById = s.updatedById; }
+  }
   return {
     id: row.id,
     patientId: row.patientId,
+    lastEditedAt: lastEditedAt.toISOString(),
+    lastEditedByName: lastEditedById ? nameById.get(lastEditedById) ?? null : null,
     date: row.date.toISOString().slice(0, 10),
     status: row.status,
     createdById: row.createdById,

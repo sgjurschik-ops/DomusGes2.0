@@ -89,6 +89,7 @@ export function PiaiTab({ patientId }: { patientId: string }) {
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [metaOpen, setMetaOpen] = useState(false);
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set(["piai-general"]));
   const collapse = useMemo(() => ({
     isOpen: (id: string) => openIds.has(id),
@@ -174,13 +175,17 @@ export function PiaiTab({ patientId }: { patientId: string }) {
             {piais.map((p) => <SelectItem key={p.id} value={p.id}>PIAI · {formatDate(p.date)}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Input type="date" aria-label="Fecha del PIA" className="h-8 w-36 text-sm" value={piai.date}
-          onChange={(e) => { if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) patchPiai.mutate({ date: e.target.value }); }} />
-        <Select value={piai.status} onValueChange={(v) => patchPiai.mutate({ status: v })}>
-          <SelectTrigger className={cn("h-8 w-40 text-xs border", STATUS_STYLE[piai.status])} aria-label="Estado del PIA"><SelectValue /></SelectTrigger>
-          <SelectContent>{PIAI_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-        </Select>
-        <span className="flex-1 text-[11px] text-muted-foreground">Creado por {piai.createdByName}</span>
+        {/* Fecha y estado NO se guardan solos: se cambian en una ventana con
+            "Guardar", para no modificar un PIAI por error. */}
+        <span className={cn("h-8 inline-flex items-center rounded-md border px-2.5 text-xs font-medium", STATUS_STYLE[piai.status])}>{piai.status}</span>
+        <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setMetaOpen(true)}>
+          <Pencil className="w-3 h-3 mr-1" />Fecha y estado
+        </Button>
+        <span className="flex-1 min-w-[180px] text-[11px] text-muted-foreground leading-tight">
+          Creado por {piai.createdByName}
+          <br />Última modificación: {new Date(piai.lastEditedAt).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+          {piai.lastEditedByName ? ` · ${piai.lastEditedByName}` : ""}
+        </span>
         <Button size="sm" variant="outline" className="h-8 text-xs" asChild>
           <a href={`/api/patients/${patientId}/piai/${piai.id}/word`}><FileDown className="w-3.5 h-3.5 mr-1" />Descargar Word</a>
         </Button>
@@ -240,7 +245,53 @@ export function PiaiTab({ patientId }: { patientId: string }) {
       </CollapseCtx.Provider>
 
       <NewPiaiDialog open={newOpen} onOpenChange={setNewOpen} previous={piais} pending={create.isPending} onCreate={(p) => create.mutate(p)} />
+      {metaOpen && (
+        <PiaiMetaDialog
+          piai={piai}
+          saving={patchPiai.isPending}
+          onClose={() => setMetaOpen(false)}
+          onSave={async (body) => { await patchPiai.mutateAsync(body); setMetaOpen(false); }}
+        />
+      )}
     </div>
+  );
+}
+
+// Cambiar fecha / estado de un PIAI: solo al pulsar "Guardar".
+function PiaiMetaDialog({ piai, saving, onClose, onSave }: {
+  piai: PiaiDTO; saving: boolean; onClose: () => void; onSave: (b: { date: string; status: string }) => Promise<void>;
+}) {
+  const [date, setDate] = useState(piai.date);
+  const [status, setStatus] = useState(piai.status);
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(date);
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Fecha y estado del PIAI</DialogTitle>
+          <DialogDescription>Los cambios solo se guardan al pulsar Guardar.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Fecha del PIA</Label>
+            <Input type="date" className="w-44" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Estado</Label>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger className="w-44 h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>{PIAI_STATUSES.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!valid || saving || (date === piai.date && status === piai.status)} onClick={() => onSave({ date, status })}>
+            <Save className="w-3.5 h-3.5 mr-1" />{saving ? "Guardando…" : "Guardar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
