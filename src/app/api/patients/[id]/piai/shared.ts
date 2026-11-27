@@ -67,7 +67,7 @@ export async function mapPiai(row: PiaiRow): Promise<PiaiDTO> {
     createdByName: row.createdBy.name,
     updatedAt: row.updatedAt.toISOString(),
     general: safeJsonObject<PiaiGeneral>(row.general, {}),
-    generalObjectives: safeJsonObject<PiaiGeneralObjective[]>(row.generalObjectives, []),
+    generalObjectives: cleanGeneralObjectives(safeJsonObject<unknown[]>(row.generalObjectives, [])),
     // Siempre normalizadas: convierte revisiones guardadas con el formato antiguo.
     reviews: cleanReviews(safeJsonObject<unknown[]>(row.reviews, [])),
     sections,
@@ -120,7 +120,15 @@ export function cleanGeneralObjectives(v: unknown): PiaiGeneralObjective[] {
   if (!Array.isArray(v)) return [];
   return v.slice(0, 30).map((o, i) => {
     const x = (o && typeof o === "object" ? o : {}) as Record<string, unknown>;
-    return { id: str(x.id, 60) || `go-${i}`, text: str(x.text, 2000) ?? "", actions: strArray(x.actions).slice(0, 20) };
+    // Acciones: antes eran solo texto; ahora { id, text, done }. Se aceptan
+    // ambos formatos para no perder las ya guardadas.
+    const rawActions = Array.isArray(x.actions) ? x.actions : [];
+    const actions = rawActions.slice(0, 30).map((a, k) => {
+      if (typeof a === "string") return { id: `ac-${i}-${k}`, text: a.slice(0, 2000), done: false };
+      const z = (a && typeof a === "object" ? a : {}) as Record<string, unknown>;
+      return { id: str(z.id, 60) || `ac-${i}-${k}`, text: str(z.text, 2000) ?? "", done: z.done === true };
+    }).filter((a) => a.text.trim());
+    return { id: str(x.id, 60) || `go-${i}`, text: str(x.text, 2000) ?? "", actions };
   });
 }
 

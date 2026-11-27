@@ -149,7 +149,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       label("Breve descripción"),
       ...body(htmlToPlainText(g.description)),
       label("Objetivos generales"),
-      ...objectivesList(piai.generalObjectives.map((o) => o.text), piai.generalObjectives.map((o) => o.actions)),
+      ...objectivesList(piai.generalObjectives.map((o) => o.text), piai.generalObjectives.map((o) => o.actions.map((a) => `${a.done ? "☑" : "☐"} ${a.text}`))),
     ];
 
     PIAI_SECTIONS.forEach((def, idx) => {

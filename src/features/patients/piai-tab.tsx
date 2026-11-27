@@ -37,7 +37,7 @@ import { EVALUATION_SECTIONS } from "@/lib/evaluations";
 import { InterventionPlanTab } from "./intervention-plan-tab";
 import {
   ClipboardList, Copy, FileDown, FilePlus2, Lock, Pencil, Plus, Save, Trash2, X, Users, Flag, History, CheckCircle2,
-  ChevronDown, ChevronRight, MoreHorizontal,
+  ChevronDown, ChevronRight, MoreHorizontal, Check,
 } from "lucide-react";
 
 const ACCENT = "#56608a";
@@ -120,6 +120,15 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
     onError: (e) => toast({ title: "No se ha podido guardar el PIAI", description: errDetail(e), variant: "destructive" }),
   });
 
+  // Guardado "rápido" (marcar una acción, marcar entregado): sin aviso de
+  // "PIAI guardado" en cada clic, solo avisa si falla.
+  const patchQuiet = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      fetcher<PiaiDTO>(`/api/patients/${patientId}/piai/${piai!.id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    onSuccess: (u) => setCached(u),
+    onError: (e) => toast({ title: "No se ha podido guardar", description: errDetail(e), variant: "destructive" }),
+  });
+
   const saveSection = useMutation({
     mutationFn: ({ key, content }: { key: string; content: PiaiSectionContent }) =>
       fetcher<PiaiDTO>(`/api/patients/${patientId}/piai/${piai!.id}/sections/${key}`, { method: "PUT", body: JSON.stringify({ content }) }),
@@ -197,15 +206,24 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
         <div className="flex items-start gap-3 px-4 pt-3 pb-2.5">
           <div className="flex-1 min-w-0">
             <h3 className="text-lg font-semibold leading-tight">PIA general · {formatDate(piai.date)}</h3>
+            {/* Entregado a la persona: un clic para marcar/desmarcar */}
+            <button type="button" disabled={patchQuiet.isPending}
+              onClick={() => {
+                const delivered = !!piai.general.deliveredDate;
+                if (delivered && !confirm("¿Quitar la marca de entregado?")) return;
+                patchQuiet.mutate({ general: { ...piai.general, deliveredDate: delivered ? "" : todayStr() } },
+                  { onSuccess: () => toast({ title: delivered ? "Marcado como no entregado" : "Marcado como entregado a la persona" }) });
+              }}
+              className={cn("mt-1.5 inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-sm transition-colors",
+                piai.general.deliveredDate ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100" : "border-dashed hover:bg-muted text-muted-foreground")}>
+              <span className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                piai.general.deliveredDate ? "bg-emerald-600 border-emerald-600 text-white" : "border-muted-foreground/50 bg-background")}>
+                {piai.general.deliveredDate && <Check className="w-3 h-3" strokeWidth={3} />}
+              </span>
+              {piai.general.deliveredDate ? `Entregado a la persona el ${formatDate(piai.general.deliveredDate)}` : "Marcar como entregado a la persona"}
+            </button>
             <div className="flex items-center gap-1.5 flex-wrap mt-1.5 text-xs">
               <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 font-medium", STATUS_STYLE[piai.status])}>{piai.status}</span>
-              {piai.general.deliveredDate ? (
-                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-medium text-emerald-800">
-                  <CheckCircle2 className="w-3 h-3" />Entregado {formatDate(piai.general.deliveredDate)}
-                </span>
-              ) : (
-                <span className="inline-flex items-center rounded-md border border-dashed px-2 py-0.5 text-muted-foreground">No entregado</span>
-              )}
               <span className="text-muted-foreground">· modificado {lastEdited}{piai.lastEditedByName ? ` por ${piai.lastEditedByName}` : ""}</span>
             </div>
           </div>
@@ -290,7 +308,10 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
               <GeneralBlock key={`g-${piai.id}`} referent={referent} careTeamReferent={careTeamReferent} piai={piai} saving={patchPiai.isPending} onSave={(general) => patchPiai.mutateAsync({ general })} />
             )}
             {activeSection === "piai-objetivos" && (
-              <GeneralObjectivesBlock key={`o-${piai.id}`} piai={piai} saving={patchPiai.isPending} onSave={(generalObjectives) => patchPiai.mutateAsync({ generalObjectives })} />
+              <GeneralObjectivesBlock key={`o-${piai.id}`} piai={piai} saving={patchPiai.isPending}
+                onSave={(generalObjectives) => patchPiai.mutateAsync({ generalObjectives })}
+                onQuickSave={(generalObjectives) => patchQuiet.mutateAsync({ generalObjectives })}
+                quickSaving={patchQuiet.isPending} />
             )}
             {PIAI_SECTIONS.filter((def) => activeSection === `piai-${def.key}`).map((def) => (
               <SectionBlock
@@ -515,11 +536,27 @@ function GeneralBlock({ piai, saving, onSave, referent, careTeamReferent }: {
 
 // ─── 2. Objetivos generales ──────────────────────────────────────────────────
 
-function GeneralObjectivesBlock({ piai, saving, onSave }: { piai: PiaiDTO; saving: boolean; onSave: (o: PiaiGeneralObjective[]) => Promise<unknown> }) {
+function GeneralObjectivesBlock({ piai, saving, onSave, onQuickSave, quickSaving }: {
+  piai: PiaiDTO; saving: boolean;
+  onSave: (o: PiaiGeneralObjective[]) => Promise<unknown>;
+  // Marcar una acción o añadir una nueva: se guarda al momento.
+  onQuickSave: (o: PiaiGeneralObjective[]) => Promise<unknown>;
+  quickSaving: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<PiaiGeneralObjective[]>(piai.generalObjectives);
+  const [newAction, setNewAction] = useState<Record<string, string>>({});
   const items = piai.generalObjectives.filter((o) => o.text.trim());
   const update = (i: number, p: Partial<PiaiGeneralObjective>) => setDraft((d) => d.map((o, j) => (j === i ? { ...o, ...p } : o)));
+
+  const withObjective = (objId: string, fn: (o: PiaiGeneralObjective) => PiaiGeneralObjective) =>
+    onQuickSave(piai.generalObjectives.map((o) => (o.id === objId ? fn(o) : o)));
+  function addAction(objId: string) {
+    const text = (newAction[objId] ?? "").trim();
+    if (!text) return;
+    setNewAction((p) => ({ ...p, [objId]: "" }));
+    withObjective(objId, (o) => ({ ...o, actions: [...o.actions, { id: newId("ac"), text, done: false }] }));
+  }
 
   return (
     <BlockCard id="piai-objetivos" icon={Flag} title="Objetivos generales" subtitle={items.length ? `${items.length} objetivo${items.length === 1 ? "" : "s"} de la persona usuaria` : "los que plantea la persona usuaria"} editing={editing}
@@ -534,7 +571,10 @@ function GeneralObjectivesBlock({ piai, saving, onSave }: { piai: PiaiDTO; savin
                 <button type="button" aria-label="Quitar objetivo" className="text-muted-foreground hover:text-destructive" onClick={() => setDraft((d) => d.filter((_, j) => j !== i))}><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
               <div className="pl-20">
-                <StringListEditor items={o.actions} onChange={(actions) => update(i, { actions })} placeholder="Acción…" addLabel="Añadir acción" />
+                <StringListEditor
+                  items={o.actions.map((a) => a.text)}
+                  onChange={(texts) => update(i, { actions: texts.map((t, k) => ({ id: o.actions[k]?.id ?? newId("ac"), text: t, done: o.actions[k]?.done ?? false })) })}
+                  placeholder="Acción…" addLabel="Añadir acción" />
               </div>
             </div>
           ))}
@@ -543,25 +583,58 @@ function GeneralObjectivesBlock({ piai, saving, onSave }: { piai: PiaiDTO; savin
             <Plus className="w-3 h-3" />Añadir objetivo general
           </button>
           <EditActions saving={saving} onCancel={() => setEditing(false)}
-            onSave={async () => { await onSave(draft.filter((o) => o.text.trim()).map((o) => ({ ...o, actions: o.actions.filter((a) => a.trim()) }))); setEditing(false); }} />
+            onSave={async () => { await onSave(draft.filter((o) => o.text.trim()).map((o) => ({ ...o, actions: o.actions.filter((a) => a.text.trim()) }))); setEditing(false); }} />
         </div>
       ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground/70">Sin objetivos generales todavía.</p>
+        <p className="text-sm text-muted-foreground/70">Sin objetivos generales todavía. Pulsa Editar para añadirlos.</p>
       ) : (
-        <ol className="space-y-2">
-          {items.map((o, i) => (
-            <li key={o.id} className="text-sm">
-              <div className="flex gap-2">
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0 bg-[#56608a]/10 text-[#56608a]">{i + 1}</span>
-                <span className="font-medium leading-snug">{o.text}</span>
-              </div>
-              {o.actions.length > 0 && (
-                <ul className="pl-7 mt-1 space-y-0.5">
-                  {o.actions.map((a, k) => <li key={k} className="text-xs text-muted-foreground">Acción {k + 1}: <span className="text-foreground">{a}</span></li>)}
-                </ul>
-              )}
-            </li>
-          ))}
+        <ol className="space-y-3">
+          {items.map((o, i) => {
+            const done = o.actions.filter((a) => a.done).length;
+            return (
+              <li key={o.id} className="text-sm">
+                <div className="flex gap-2 items-start">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0 bg-[#56608a]/10 text-[#56608a] mt-0.5">{i + 1}</span>
+                  <span className="font-medium leading-snug flex-1">{o.text}</span>
+                  {o.actions.length > 0 && <span className="text-[11px] text-muted-foreground shrink-0">{done}/{o.actions.length} acciones</span>}
+                </div>
+                {/* Acciones: casilla para marcar hecha + línea para añadir */}
+                <div className="pl-7 mt-1.5 space-y-1">
+                  {o.actions.map((a) => (
+                    <div key={a.id} className="group flex items-center gap-2">
+                      <button type="button" disabled={quickSaving} aria-pressed={a.done}
+                        onClick={() => withObjective(o.id, (x) => ({ ...x, actions: x.actions.map((y) => (y.id === a.id ? { ...y, done: !y.done } : y)) }))}
+                        className="flex items-center gap-2 text-left flex-1 min-w-0">
+                        <span className={cn("w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                          a.done ? "bg-emerald-600 border-emerald-600 text-white" : "border-muted-foreground/40 group-hover:border-foreground/60")}>
+                          {a.done && <Check className="w-3 h-3" strokeWidth={3} />}
+                        </span>
+                        <span className={cn("text-[13px]", a.done && "line-through text-muted-foreground")}>{a.text}</span>
+                      </button>
+                      <button type="button" aria-label="Quitar acción" disabled={quickSaving}
+                        onClick={() => { if (confirm("¿Quitar esta acción?")) withObjective(o.id, (x) => ({ ...x, actions: x.actions.filter((y) => y.id !== a.id) })); }}
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <input
+                      value={newAction[o.id] ?? ""}
+                      onChange={(e) => setNewAction((p) => ({ ...p, [o.id]: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addAction(o.id); } }}
+                      placeholder="Añadir acción y pulsar Enter…"
+                      className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/70 py-0.5 border-b border-transparent focus:border-border"
+                    />
+                    {(newAction[o.id] ?? "").trim() && (
+                      <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" disabled={quickSaving} onClick={() => addAction(o.id)}>Añadir</Button>
+                    )}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
         </ol>
       )}
     </BlockCard>

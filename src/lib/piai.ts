@@ -35,10 +35,16 @@ export const PIAI_GENERAL_FIELDS: { key: keyof PiaiGeneral; label: string; type:
   { key: "publicFunding", label: "Financiación pública", type: "text" },
 ];
 
+export interface PiaiAction {
+  id: string;
+  text: string;
+  done: boolean; // casilla marcada = acción realizada
+}
+
 export interface PiaiGeneralObjective {
   id: string;
   text: string;
-  actions: string[];
+  actions: PiaiAction[];
 }
 
 // ─── Apartados por profesión ─────────────────────────────────────────────────
