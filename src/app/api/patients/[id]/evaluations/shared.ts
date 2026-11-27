@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import type { PatientEvaluationDTO } from "@/lib/evaluations";
 
 export const EVALUATION_INCLUDE = {
-  author: { select: { name: true } },
+  author: { select: { name: true, role: true } },
 } as const;
 
 type EvaluationRow = {
@@ -22,7 +22,7 @@ type EvaluationRow = {
   other: string;
   updatedById: string | null;
   updatedAt: Date;
-  author: { name: string };
+  author: { name: string; role: string };
 };
 
 export async function mapEvaluation(row: EvaluationRow): Promise<PatientEvaluationDTO> {
@@ -40,6 +40,7 @@ export async function mapEvaluation(row: EvaluationRow): Promise<PatientEvaluati
     date: row.date.toISOString().slice(0, 10),
     authorId: row.authorId,
     authorName: row.author.name,
+    profession: row.author.role,
     updatedByName,
     updatedAt: row.updatedAt.toISOString(),
     generalData: row.generalData,

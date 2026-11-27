@@ -1101,9 +1101,9 @@ function EvaluationSummaryCard({
         ) : (
           <>
             <p className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{evaluations.length === 1 ? "Valoración inicial" : "Revaloración"}</span>
+              <span className="font-medium text-foreground">{latest.profession}</span>
               {" · "}{formatDate(latest.date)} · {latest.authorName}
-              {evaluations.length > 1 && <> · {evaluations.length} valoraciones</>}
+              {evaluations.length > 1 && <> · {evaluations.length} valoraciones en total</>}
             </p>
             {excerpt ? (
               <p className="text-sm leading-snug line-clamp-4">{excerpt}</p>

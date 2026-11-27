@@ -25,9 +25,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
     const existing = await db.patientEvaluation.findFirst({
       where: { id: evaluationId, patientId },
-      select: { id: true },
+      select: { id: true, author: { select: { role: true } } },
     });
     if (!existing) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+    // Cada profesión edita sus propias valoraciones (todos las pueden leer).
+    if (existing.author.role !== prof.role) {
+      return NextResponse.json({ error: "FORBIDDEN", detail: `Solo un/a profesional de ${existing.author.role} puede editar esta valoración` }, { status: 403 });
+    }
 
     const body = await req.json().catch(() => ({}));
 

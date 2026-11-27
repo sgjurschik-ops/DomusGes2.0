@@ -25,19 +25,22 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RichTextarea } from "@/components/rich-textarea";
+import { ClinicalNotes } from "@/components/clinical-notes";
 import { formatDate } from "@/components/domain";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { QUALITATIVE_SCALES } from "@/lib/schemas";
 import {
   EVALUATION_SECTIONS,
+  OT_PROFESSION,
+  evaluationSectionsFor,
   EVALUATION_TEXT_FIELDS,
   type EvaluationSectionDef,
   type EvaluationTextField,
   type PatientEvaluationDTO,
 } from "@/lib/evaluations";
 import type { AssessmentDTO } from "@/types/domain";
-import { ClipboardList, Copy, FilePlus2, Gauge, Save, Trash2, Check } from "lucide-react";
+import { ClipboardList, Copy, FilePlus2, Gauge, Save, Trash2, Check, Lock } from "lucide-react";
 
 type Drafts = Record<EvaluationTextField, string>;
 
@@ -95,8 +98,20 @@ export function EvaluationTab({
   const [newOpen, setNewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [pendingSwitchId, setPendingSwitchId] = useState<string | null>(null);
+  // Profesión cuyas valoraciones se ven. Por defecto, la mía. Todos pueden
+  // LEER las de las demás profesiones, pero solo editar las suyas.
+  const [professionChoice, setProfessionChoice] = useState<string | null>(null);
+  const profession = professionChoice ?? me?.role ?? OT_PROFESSION;
+  const canEdit = me?.role === profession;
+  const sections = evaluationSectionsFor(profession);
+  const myRole = me?.role;
+  const professions = useMemo(() => {
+    const set = new Set<string>((evaluations ?? []).map((e) => e.profession));
+    if (myRole) set.add(myRole);
+    return [...set].sort();
+  }, [evaluations, myRole]);
 
-  const list = useMemo(() => evaluations ?? [], [evaluations]);
+  const list = useMemo(() => (evaluations ?? []).filter((e) => e.profession === profession), [evaluations, profession]);
   const selectedIndex = list.findIndex((e) => e.id === selectedId);
   const selected = selectedIndex >= 0 ? list[selectedIndex] : null;
   // La más antigua es la valoración inicial; el resto, revaloraciones.
@@ -126,7 +141,7 @@ export function EvaluationTab({
   const isFieldDirty = (f: EvaluationTextField) =>
     !!selected && !!drafts && normalizeHtml(drafts[f]) !== normalizeHtml(selected[f]);
   const isSectionDirty = (s: EvaluationSectionDef) => s.fields.some((x) => isFieldDirty(x.field));
-  const anyDirty = EVALUATION_SECTIONS.some(isSectionDirty);
+  const anyDirty = sections.some(isSectionDirty);
 
   // Mantiene al día el almacén de borradores sin guardar.
   useEffect(() => {
@@ -248,18 +263,41 @@ export function EvaluationTab({
 
   return (
     <div className="space-y-4">
+      {/* Valoraciones de qué profesión se están viendo */}
+      {professions.length > 1 && (
+        <div className="flex items-center gap-1 flex-wrap text-xs">
+          <span className="text-muted-foreground mr-1">Profesión:</span>
+          {professions.map((p) => (
+            <button key={p} type="button"
+              onClick={() => {
+                if (p === profession) return;
+                if (anyDirty) { toast({ title: "Tienes cambios sin guardar", description: "Guarda o descarta antes de cambiar de profesión.", variant: "destructive" }); return; }
+                setProfessionChoice(p); setSelectedId(null); setSavedSection(null);
+              }}
+              className={cn("rounded-full border px-2.5 py-1 transition-colors",
+                p === profession ? "bg-[#6e6587] border-[#6e6587] text-white" : "hover:bg-muted text-muted-foreground")}>
+              {p}{p === me?.role ? " (tú)" : ""}
+            </button>
+          ))}
+        </div>
+      )}
+
       {list.length === 0 || !selected || !drafts ? (
         <Card className="p-8 text-center space-y-3">
           <ClipboardList className="w-8 h-8 mx-auto text-muted-foreground opacity-50" />
-          <p className="text-sm text-muted-foreground">Todavía no hay ninguna valoración para este/a usuario/a.</p>
-          <div className="flex items-center justify-center gap-2">
-            <Button size="sm" onClick={() => setNewOpen(true)}>
-              <FilePlus2 className="w-3.5 h-3.5 mr-1" />Crear valoración inicial
-            </Button>
-            <Button size="sm" variant="outline" onClick={onGoToScales}>
-              <Gauge className="w-3.5 h-3.5 mr-1" />Ir a escalas
-            </Button>
-          </div>
+          <p className="text-sm text-muted-foreground">Todavía no hay ninguna valoración de {profession} para este/a usuario/a.</p>
+          {canEdit && (
+            <div className="flex items-center justify-center gap-2">
+              <Button size="sm" onClick={() => setNewOpen(true)}>
+                <FilePlus2 className="w-3.5 h-3.5 mr-1" />Crear valoración inicial
+              </Button>
+              {allowedScales.length > 0 && (
+                <Button size="sm" variant="outline" onClick={onGoToScales}>
+                  <Gauge className="w-3.5 h-3.5 mr-1" />Ir a escalas
+                </Button>
+              )}
+            </div>
+          )}
         </Card>
       ) : (
         <>
@@ -282,7 +320,7 @@ export function EvaluationTab({
               aria-label="Fecha de la valoración"
               className="h-8 w-36 text-sm"
               value={selected.date}
-              disabled={changeDate.isPending}
+              disabled={changeDate.isPending || !canEdit}
               onChange={(e) => {
                 const v = e.target.value;
                 if (/^\d{4}-\d{2}-\d{2}$/.test(v) && v !== selected.date) {
@@ -291,15 +329,20 @@ export function EvaluationTab({
               }}
             />
             <span className="flex-1 min-w-[160px] text-[11px] text-muted-foreground leading-tight">
-              {isInitial ? "Valoración inicial" : "Revaloración"} · {selected.authorName}
+              {profession} · {isInitial ? "Valoración inicial" : "Revaloración"} · {selected.authorName}
+              {!canEdit && <> · <span className="inline-flex items-center gap-0.5"><Lock className="w-3 h-3" />solo lectura</span></>}
               {selected.updatedByName && <> · editada por {selected.updatedByName}, {formatDate(selected.updatedAt)}</>}
             </span>
-            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onGoToScales}>
-              <Gauge className="w-3.5 h-3.5 mr-1" />Escalas
-            </Button>
-            <Button size="sm" className="h-8 text-xs" onClick={openNewDialog}>
-              <FilePlus2 className="w-3.5 h-3.5 mr-1" />Nueva valoración
-            </Button>
+            {allowedScales.length > 0 && canEdit && (
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onGoToScales}>
+                <Gauge className="w-3.5 h-3.5 mr-1" />Escalas
+              </Button>
+            )}
+            {canEdit && (
+              <Button size="sm" className="h-8 text-xs" onClick={openNewDialog}>
+                <FilePlus2 className="w-3.5 h-3.5 mr-1" />Nueva valoración
+              </Button>
+            )}
             {me?.id === selected.authorId && (
               <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive"
                 aria-label="Eliminar valoración" onClick={() => setDeleteOpen(true)}>
@@ -311,7 +354,7 @@ export function EvaluationTab({
           {/* Bloques: todos en una sola tarjeta, separados por líneas, con el
               título a la izquierda en pantallas anchas para ahorrar altura. */}
           <Card className="overflow-hidden py-0 gap-0">
-            {EVALUATION_SECTIONS.map((section, idx) => {
+            {sections.map((section, idx) => {
               const dirty = isSectionDirty(section);
               const saving = saveFields.isPending && saveFields.variables?.sectionKey === section.key;
               const sectionScales = section.scales.filter((sc) => allowedScales.includes(sc));
@@ -330,7 +373,7 @@ export function EvaluationTab({
                       <h3 className="text-sm font-semibold leading-tight">{section.title}</h3>
                       <p className="hidden lg:block text-[11px] text-muted-foreground leading-snug mt-0.5">{section.hint}</p>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className={cn("flex items-center gap-1.5 flex-wrap", !canEdit && "hidden")}>
                       <Button size="sm" variant={dirty ? "default" : "outline"} className="h-7 px-2.5 text-xs" disabled={!dirty || saving}
                         onClick={() => {
                           const fields: Partial<Drafts> = {};
@@ -369,17 +412,21 @@ export function EvaluationTab({
                       {section.fields.map((x) => (
                         <div key={x.field} className="space-y-1 min-w-0">
                           {x.label && <p className="text-xs font-semibold text-muted-foreground">{x.label}</p>}
-                          <RichTextarea
-                            key={`${selected.id}-${x.field}`}
-                            tone="filled"
-                            value={drafts[x.field]}
-                            onChange={(html) => {
-                              setSavedSection(null);
-                              setDrafts((d) => (d ? { ...d, [x.field]: html } : d));
-                            }}
-                            rows={3}
-                            placeholder={x.placeholder}
-                          />
+                          {canEdit ? (
+                            <RichTextarea
+                              key={`${selected.id}-${x.field}`}
+                              tone="filled"
+                              value={drafts[x.field]}
+                              onChange={(html) => {
+                                setSavedSection(null);
+                                setDrafts((d) => (d ? { ...d, [x.field]: html } : d));
+                              }}
+                              rows={section.key === "free" ? 10 : 3}
+                              placeholder={x.placeholder}
+                            />
+                          ) : (
+                            <div className="rounded-md bg-muted/30 px-3 py-2"><ClinicalNotes html={selected[x.field] || ""} /></div>
+                          )}
                         </div>
                       ))}
                     </div>

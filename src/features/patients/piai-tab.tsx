@@ -33,7 +33,7 @@ import {
   type PiaiSectionContent, type PiaiSectionDef,
 } from "@/lib/piai";
 import type { PatientEvaluationDTO } from "@/lib/evaluations";
-import { EVALUATION_SECTIONS } from "@/lib/evaluations";
+import { evaluationToHtml } from "@/lib/evaluations";
 import { InterventionPlanTab } from "./intervention-plan-tab";
 import {
   ClipboardList, Copy, FileDown, FilePlus2, Lock, Pencil, Plus, Save, Trash2, X, Users, Flag, History, CheckCircle2,
@@ -659,16 +659,12 @@ function SectionBlock({ def, piai, patientId, canEdit, saving, onSave }: {
     queryKey: ["evaluations", patientId],
     queryFn: () => fetcher(`/api/patients/${patientId}/evaluations`),
   });
-  const latestEv = evaluations?.[0];
-  const latestEvHasText = !!latestEv && EVALUATION_SECTIONS.some((sec) => sec.fields.some((f) => hasHtmlText(latestEv[f.field])));
+  // La última valoración DE ESTA PROFESIÓN (cada profesión tiene las suyas).
+  const latestEv = evaluations?.find((e) => e.profession === def.role);
+  const latestEvHasText = !!latestEv && hasHtmlText(evaluationToHtml(latestEv));
   // ¿La valoración es más reciente que lo guardado en este apartado?
   const newerEvaluation = latestEvHasText && (!stored || latestEv!.updatedAt > stored.updatedAt);
 
-  function evaluationHtml(ev: PatientEvaluationDTO) {
-    return EVALUATION_SECTIONS.flatMap((sec) => sec.fields
-      .filter((f) => hasHtmlText(ev[f.field]))
-      .map((f) => `<p><b>${f.label ? `${sec.title} — ${f.label}` : sec.title}</b></p>${ev[f.field]}`)).join("");
-  }
   // Abre la edición con la valoración volcada; se guarda al pulsar Guardar.
   function dumpLatestEvaluation() {
     if (!latestEv || !latestEvHasText) {
@@ -678,7 +674,7 @@ function SectionBlock({ def, piai, patientId, canEdit, saving, onSave }: {
     const base = editing ? draft : { ...saved, objectives: saved.objectives?.length ? saved.objectives : [""] };
     const current = base.assessment;
     if (hasHtmlText(current) && !confirm(`Este apartado ya tiene una valoración escrita.\n\n¿Sustituirla por la valoración del ${formatDate(latestEv.date)}?`)) return;
-    setDraft({ ...base, assessment: evaluationHtml(latestEv), assessedBy: base.assessedBy || latestEv.authorName });
+    setDraft({ ...base, assessment: evaluationToHtml(latestEv), assessedBy: base.assessedBy || latestEv.authorName });
     setEditing(true);
     toast({ title: "Valoración volcada", description: `Del ${formatDate(latestEv.date)}. Revísala y pulsa Guardar.` });
   }
@@ -712,7 +708,7 @@ function SectionBlock({ def, piai, patientId, canEdit, saving, onSave }: {
             {loadingEvaluations ? "Buscando la última valoración…"
               : latestEvHasText
                 ? <>{newerEvaluation ? "Hay una valoración más reciente" : "Última valoración"}: <b>{formatDate(latestEv!.date)}</b> ({latestEv!.authorName})</>
-                : "No hay ninguna valoración escrita en la pestaña Valoración."}
+                : `No hay ninguna valoración de ${def.title} escrita en la pestaña Valoración.`}
           </span>
           {latestEvHasText && (
             <Button type="button" size="sm" variant={newerEvaluation ? "default" : "outline"} className="h-7 text-xs" onClick={dumpLatestEvaluation}>

@@ -52,7 +52,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     let copied = {};
     if (typeof body?.copyFromId === "string" && body.copyFromId) {
       const source = await db.patientEvaluation.findFirst({
-        where: { id: body.copyFromId, patientId },
+        // Solo se puede copiar una valoración de la misma profesión.
+        where: { id: body.copyFromId, patientId, author: { role: prof.role } },
         select: { generalData: true, adl: true, iadl: true, physical: true, routines: true, other: true },
       });
       if (!source) {

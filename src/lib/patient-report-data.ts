@@ -5,7 +5,7 @@
 
 import { db } from "@/lib/db";
 import { scalesForRole } from "@/lib/schemas";
-import { EVALUATION_SECTIONS } from "@/lib/evaluations";
+import { evaluationSectionsFor } from "@/lib/evaluations";
 
 export const REPORT_SECTIONS = ["summary", "goals", "evaluation", "visits", "assessments"] as const;
 export type ReportSection = typeof REPORT_SECTIONS[number];
@@ -146,7 +146,7 @@ export async function gatherPatientReportData(
       ? db.patientEvaluation.findMany({
           where: { patientId },
           orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-          include: { author: { select: { name: true } } },
+          include: { author: { select: { name: true, role: true } } },
         })
       : Promise.resolve([]),
   ]);
@@ -161,14 +161,15 @@ export async function gatherPatientReportData(
       metas: parseSpecificGoals(g.specificGoals).map((m) => ({ text: m.text, status: m.status })),
     }));
 
-  // Valoración: la más reciente, con todos sus bloques rellenos.
-  const latest = evaluations[0];
+  // Valoración: la más reciente de la profesión de quien genera el informe
+  // (si no tiene, la más reciente de cualquier profesión).
+  const latest = evaluations.find((e) => e.author.role === professionalRole) ?? evaluations[0];
   const evaluation = latest
     ? {
         date: latest.date,
         isInitial: evaluations.length === 1,
         authorName: latest.author.name,
-        blocks: EVALUATION_SECTIONS.flatMap((section) =>
+        blocks: evaluationSectionsFor(latest.author.role).flatMap((section) =>
           section.fields
             .map((f) => ({
               title: f.label ? `${section.title} — ${f.label}` : section.title,

@@ -68,9 +68,41 @@ export const EVALUATION_SECTIONS: readonly EvaluationSectionDef[] = [
   },
 ];
 
+// Valoración POR PROFESIÓN: Terapia ocupacional usa los bloques de arriba;
+// el resto de profesiones escriben su valoración en una sola caja de texto
+// libre (se guarda en el campo generalData).
+export const OT_PROFESSION = "Terapia ocupacional";
+
+export const FREE_TEXT_SECTIONS: readonly EvaluationSectionDef[] = [
+  {
+    key: "free",
+    title: "Valoración",
+    hint: "Texto libre",
+    fields: [{ field: "generalData", placeholder: "Escribe aquí tu valoración…" }],
+    scales: [],
+  },
+];
+
+export function evaluationSectionsFor(profession: string | null | undefined): readonly EvaluationSectionDef[] {
+  return !profession || profession === OT_PROFESSION ? EVALUATION_SECTIONS : FREE_TEXT_SECTIONS;
+}
+
+// HTML de toda la valoración (para volcarla en el PIAI): con títulos de
+// bloque en TO; tal cual en el resto.
+export function evaluationToHtml(ev: PatientEvaluationDTO): string {
+  const hasText = (h?: string) => !!h && h.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
+  const sections = evaluationSectionsFor(ev.profession);
+  if (sections === FREE_TEXT_SECTIONS) return ev.generalData;
+  return sections.flatMap((sec) => sec.fields
+    .filter((f) => hasText(ev[f.field]))
+    .map((f) => `<p><b>${f.label ? `${sec.title} — ${f.label}` : sec.title}</b></p>${ev[f.field]}`)).join("");
+}
+
 export interface PatientEvaluationDTO {
   id: string;
   patientId: string;
+  // Profesión de quien la creó (Professional.role).
+  profession: string;
   date: string; // YYYY-MM-DD
   authorId: string;
   authorName: string;
