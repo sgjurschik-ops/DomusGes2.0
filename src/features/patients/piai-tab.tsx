@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RichTextarea } from "@/components/rich-textarea";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ClinicalNotes } from "@/components/clinical-notes";
 import { formatDate } from "@/components/domain";
 import { toast } from "@/hooks/use-toast";
@@ -36,7 +37,7 @@ import { EVALUATION_SECTIONS } from "@/lib/evaluations";
 import { InterventionPlanTab } from "./intervention-plan-tab";
 import {
   ClipboardList, Copy, FileDown, FilePlus2, Lock, Pencil, Plus, Save, Trash2, X, Users, Flag, History, CheckCircle2,
-  ChevronDown, ChevronRight,
+  ChevronDown, ChevronRight, MoreHorizontal,
 } from "lucide-react";
 
 const ACCENT = "#56608a";
@@ -54,22 +55,23 @@ const todayStr = () => {
 const fmt = (d?: string | null) => (d ? formatDate(d) : "—");
 const hasHtmlText = (html?: string) => !!html && html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
 
-// Color suave por profesión: solo para las pestañas del índice de arriba.
-const SECTION_CHIP: Record<string, string> = {
-  "trabajo-social": "bg-sky-50 border-sky-200 text-sky-900 hover:bg-sky-100",
-  "terapia-ocupacional": "bg-orange-50 border-orange-200 text-orange-900 hover:bg-orange-100",
-  "logopedia": "bg-rose-50 border-rose-200 text-rose-900 hover:bg-rose-100",
-  "fisioterapia": "bg-emerald-50 border-emerald-200 text-emerald-900 hover:bg-emerald-100",
-  "psicologia": "bg-violet-50 border-violet-200 text-violet-900 hover:bg-violet-100",
-  "neuropsicologia": "bg-fuchsia-50 border-fuchsia-200 text-fuchsia-900 hover:bg-fuchsia-100",
-  "cuidados": "bg-cyan-50 border-cyan-200 text-cyan-900 hover:bg-cyan-100",
+// Punto de color de cada profesión en el menú lateral.
+const SECTION_DOT: Record<string, string> = {
+  "trabajo-social": "#378ADD",
+  "terapia-ocupacional": "#D85A30",
+  "logopedia": "#D4537E",
+  "fisioterapia": "#639922",
+  "psicologia": "#7F77DD",
+  "neuropsicologia": "#993556",
+  "cuidados": "#1D9E75",
 };
 
-// Qué bloques están desplegados. Por defecto solo "Información general";
-// el resto aparecen plegados (solo la cabecera) hasta que se pulsan.
-const CollapseCtx = createContext<{ isOpen: (id: string) => boolean; setOpen: (id: string, open: boolean) => void }>({
+// Plegado de bloques. Con el menú lateral se ve un apartado cada vez, así
+// que los bloques van siempre abiertos y sin flecha de plegar.
+const CollapseCtx = createContext<{ isOpen: (id: string) => boolean; setOpen: (id: string, open: boolean) => void; collapsible?: boolean }>({
   isOpen: () => true,
   setOpen: () => {},
+  collapsible: false,
 });
 
 const STATUS_STYLE: Record<string, string> = {
@@ -97,15 +99,9 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
   const [newOpen, setNewOpen] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);
   const [highlightReview, setHighlightReview] = useState<string | null>(null);
-  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set(["piai-general"]));
-  const collapse = useMemo(() => ({
-    isOpen: (id: string) => openIds.has(id),
-    setOpen: (id: string, open: boolean) => setOpenIds((prev) => {
-      const next = new Set(prev);
-      if (open) next.add(id); else next.delete(id);
-      return next;
-    }),
-  }), [openIds]);
+  // Apartado que se está viendo (menú lateral).
+  const [activeSection, setActiveSection] = useState("piai-general");
+  const collapse = useMemo(() => ({ isOpen: () => true, setOpen: () => {}, collapsible: false }), []);
   const piais = useMemo(() => list ?? [], [list]);
   const piai = piais.find((p) => p.id === selectedId) ?? piais[0] ?? null;
 
@@ -171,118 +167,148 @@ export function PiaiTab({ patientId, referent, careTeamReferent }: {
   }
 
   const canDelete = me?.id === piai.createdById;
+  const history = historyEntries(piais);
+  const navItems: { id: string; label: string; dot?: string; done?: boolean; group?: string }[] = [
+    { id: "piai-general", label: "Información general" },
+    { id: "piai-objetivos", label: "Objetivos generales", done: piai.generalObjectives.some((o) => o.text.trim()) },
+    ...PIAI_SECTIONS.map((sec, i) => ({
+      id: `piai-${sec.key}`, label: sec.title, dot: SECTION_DOT[sec.key], group: i === 0 ? "Profesionales" : undefined,
+      done: hasHtmlText(piai.sections[sec.key]?.content.assessment),
+    })),
+    { id: "piai-revisiones", label: "Revisión de objetivos", done: piai.reviews.length > 0 },
+  ];
+  const lastEdited = new Date(piai.lastEditedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" });
+
+  function goToEntry(h: (typeof history)[number]) {
+    setSelectedId(h.piaiId);
+    if (h.kind === "review") {
+      setHighlightReview(h.reviewId!);
+      setActiveSection("piai-revisiones");
+      setTimeout(() => document.getElementById(`piai-review-${h.reviewId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+    } else {
+      setHighlightReview(null);
+    }
+  }
 
   return (
     <div className="space-y-4">
-      {/* Barra: selector, fecha, estado, acciones */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2">
-        <span className="text-sm font-semibold">PIA general · {formatDate(piai.date)}</span>
-        {/* Fecha y estado NO se guardan solos: se cambian en una ventana con
-            "Guardar", para no modificar un PIAI por error. */}
-        <span className={cn("h-8 inline-flex items-center rounded-md border px-2.5 text-xs font-medium", STATUS_STYLE[piai.status])}>{piai.status}</span>
-        {piai.general.deliveredDate ? (
-          <span className="h-8 inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-medium text-emerald-800">
-            <CheckCircle2 className="w-3.5 h-3.5" />Entregado {formatDate(piai.general.deliveredDate)}
-          </span>
-        ) : (
-          <span className="h-8 inline-flex items-center rounded-md border border-dashed px-2.5 text-xs text-muted-foreground">No entregado</span>
-        )}
-        <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setMetaOpen(true)}>
-          <Pencil className="w-3 h-3 mr-1" />Fecha, estado y entrega
-        </Button>
-        <span className="flex-1 min-w-[180px] text-[11px] text-muted-foreground leading-tight">
-          Creado por {piai.createdByName}
-          <br />Última modificación: {new Date(piai.lastEditedAt).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-          {piai.lastEditedByName ? ` · ${piai.lastEditedByName}` : ""}
-        </span>
-        <Button size="sm" variant="outline" className="h-8 text-xs" asChild>
-          <a href={`/api/patients/${patientId}/piai/${piai.id}/word`}><FileDown className="w-3.5 h-3.5 mr-1" />Descargar Word</a>
-        </Button>
-        <Button size="sm" className="h-8 text-xs" onClick={() => setNewOpen(true)}><FilePlus2 className="w-3.5 h-3.5 mr-1" />Nuevo PIAI</Button>
-        {canDelete && (
-          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label="Eliminar PIAI"
-            onClick={() => { if (confirm("¿Eliminar este PIAI con todos sus apartados? No se puede deshacer.")) remove.mutate(piai.id); }}>
-            <Trash2 className="w-4 h-4" />
+      {/* ── Cabecera única: qué PIA es, su estado y el historial ── */}
+      <Card className="py-0 gap-0">
+        <div className="flex items-start gap-3 px-4 pt-3 pb-2.5">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-semibold leading-tight">PIA general · {formatDate(piai.date)}</h3>
+            <div className="flex items-center gap-1.5 flex-wrap mt-1.5 text-xs">
+              <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 font-medium", STATUS_STYLE[piai.status])}>{piai.status}</span>
+              {piai.general.deliveredDate ? (
+                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-medium text-emerald-800">
+                  <CheckCircle2 className="w-3 h-3" />Entregado {formatDate(piai.general.deliveredDate)}
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-md border border-dashed px-2 py-0.5 text-muted-foreground">No entregado</span>
+              )}
+              <span className="text-muted-foreground">· modificado {lastEdited}{piai.lastEditedByName ? ` por ${piai.lastEditedByName}` : ""}</span>
+            </div>
+          </div>
+          <Button size="sm" variant="outline" className="h-8 text-xs shrink-0" asChild>
+            <a href={`/api/patients/${patientId}/piai/${piai.id}/word`}><FileDown className="w-3.5 h-3.5 mr-1" />Word</a>
           </Button>
-        )}
-      </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" aria-label="Más acciones del PIA"><MoreHorizontal className="w-4 h-4" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setMetaOpen(true)}><Pencil className="w-4 h-4 mr-2" />Fecha, estado y entrega</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setNewOpen(true)}><FilePlus2 className="w-4 h-4 mr-2" />Nuevo PIA</DropdownMenuItem>
+              {canDelete && (
+                <DropdownMenuItem variant="destructive"
+                  onClick={() => { if (confirm("¿Eliminar este PIA con todos sus apartados? No se puede deshacer.")) remove.mutate(piai.id); }}>
+                  <Trash2 className="w-4 h-4 mr-2" />Eliminar este PIA
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
-      {/* Historial: todos los PIA generales y sus revisiones de objetivos, en
-          orden de fecha. Pulsar uno lo abre. */}
-      <div className="flex items-center gap-1.5 flex-wrap text-xs rounded-lg border bg-muted/20 px-3 py-2">
-        <span className="inline-flex items-center gap-1 font-medium text-muted-foreground mr-1"><History className="w-3.5 h-3.5" />Historial:</span>
-        {historyEntries(piais).map((h) => {
-          const active = h.piaiId === piai.id && (h.kind === "pia" || highlightReview === h.reviewId);
-          return (
-            <button key={h.key} type="button"
-              onClick={() => {
-                setSelectedId(h.piaiId);
-                if (h.kind === "review") {
-                  setHighlightReview(h.reviewId!);
-                  collapse.setOpen("piai-revisiones", true);
-                  setTimeout(() => document.getElementById(`piai-review-${h.reviewId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
-                } else {
-                  setHighlightReview(null);
-                }
-              }}
-              className={cn(
-                "rounded-full border px-2.5 py-1 inline-flex items-center gap-1 transition-colors",
-                h.kind === "pia" ? "font-medium" : "",
-                active ? "bg-[#56608a] border-[#56608a] text-white" : h.kind === "pia" ? "bg-background hover:bg-muted" : "bg-background/60 border-dashed hover:bg-muted",
-              )}>
-              {h.kind === "pia" ? <ClipboardList className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
-              {h.kind === "pia" ? "PIA" : "Revisión"} {formatDate(h.date)}
-              {h.kind === "pia" && h.delivered && <span title="Entregado a la persona usuaria" className={active ? "text-white" : "text-emerald-600"}>✓</span>}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Índice rápido */}
-      <nav className="flex flex-wrap gap-1.5 text-xs">
-        {[
-          { id: "piai-general", label: "Información general", cls: "" },
-          { id: "piai-objetivos", label: "Objetivos generales", cls: "" },
-          ...PIAI_SECTIONS.map((s) => ({ id: `piai-${s.key}`, label: s.title, cls: SECTION_CHIP[s.key] ?? "", done: hasHtmlText(piai.sections[s.key]?.content.assessment) })),
-          { id: "piai-revisiones", label: "Revisión de objetivos", cls: "" },
-        ].map((x) => (
-          // Botón (no enlace "#…"): la app usa la dirección para navegar entre
-          // pantallas, y un enlace con "#" la mandaba a Inicio.
-          <button key={x.id} type="button"
-            onClick={() => {
-              collapse.setOpen(x.id, true);
-              setTimeout(() => document.getElementById(x.id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-            }}
-            className={cn("rounded-full border px-2.5 py-1 inline-flex items-center gap-1", x.cls || "hover:bg-muted")}>
-            {"done" in x && (x.done ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />)}
-            {x.label}
+        {/* Historial como línea de tiempo */}
+        <div className="flex items-center gap-y-2 flex-wrap px-4 py-2.5 border-t text-xs">
+          <span className="text-muted-foreground mr-3 inline-flex items-center gap-1"><History className="w-3.5 h-3.5" />Historial</span>
+          {history.map((h, i) => {
+            const active = h.piaiId === piai.id && (h.kind === "pia" ? !highlightReview : highlightReview === h.reviewId);
+            return (
+              <span key={h.key} className="inline-flex items-center">
+                {i > 0 && <span className="w-6 h-px bg-border mx-1.5" aria-hidden />}
+                <button type="button" onClick={() => goToEntry(h)}
+                  className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-1 transition-colors",
+                    active ? "bg-[#56608a]/10 text-foreground font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted")}>
+                  <span className={cn("rounded-full shrink-0",
+                    h.kind === "pia" ? "w-2.5 h-2.5" : "w-2 h-2 border-[1.5px] border-muted-foreground bg-background",
+                    h.kind === "pia" && (active ? "bg-[#56608a]" : "bg-muted-foreground/60"))} />
+                  {h.kind === "pia" ? "PIA" : "Revisión"} {formatDate(h.date)}
+                  {h.kind === "pia" && h.delivered && <CheckCircle2 className="w-3 h-3 text-emerald-600" aria-label="Entregado" />}
+                </button>
+              </span>
+            );
+          })}
+          <span className="flex-1" />
+          <button type="button" onClick={() => setNewOpen(true)} className="text-primary hover:underline inline-flex items-center gap-1">
+            <Plus className="w-3 h-3" />Nuevo PIA
           </button>
-        ))}
-      </nav>
+        </div>
+      </Card>
 
-      <CollapseCtx.Provider value={collapse}>
-      <GeneralBlock key={`g-${piai.id}`} referent={referent} careTeamReferent={careTeamReferent} piai={piai} saving={patchPiai.isPending} onSave={(general) => patchPiai.mutateAsync({ general })} />
-      <GeneralObjectivesBlock key={`o-${piai.id}`} piai={piai} saving={patchPiai.isPending} onSave={(generalObjectives) => patchPiai.mutateAsync({ generalObjectives })} />
+      {/* ── Menú lateral de apartados + contenido (un apartado cada vez) ── */}
+      <div className="grid lg:grid-cols-[13rem_minmax(0,1fr)] gap-4 items-start">
+        {/* Pantallas medianas: desplegable */}
+        <div className="lg:hidden">
+          <Select value={activeSection} onValueChange={setActiveSection}>
+            <SelectTrigger className="h-9 text-sm" aria-label="Apartado del PIA"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {navItems.map((n) => <SelectItem key={n.id} value={n.id}>{n.label}{n.done ? " ✓" : ""}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        {/* Pantallas anchas: menú fijo a la izquierda */}
+        <nav className="hidden lg:flex flex-col gap-0.5 sticky top-4 text-sm" aria-label="Apartados del PIA">
+          {navItems.map((n) => (
+            <div key={n.id}>
+              {n.group && <p className="px-2.5 pt-3 pb-1 text-[11px] font-medium text-muted-foreground">{n.group}</p>}
+              {n.id === "piai-revisiones" && <div className="my-1.5 border-t" />}
+              <button type="button" onClick={() => setActiveSection(n.id)} aria-current={activeSection === n.id}
+                className={cn("w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors",
+                  activeSection === n.id ? "bg-[#56608a]/10 font-semibold text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                {n.dot && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: n.dot }} />}
+                <span className="flex-1 truncate">{n.label}</span>
+                {n.done && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" aria-label="Completado" />}
+              </button>
+            </div>
+          ))}
+        </nav>
 
-      <div className="flex items-center gap-2 pt-2">
-        <Users className="w-4 h-4" style={{ color: ACCENT }} />
-        <h3 className="text-sm font-semibold">Valoraciones de los profesionales</h3>
-        <span className="text-[11px] text-muted-foreground">Cada profesional edita solo su apartado; todos los ven.</span>
+        <div className="min-w-0">
+          <CollapseCtx.Provider value={collapse}>
+            {activeSection === "piai-general" && (
+              <GeneralBlock key={`g-${piai.id}`} referent={referent} careTeamReferent={careTeamReferent} piai={piai} saving={patchPiai.isPending} onSave={(general) => patchPiai.mutateAsync({ general })} />
+            )}
+            {activeSection === "piai-objetivos" && (
+              <GeneralObjectivesBlock key={`o-${piai.id}`} piai={piai} saving={patchPiai.isPending} onSave={(generalObjectives) => patchPiai.mutateAsync({ generalObjectives })} />
+            )}
+            {PIAI_SECTIONS.filter((def) => activeSection === `piai-${def.key}`).map((def) => (
+              <SectionBlock
+                key={`${piai.id}-${def.key}`}
+                def={def}
+                piai={piai}
+                patientId={patientId}
+                canEdit={me?.role === def.role}
+                saving={saveSection.isPending && saveSection.variables?.key === def.key}
+                onSave={(content) => saveSection.mutateAsync({ key: def.key, content })}
+              />
+            ))}
+            {activeSection === "piai-revisiones" && (
+              <ReviewsBlock key={`r-${piai.id}`} piai={piai} highlightId={highlightReview} saving={patchPiai.isPending} onSave={(reviews) => patchPiai.mutateAsync({ reviews })} />
+            )}
+          </CollapseCtx.Provider>
+        </div>
       </div>
-      {PIAI_SECTIONS.map((def) => (
-        <SectionBlock
-          key={`${piai.id}-${def.key}`}
-          def={def}
-          piai={piai}
-          patientId={patientId}
-          canEdit={me?.role === def.role}
-          saving={saveSection.isPending && saveSection.variables?.key === def.key}
-          onSave={(content) => saveSection.mutateAsync({ key: def.key, content })}
-        />
-      ))}
-
-      <ReviewsBlock key={`r-${piai.id}`} piai={piai} highlightId={highlightReview} saving={patchPiai.isPending} onSave={(reviews) => patchPiai.mutateAsync({ reviews })} />
-      </CollapseCtx.Provider>
 
       <NewPiaiDialog open={newOpen} onOpenChange={setNewOpen} previous={piais} pending={create.isPending} onCreate={(p) => create.mutate(p)} />
       {metaOpen && (
@@ -366,15 +392,15 @@ function BlockCard({ id, icon: Icon, title, subtitle, editing, canEdit = true, o
   onEdit: () => void;
   children: React.ReactNode;
 }) {
-  const { isOpen, setOpen } = useContext(CollapseCtx);
+  const { isOpen, setOpen, collapsible } = useContext(CollapseCtx);
   const open = editing || isOpen(id);
   return (
     <Card id={id} className={cn("py-0 gap-0 scroll-mt-4", editing && "ring-2 ring-[#56608a]/30")}>
       <div className={cn("flex items-center gap-2 px-4 py-2.5 bg-muted/30", open && "border-b")}>
         {/* Pulsar la cabecera pliega/despliega el bloque */}
-        <button type="button" onClick={() => !editing && setOpen(id, !open)} aria-expanded={open}
+        <button type="button" onClick={() => !editing && collapsible && setOpen(id, !open)} aria-expanded={open}
           className="flex items-center gap-2 min-w-0 flex-1 text-left">
-          {open ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+          {collapsible && (open ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />)}
           <Icon className="w-4 h-4 shrink-0" style={{ color: ACCENT }} />
           <h4 className="text-sm font-semibold shrink-0">{title}</h4>
           {subtitle && <span className="text-[11px] text-muted-foreground truncate">{subtitle}</span>}
@@ -465,13 +491,10 @@ function GeneralBlock({ piai, saving, onSave, referent, careTeamReferent }: {
   return (
     <BlockCard id="piai-general" icon={ClipboardList} title="Información general" editing={editing}
       onEdit={() => { setDraft(piai.general); setEditing(true); }}>
-      {/* Referentes: vienen de la ficha del/de la usuario/a */}
-      <div className="flex flex-wrap gap-x-8 gap-y-1 rounded-md bg-[#56608a]/5 border border-[#56608a]/15 px-3 py-2 text-sm">
-        <span><span className="text-muted-foreground">Referente técnico/a:</span> <span className="font-medium">{referent || "—"}</span></span>
-        <span><span className="text-muted-foreground">Referente de cuidados:</span> <span className="font-medium">{careTeamReferent || "—"}</span></span>
-        <span className="text-[11px] text-muted-foreground self-center">(se cambian en la ficha → Editar)</span>
-      </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
+        {/* Referentes: vienen de la ficha del/de la usuario/a (se cambian allí) */}
+        <Field label="Referente técnico/a"><ReadValue value={referent} />{editing && <p className="text-[10px] text-muted-foreground">Se cambia en la ficha → Editar</p>}</Field>
+        <Field label="Referente de cuidados"><ReadValue value={careTeamReferent} />{editing && <p className="text-[10px] text-muted-foreground">Se cambia en la ficha → Editar</p>}</Field>
         {PIAI_GENERAL_FIELDS.map((f) => (
           <Field key={f.key} label={f.label}>
             {editing
