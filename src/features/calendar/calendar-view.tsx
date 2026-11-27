@@ -19,7 +19,7 @@ import {
   addMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Lock, AlertTriangle, Trash2, Copy, Check, Calendar as CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Lock, AlertTriangle, Trash2, Copy, Check, UserX, Ban, Calendar as CalendarIcon } from "lucide-react";
 
 import {
   useAppointments,
@@ -98,8 +98,12 @@ import type { AppointmentDTO, AppointmentStatus, SlotReservationDTO, Reservation
 
 type ViewMode = "month" | "week" | "day";
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+// La agenda muestra solo de lunes a viernes (sin fin de semana).
+const WORK_DAYS = 5;
+const isWeekend = (d: Date) => d.getDay() === 0 || d.getDay() === 6;
 const HOUR_START = 7;
-const HOUR_END = 20;
+// Última franja visible: 17:00–18:00 (la agenda termina a las 18:00).
+const HOUR_END = 17;
 const HOUR_PX = 64; // height of one hour row in week/day view
 const SNAP_MIN = 15; // drag-and-drop snaps to 15-minute increments
 
@@ -288,6 +292,14 @@ const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
   no_show: "No asistió",
 };
 
+// Botones de asistencia del detalle de la cita (un clic, sin desplegable).
+const STATUS_BUTTONS: { status: AppointmentStatus; label: string; icon: typeof Check; activeClass: string }[] = [
+  { status: "completada", label: "Asistió", icon: Check, activeClass: "bg-green-600 border-green-600 text-white" },
+  { status: "no_show", label: "No asistió", icon: UserX, activeClass: "bg-red-600 border-red-600 text-white" },
+  { status: "cancelada", label: "Cancelada", icon: Ban, activeClass: "bg-zinc-600 border-zinc-600 text-white" },
+  { status: "programada", label: "Pendiente", icon: Clock, activeClass: "bg-sky-600 border-sky-600 text-white" },
+];
+
 // Dropdown for picking a time in 15-minute steps. If the current value
 // doesn't fall on a 15-minute mark (e.g. an older record saved at :05),
 // it's still included as an extra option so the field never silently
@@ -395,7 +407,12 @@ export function CalendarView() {
     const step = dir === "next" ? 1 : -1;
     if (view === "month") setCursor(addMonths(cursor, step));
     else if (view === "week") setCursor(addWeeks(cursor, step));
-    else setCursor(addDays(cursor, step));
+    else {
+      // Vista día: saltar sábado y domingo.
+      let next = addDays(cursor, step);
+      while (isWeekend(next)) next = addDays(next, step);
+      setCursor(next);
+    }
   };
 
   const openCreateAppt = (date?: Date, time?: string) => {
@@ -487,7 +504,7 @@ export function CalendarView() {
     if (view === "month") return format(cursor, "MMMM yyyy", { locale: es });
     if (view === "week") {
       const s = startOfWeek(cursor, { weekStartsOn: 1 });
-      const e = endOfWeek(cursor, { weekStartsOn: 1 });
+      const e = addDays(s, WORK_DAYS - 1);
       return `${format(s, "d MMM", { locale: es })} – ${format(e, "d MMM yyyy", { locale: es })}`;
     }
     return format(cursor, "EEEE d 'de' MMMM yyyy", { locale: es });
@@ -745,18 +762,18 @@ function MonthView({
   const monthEnd = endOfMonth(cursor);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
-  const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
+  const days = eachDayOfInterval({ start: gridStart, end: gridEnd }).filter((d) => !isWeekend(d));
   const today = new Date();
   const [dragOverDay, setDragOverDay] = useState<string | null>(null);
 
   return (
     <Card className="p-2 sm:p-4">
       <div
-        className="grid grid-cols-7 gap-1"
+        className="grid grid-cols-5 gap-1"
         role="grid"
         aria-label="Vista mensual"
       >
-        {WEEKDAYS.map((d) => (
+        {WEEKDAYS.slice(0, WORK_DAYS).map((d) => (
           <div
             key={d}
             className="text-xs font-medium text-muted-foreground text-center py-2"
@@ -947,7 +964,7 @@ function WeekView({
   onDuplicateReservation,
 }: SharedViewProps & { cursor: Date }) {
   const weekStart = startOfWeek(cursor, { weekStartsOn: 1 });
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const days = Array.from({ length: WORK_DAYS }, (_, i) => addDays(weekStart, i));
   const today = new Date();
   const hours = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
 
@@ -960,7 +977,7 @@ function WeekView({
           aria-label="Vista semanal"
         >
           {/* Header row */}
-          <div className="grid grid-cols-[44px_repeat(7,1fr)] sticky top-0 bg-card z-10">
+          <div className="grid grid-cols-[44px_repeat(5,1fr)] sticky top-0 bg-card z-10">
             <div />
             {days.map((d) => {
               const isToday = isSameDay(d, today);
@@ -988,7 +1005,7 @@ function WeekView({
           </div>
 
           {/* Time grid */}
-          <div className="grid grid-cols-[44px_repeat(7,1fr)] relative">
+          <div className="grid grid-cols-[44px_repeat(5,1fr)] relative">
             {/* Hours column */}
             <div className="relative">
               {hours.map((h) => (
@@ -1000,6 +1017,10 @@ function WeekView({
                   {String(h).padStart(2, "0")}:00
                 </div>
               ))}
+              {/* Hora de cierre de la agenda */}
+              <span className="absolute bottom-0 right-1.5 translate-y-1/2 text-[11px] leading-none text-muted-foreground bg-card px-0.5">
+                {String(HOUR_END + 1).padStart(2, "0")}:00
+              </span>
             </div>
 
             {/* Day columns */}
@@ -1086,6 +1107,10 @@ function DayView({
                   {String(h).padStart(2, "0")}:00
                 </div>
               ))}
+              {/* Hora de cierre de la agenda */}
+              <span className="absolute bottom-0 right-1.5 translate-y-1/2 text-[11px] leading-none text-muted-foreground bg-card px-0.5">
+                {String(HOUR_END + 1).padStart(2, "0")}:00
+              </span>
             </div>
             <DayColumn
               day={cursor}
@@ -1146,7 +1171,7 @@ function DayColumn({
   const nowMinutes = useNowMinutes();
   const isToday = isSameDay(day, new Date());
   const nowOffsetMin = nowMinutes - HOUR_START * 60;
-  const showNowLine = isToday && nowOffsetMin >= 0 && nowOffsetMin <= (HOUR_END - HOUR_START) * 60;
+  const showNowLine = isToday && nowOffsetMin >= 0 && nowOffsetMin <= (HOUR_END + 1 - HOUR_START) * 60;
   const nowTop = (nowOffsetMin / 60) * HOUR_PX;
   const colRef = useRef<HTMLDivElement>(null);
   const [dragOverMin, setDragOverMin] = useState<number | null>(null);
@@ -1403,12 +1428,15 @@ function DayColumn({
                   onStart={() => beginResize("reservation", r.id, "top", startMins, r.durationMin)}
                 />
                 <div className="overflow-hidden h-full">
+                  {/* Reservas cortas (≤30 min): hora y título en una sola
+                      línea para que el título no quede cortado. */}
                   <p className="text-[11px] font-semibold leading-tight truncate flex items-center gap-1">
                     <Lock className="w-2.5 h-2.5 shrink-0" />
                     {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
+                    {height < 40 && <span className="font-medium text-foreground/80 truncate">· {r.title}</span>}
                     {overlapsAppt && <AlertTriangle className="w-2.5 h-2.5 text-amber-600 ml-auto shrink-0" />}
                   </p>
-                  <p className="text-[11px] font-medium leading-tight truncate text-foreground/80">{r.title}</p>
+                  {height >= 40 && <p className="text-[11px] font-medium leading-tight truncate text-foreground/80">{r.title}</p>}
                 </div>
                 <ResizeHandle
                   position="bottom"
@@ -1459,7 +1487,9 @@ function DayColumn({
                     ? "bg-muted/40 border-border opacity-60"
                     : a.status === "no_show"
                       ? "bg-red-50 border-red-200"
-                      : "bg-card border-border"
+                      : a.status === "completada"
+                        ? "bg-green-50/70 border-green-200"
+                        : "bg-card border-border"
                 }`}
                 style={{
                   top,
@@ -1481,10 +1511,10 @@ function DayColumn({
                   </span>
                 )}
                 <div className="overflow-hidden h-full">
-                  <p className={`text-[11px] font-semibold leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
+                  <p className={`text-[11px] text-muted-foreground leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
                     {format(effectiveStart, "HH:mm")}–{format(end, "HH:mm")}
                   </p>
-                  <p className={`text-[11px] font-medium leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
+                  <p className={`text-xs font-semibold leading-tight truncate ${a.status === "cancelada" ? "line-through" : ""}`}>
                     {a.patientName}
                   </p>
                   {!compact && <p className="text-[11px] opacity-80 truncate">{a.type}</p>}
@@ -1582,28 +1612,6 @@ function AppointmentDetailDialogInner({
   return (
     <Dialog open={!!appt} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
-        <Select value={appt.status} onValueChange={(v) => handleStatusChange(v as AppointmentStatus)}>
-          <SelectTrigger
-            className={`absolute top-3 right-10 h-6 w-auto gap-1 border-none px-2 text-[12px] font-medium shadow-none focus:ring-0 ${
-              appt.status === "completada"
-                ? "bg-green-100 text-green-800"
-                : appt.status === "cancelada"
-                  ? "bg-muted text-muted-foreground"
-                  : appt.status === "no_show"
-                    ? "bg-red-100 text-red-800"
-                    : "bg-muted/60 text-muted-foreground"
-            }`}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="end">
-            {APPOINTMENT_STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {APPOINTMENT_STATUS_LABELS[s]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <Avatar name={appt.patientName} color={appt.patientColor} size={36} />
@@ -1616,6 +1624,28 @@ function AppointmentDetailDialogInner({
             Detalle de la cita de {appt.patientName}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Asistencia con un solo clic (antes era un desplegable) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+          {STATUS_BUTTONS.map((b) => {
+            const active = appt.status === b.status;
+            return (
+              <button
+                key={b.status}
+                type="button"
+                disabled={updateStatus.isPending}
+                onClick={() => { if (!active) handleStatusChange(b.status); }}
+                className={`rounded-md border px-2 py-2 text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-60 ${
+                  active ? b.activeClass : "bg-background hover:bg-muted text-muted-foreground"
+                }`}
+                aria-pressed={active}
+              >
+                <b.icon className="w-3.5 h-3.5" />
+                {b.label}
+              </button>
+            );
+          })}
+        </div>
 
         <div className="space-y-3 text-sm">
           <div className="flex items-center gap-2">
@@ -1657,9 +1687,6 @@ function AppointmentDetailDialogInner({
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
               <Pencil className="w-4 h-4 mr-1" /> Editar
-            </Button>
-            <Button variant="outline" size="sm" onClick={onClose}>
-              <X className="w-4 h-4 mr-1" /> Cerrar
             </Button>
             <Button
               variant="destructive"
@@ -1765,9 +1792,6 @@ function ReservationDetailDialogInner({
         <DialogFooter className="gap-2">
           <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
             <Pencil className="w-4 h-4 mr-1" /> Editar
-          </Button>
-          <Button variant="outline" size="sm" onClick={onClose}>
-            <X className="w-4 h-4 mr-1" /> Cerrar
           </Button>
           <Button variant="destructive" size="sm" onClick={handleDelete} disabled={del.isPending}>
             Eliminar
