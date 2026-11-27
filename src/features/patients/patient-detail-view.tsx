@@ -378,7 +378,7 @@ export function PatientDetailView() {
                   </span>
                   {isDayCenter && (
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="text-muted-foreground">Referente:</span><span className="font-medium">{patient.referent || "—"}</span>
+                      <span className="text-muted-foreground">Referente técnico/a:</span><span className="font-medium">{patient.referent || "—"}</span>
                       <span className="text-muted-foreground ml-1.5">Cuidados:</span><span className="font-medium">{patient.careTeamReferent || "—"}</span>
                     </span>
                   )}
@@ -795,7 +795,7 @@ export function PatientDetailView() {
 {!isAdmin && <TabsContent value="intervention-plan" className="mt-4">
   {/* Centro de día: el PIAI de equipo (los objetivos de TO del plan van
       dentro, en su apartado). Resto: el Plan de intervención de siempre. */}
-  {isDayCenter ? <PiaiTab patientId={patient.id} /> : <InterventionPlanTab patientId={patient.id} />}
+  {isDayCenter ? <PiaiTab patientId={patient.id} referent={patient.referent} careTeamReferent={patient.careTeamReferent} /> : <InterventionPlanTab patientId={patient.id} />}
 </TabsContent>}
 
         {/* Assessments — hidden for admin */}

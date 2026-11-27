@@ -115,7 +115,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     }
     const [row, patient, profile] = await Promise.all([
       db.piai.findFirst({ where: { id: piaiId, patientId }, include: PIAI_INCLUDE }),
-      db.patient.findUnique({ where: { id: patientId }, select: { firstName: true, lastName: true, diagnosis: true } }),
+      db.patient.findUnique({ where: { id: patientId }, select: { firstName: true, lastName: true, diagnosis: true, referent: true, careTeamReferent: true } }),
       db.occupationalProfile.findUnique({ where: { patientId }, include: { goals: { orderBy: { createdAt: "asc" } } } }),
     ]);
     if (!row || !patient) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
@@ -139,6 +139,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         ["Grado y nivel de dependencia", g.dependencyGrade],
         ["Grado de discapacidad", g.disabilityGrade],
         ["Diagnóstico", patient.diagnosis ?? ""],
+        ["Referente técnico/a", patient.referent ?? ""],
+        ["Referente de cuidados", patient.careTeamReferent ?? ""],
         ...PIAI_GENERAL_FIELDS
           .filter((f) => ["service", "benefits", "publicFunding", "objectivesSheetDelivered"].includes(f.key))
           .map((f) => [f.label, g[f.key]] as [string, string | undefined]),
@@ -183,20 +185,23 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
     blocks.push(label("Fecha y aceptación de la persona usuaria"), ...body([fmt(g.acceptanceDate), g.acceptanceNotes].filter(Boolean).join(" — ")));
 
-    blocks.push(h1("2. REVISIÓN PIA"));
+    blocks.push(h1("2. REVISIÓN DE OBJETIVOS"));
     if (piai.reviews.length === 0) blocks.push(...body("", "Sin revisiones."));
-    for (const r of piai.reviews) {
-      blocks.push(kv([["Fecha revisión", fmt(r.date)], ["Fecha reunión PPUU/equipo técnico", fmt(r.meetingDate)]]));
-      blocks.push(label("Comentarios y revisiones"), ...body(r.comments));
-      r.objectives.forEach((o, i) => {
-        blocks.push(new Paragraph({ spacing: { before: 100, after: 20 }, children: [
-          new TextRun({ text: `Objetivo ${i + 1}: `, bold: true, size: 20 }), new TextRun({ text: o.text, size: 20 }),
+    for (const r of [...piai.reviews].sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""))) {
+      blocks.push(h2(`Revisión del ${fmt(r.date)}`));
+      if (r.meetingDate) blocks.push(new Paragraph({ spacing: { after: 60 }, children: [
+        new TextRun({ text: "Fecha reunión PPUU/equipo técnico: ", bold: true, size: 19 }), new TextRun({ text: fmt(r.meetingDate), size: 19 }),
+      ] }));
+      r.items.forEach((it, i) => {
+        blocks.push(new Paragraph({ spacing: { before: 60, after: 20 }, children: [
+          new TextRun({ text: `Objetivo ${i + 1}: `, bold: true, size: 20 }),
+          new TextRun({ text: it.text, size: 20 }),
+          new TextRun({ text: `   →  ${it.result || "Sin marcar"}`, bold: true, size: 20,
+            color: it.result === "Conseguido" ? "15803D" : it.result === "No conseguido" ? "B91C1C" : it.result ? "B45309" : "808080" }),
         ] }));
-        if (o.modifications) blocks.push(new Paragraph({ indent: { left: 400 }, children: [new TextRun({ text: `Modificaciones: ${o.modifications}`, size: 19 })] }));
-        o.actions.forEach((a, k) => blocks.push(new Paragraph({ indent: { left: 400 }, children: [
-          new TextRun({ text: `Acción ${k + 1}: ${a.text}`, size: 19 }), new TextRun({ text: `   Estado: ${a.status}`, size: 19, color: "707070" }),
-        ] })));
+        if (it.comment) blocks.push(new Paragraph({ indent: { left: 400 }, children: [new TextRun({ text: it.comment, size: 19, color: "505050" })] }));
       });
+      if (r.comments) blocks.push(label("Comentarios"), ...body(r.comments));
     }
 
     const doc = new Document({

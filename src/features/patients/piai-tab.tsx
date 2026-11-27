@@ -27,7 +27,7 @@ import { formatDate } from "@/components/domain";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  PIAI_ACTION_STATUSES, PIAI_GENERAL_FIELDS, PIAI_SECTIONS, PIAI_STATUSES, newId,
+  PIAI_REVIEW_RESULTS, PIAI_GENERAL_FIELDS, PIAI_SECTIONS, PIAI_STATUSES, newId,
   type PiaiDTO, type PiaiGeneral, type PiaiGeneralObjective, type PiaiReview,
   type PiaiSectionContent, type PiaiSectionDef,
 } from "@/lib/piai";
@@ -79,7 +79,13 @@ const STATUS_STYLE: Record<string, string> = {
   "Cerrado": "bg-emerald-50 text-emerald-800 border-emerald-200",
 };
 
-export function PiaiTab({ patientId }: { patientId: string }) {
+export function PiaiTab({ patientId, referent, careTeamReferent }: {
+  patientId: string;
+  // Referentes del/de la usuario/a (se editan en su ficha); se muestran en el
+  // PIAI para que todo el equipo los tenga a mano.
+  referent?: string | null;
+  careTeamReferent?: string | null;
+}) {
   const qc = useQueryClient();
   const queryKey = ["piai", patientId];
   const { data: me } = useMe();
@@ -90,6 +96,7 @@ export function PiaiTab({ patientId }: { patientId: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);
+  const [highlightReview, setHighlightReview] = useState<string | null>(null);
   const [openIds, setOpenIds] = useState<Set<string>>(() => new Set(["piai-general"]));
   const collapse = useMemo(() => ({
     isOpen: (id: string) => openIds.has(id),
@@ -169,12 +176,7 @@ export function PiaiTab({ patientId }: { patientId: string }) {
     <div className="space-y-4">
       {/* Barra: selector, fecha, estado, acciones */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2">
-        <Select value={piai.id} onValueChange={setSelectedId}>
-          <SelectTrigger className="h-8 w-48 text-sm font-medium" aria-label="PIAI"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {piais.map((p) => <SelectItem key={p.id} value={p.id}>PIAI · {formatDate(p.date)}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <span className="text-sm font-semibold">PIA general · {formatDate(piai.date)}</span>
         {/* Fecha y estado NO se guardan solos: se cambian en una ventana con
             "Guardar", para no modificar un PIAI por error. */}
         <span className={cn("h-8 inline-flex items-center rounded-md border px-2.5 text-xs font-medium", STATUS_STYLE[piai.status])}>{piai.status}</span>
@@ -198,13 +200,43 @@ export function PiaiTab({ patientId }: { patientId: string }) {
         )}
       </div>
 
+      {/* Historial: todos los PIA generales y sus revisiones de objetivos, en
+          orden de fecha. Pulsar uno lo abre. */}
+      <div className="flex items-center gap-1.5 flex-wrap text-xs rounded-lg border bg-muted/20 px-3 py-2">
+        <span className="inline-flex items-center gap-1 font-medium text-muted-foreground mr-1"><History className="w-3.5 h-3.5" />Historial:</span>
+        {historyEntries(piais).map((h) => {
+          const active = h.piaiId === piai.id && (h.kind === "pia" || highlightReview === h.reviewId);
+          return (
+            <button key={h.key} type="button"
+              onClick={() => {
+                setSelectedId(h.piaiId);
+                if (h.kind === "review") {
+                  setHighlightReview(h.reviewId!);
+                  collapse.setOpen("piai-revisiones", true);
+                  setTimeout(() => document.getElementById(`piai-review-${h.reviewId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+                } else {
+                  setHighlightReview(null);
+                }
+              }}
+              className={cn(
+                "rounded-full border px-2.5 py-1 inline-flex items-center gap-1 transition-colors",
+                h.kind === "pia" ? "font-medium" : "",
+                active ? "bg-[#56608a] border-[#56608a] text-white" : h.kind === "pia" ? "bg-background hover:bg-muted" : "bg-background/60 border-dashed hover:bg-muted",
+              )}>
+              {h.kind === "pia" ? <ClipboardList className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+              {h.kind === "pia" ? "PIA" : "Revisión"} {formatDate(h.date)}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Índice rápido */}
       <nav className="flex flex-wrap gap-1.5 text-xs">
         {[
           { id: "piai-general", label: "Información general", cls: "" },
           { id: "piai-objetivos", label: "Objetivos generales", cls: "" },
           ...PIAI_SECTIONS.map((s) => ({ id: `piai-${s.key}`, label: s.title, cls: SECTION_CHIP[s.key] ?? "", done: hasHtmlText(piai.sections[s.key]?.content.assessment) })),
-          { id: "piai-revisiones", label: "Revisiones", cls: "" },
+          { id: "piai-revisiones", label: "Revisión de objetivos", cls: "" },
         ].map((x) => (
           // Botón (no enlace "#…"): la app usa la dirección para navegar entre
           // pantallas, y un enlace con "#" la mandaba a Inicio.
@@ -221,7 +253,7 @@ export function PiaiTab({ patientId }: { patientId: string }) {
       </nav>
 
       <CollapseCtx.Provider value={collapse}>
-      <GeneralBlock key={`g-${piai.id}`} piai={piai} saving={patchPiai.isPending} onSave={(general) => patchPiai.mutateAsync({ general })} />
+      <GeneralBlock key={`g-${piai.id}`} referent={referent} careTeamReferent={careTeamReferent} piai={piai} saving={patchPiai.isPending} onSave={(general) => patchPiai.mutateAsync({ general })} />
       <GeneralObjectivesBlock key={`o-${piai.id}`} piai={piai} saving={patchPiai.isPending} onSave={(generalObjectives) => patchPiai.mutateAsync({ generalObjectives })} />
 
       <div className="flex items-center gap-2 pt-2">
@@ -241,7 +273,7 @@ export function PiaiTab({ patientId }: { patientId: string }) {
         />
       ))}
 
-      <ReviewsBlock key={`r-${piai.id}`} piai={piai} saving={patchPiai.isPending} onSave={(reviews) => patchPiai.mutateAsync({ reviews })} />
+      <ReviewsBlock key={`r-${piai.id}`} piai={piai} highlightId={highlightReview} saving={patchPiai.isPending} onSave={(reviews) => patchPiai.mutateAsync({ reviews })} />
       </CollapseCtx.Provider>
 
       <NewPiaiDialog open={newOpen} onOpenChange={setNewOpen} previous={piais} pending={create.isPending} onCreate={(p) => create.mutate(p)} />
@@ -394,7 +426,10 @@ function NumberedList({ items, empty = "Sin objetivos." }: { items: string[]; em
 
 // ─── 1. Información general ──────────────────────────────────────────────────
 
-function GeneralBlock({ piai, saving, onSave }: { piai: PiaiDTO; saving: boolean; onSave: (g: PiaiGeneral) => Promise<unknown> }) {
+function GeneralBlock({ piai, saving, onSave, referent, careTeamReferent }: {
+  piai: PiaiDTO; saving: boolean; onSave: (g: PiaiGeneral) => Promise<unknown>;
+  referent?: string | null; careTeamReferent?: string | null;
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<PiaiGeneral>(piai.general);
   const g = editing ? draft : piai.general;
@@ -403,6 +438,12 @@ function GeneralBlock({ piai, saving, onSave }: { piai: PiaiDTO; saving: boolean
   return (
     <BlockCard id="piai-general" icon={ClipboardList} title="Información general" editing={editing}
       onEdit={() => { setDraft(piai.general); setEditing(true); }}>
+      {/* Referentes: vienen de la ficha del/de la usuario/a */}
+      <div className="flex flex-wrap gap-x-8 gap-y-1 rounded-md bg-[#56608a]/5 border border-[#56608a]/15 px-3 py-2 text-sm">
+        <span><span className="text-muted-foreground">Referente técnico/a:</span> <span className="font-medium">{referent || "—"}</span></span>
+        <span><span className="text-muted-foreground">Referente de cuidados:</span> <span className="font-medium">{careTeamReferent || "—"}</span></span>
+        <span className="text-[11px] text-muted-foreground self-center">(se cambian en la ficha → Editar)</span>
+      </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2.5">
         {PIAI_GENERAL_FIELDS.map((f) => (
           <Field key={f.key} label={f.label}>
@@ -598,90 +639,177 @@ function SectionBlock({ def, piai, patientId, canEdit, saving, onSave }: {
   );
 }
 
-// ─── 4. Revisiones ───────────────────────────────────────────────────────────
+// ─── 4. Revisión de objetivos ────────────────────────────────────────────────
+// A los ~6 meses del PIA general: para cada objetivo general se marca si se
+// ha conseguido, se mantiene o no se ha conseguido. Cada revisión se guarda
+// con su fecha (solo al pulsar Guardar) y aparece en el historial.
 
-function ReviewsBlock({ piai, saving, onSave }: { piai: PiaiDTO; saving: boolean; onSave: (r: PiaiReview[]) => Promise<unknown> }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<PiaiReview[]>(piai.reviews);
-  const updateReview = (i: number, p: Partial<PiaiReview>) => setDraft((d) => d.map((r, j) => (j === i ? { ...r, ...p } : r)));
+const RESULT_STYLE: Record<string, { active: string; badge: string }> = {
+  "Conseguido": { active: "bg-green-600 border-green-600 text-white", badge: "bg-green-100 text-green-800" },
+  "Se mantiene": { active: "bg-amber-500 border-amber-500 text-white", badge: "bg-amber-100 text-amber-800" },
+  "No conseguido": { active: "bg-red-600 border-red-600 text-white", badge: "bg-red-100 text-red-800" },
+};
 
-  function addReview() {
-    // Una revisión nueva parte de los objetivos generales actuales.
-    setDraft((d) => [...d, {
-      id: newId("rv"), date: todayStr(), comments: "",
-      objectives: piai.generalObjectives.filter((o) => o.text.trim()).map((o) => ({
-        id: newId("ro"), text: o.text, modifications: "",
-        actions: o.actions.map((a) => ({ id: newId("ra"), text: a, status: "En curso" })),
-      })),
-    }]);
-  }
+function ReviewsBlock({ piai, saving, onSave, highlightId }: {
+  piai: PiaiDTO; saving: boolean; onSave: (r: PiaiReview[]) => Promise<unknown>; highlightId: string | null;
+}) {
+  const [dialog, setDialog] = useState<PiaiReview | "new" | null>(null);
+  const reviews = [...piai.reviews].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  const objectives = piai.generalObjectives.filter((o) => o.text.trim());
 
   return (
-    <BlockCard id="piai-revisiones" icon={History} title="Revisiones del PIA" subtitle={piai.reviews.length ? `${piai.reviews.length} revisión${piai.reviews.length === 1 ? "" : "es"}` : undefined} editing={editing}
-      onEdit={() => { setDraft(piai.reviews); setEditing(true); }}>
-      {!editing && piai.reviews.length === 0 && <p className="text-sm text-muted-foreground/70">Sin revisiones todavía.</p>}
-      {(editing ? draft : piai.reviews).map((r, i) => (
-        <div key={r.id} className="rounded-md border p-3 space-y-2">
-          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2">
-            <Field label="Fecha revisión">{editing ? <Input type="date" className="h-8 text-sm" value={r.date ?? ""} onChange={(e) => updateReview(i, { date: e.target.value })} /> : <ReadValue value={r.date ? fmt(r.date) : ""} />}</Field>
-            <Field label="Fecha reunión PPUU / equipo técnico">{editing ? <Input type="date" className="h-8 text-sm" value={r.meetingDate ?? ""} onChange={(e) => updateReview(i, { meetingDate: e.target.value })} /> : <ReadValue value={r.meetingDate ? fmt(r.meetingDate) : ""} />}</Field>
+    <BlockCard id="piai-revisiones" icon={History} title="Revisión de objetivos"
+      subtitle={reviews.length ? `${reviews.length} revisión${reviews.length === 1 ? "" : "es"} · última ${fmt(reviews[0].date)}` : "cada 6 meses, entre PIA y PIA"}
+      editing={false} canEdit={false} onEdit={() => {}}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">Marca para cada objetivo general si se ha conseguido, se mantiene o no se ha conseguido.</p>
+        <Button size="sm" className="h-8 text-xs shrink-0" disabled={objectives.length === 0} onClick={() => setDialog("new")}
+          title={objectives.length === 0 ? "Primero añade objetivos generales" : undefined}>
+          <Plus className="w-3.5 h-3.5 mr-1" />Nueva revisión
+        </Button>
+      </div>
+      {objectives.length === 0 && <p className="text-sm text-muted-foreground/70">Añade objetivos generales para poder revisarlos.</p>}
+      {reviews.length === 0 && objectives.length > 0 && <p className="text-sm text-muted-foreground/70">Todavía no se ha hecho ninguna revisión.</p>}
+      {reviews.map((r) => {
+        const counts = PIAI_REVIEW_RESULTS.map((res) => ({ res, n: r.items.filter((i) => i.result === res).length })).filter((c) => c.n > 0);
+        return (
+          <div key={r.id} id={`piai-review-${r.id}`}
+            className={cn("rounded-md border p-3 space-y-2 scroll-mt-24 transition-shadow", highlightId === r.id && "ring-2 ring-[#56608a]/40")}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-semibold">Revisión del {fmt(r.date)}</span>
+              {r.meetingDate && <span className="text-[11px] text-muted-foreground">· reunión {fmt(r.meetingDate)}</span>}
+              {counts.map((c) => <span key={c.res} className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded-full", RESULT_STYLE[c.res].badge)}>{c.n} {c.res.toLowerCase()}</span>)}
+              <span className="flex-1" />
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setDialog(r)}><Pencil className="w-3 h-3 mr-1" />Editar</Button>
+            </div>
+            <ol className="space-y-1">
+              {r.items.map((it, i) => (
+                <li key={it.id} className="text-sm flex items-start gap-2">
+                  <span className="text-[11px] text-muted-foreground w-4 shrink-0 pt-0.5 text-right">{i + 1}.</span>
+                  <span className="flex-1 leading-snug">
+                    {it.text}
+                    {it.comment && <span className="block text-xs text-muted-foreground">{it.comment}</span>}
+                  </span>
+                  <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0", it.result ? RESULT_STYLE[it.result]?.badge : "bg-muted text-muted-foreground")}>
+                    {it.result || "Sin marcar"}
+                  </span>
+                </li>
+              ))}
+            </ol>
+            {r.comments && <p className="text-xs text-muted-foreground whitespace-pre-wrap"><span className="font-medium text-foreground">Comentarios:</span> {r.comments}</p>}
           </div>
-          <Field label="Comentarios y revisiones">{editing ? <Textarea rows={2} value={r.comments ?? ""} onChange={(e) => updateReview(i, { comments: e.target.value })} /> : <ReadValue value={r.comments} />}</Field>
-          {r.objectives.map((o, j) => (
-            <div key={o.id} className="pl-2 border-l-2 border-[#56608a]/30 space-y-1">
-              {editing ? (
-                <>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-semibold w-20 shrink-0">Objetivo {j + 1}</span>
-                    <Input className="h-8 text-sm" value={o.text} onChange={(e) => updateReview(i, { objectives: r.objectives.map((x, k) => (k === j ? { ...x, text: e.target.value } : x)) })} />
-                    <button type="button" aria-label="Quitar objetivo" className="text-muted-foreground hover:text-destructive" onClick={() => updateReview(i, { objectives: r.objectives.filter((_, k) => k !== j) })}><X className="w-3.5 h-3.5" /></button>
-                  </div>
-                  <Input className="h-8 text-sm" placeholder="Modificaciones…" value={o.modifications ?? ""} onChange={(e) => updateReview(i, { objectives: r.objectives.map((x, k) => (k === j ? { ...x, modifications: e.target.value } : x)) })} />
-                  {o.actions.map((a, k) => (
-                    <div key={a.id} className="flex items-center gap-1.5 pl-4">
-                      <Input className="h-7 text-xs" value={a.text} placeholder={`Acción ${k + 1}`}
-                        onChange={(e) => updateReview(i, { objectives: r.objectives.map((x, m) => (m === j ? { ...x, actions: x.actions.map((y, n) => (n === k ? { ...y, text: e.target.value } : y)) } : x)) })} />
-                      <Select value={a.status} onValueChange={(v) => updateReview(i, { objectives: r.objectives.map((x, m) => (m === j ? { ...x, actions: x.actions.map((y, n) => (n === k ? { ...y, status: v } : y)) } : x)) })}>
-                        <SelectTrigger className="h-7 w-36 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>{PIAI_ACTION_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                  ))}
-                  <button type="button" className="ml-4 text-[11px] text-primary hover:underline"
-                    onClick={() => updateReview(i, { objectives: r.objectives.map((x, m) => (m === j ? { ...x, actions: [...x.actions, { id: newId("ra"), text: "", status: "Pendiente" }] } : x)) })}>
-                    + Añadir acción
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm"><span className="font-medium">Objetivo {j + 1}:</span> {o.text}</p>
-                  {o.modifications && <p className="text-xs text-muted-foreground">Modificaciones: {o.modifications}</p>}
-                  {o.actions.map((a, k) => (
-                    <p key={a.id} className="text-xs pl-4">Acción {k + 1}: {a.text} <span className="text-muted-foreground">· {a.status}</span></p>
-                  ))}
-                </>
-              )}
-            </div>
-          ))}
-          {editing && (
-            <div className="flex gap-3">
-              <button type="button" className="text-xs text-primary hover:underline"
-                onClick={() => updateReview(i, { objectives: [...r.objectives, { id: newId("ro"), text: "", modifications: "", actions: [] }] })}>
-                + Añadir objetivo
-              </button>
-              <button type="button" className="text-xs text-destructive hover:underline" onClick={() => setDraft((d) => d.filter((_, k) => k !== i))}>Eliminar revisión</button>
-            </div>
-          )}
-        </div>
-      ))}
-      {editing && (
-        <>
-          <button type="button" className="text-xs text-primary hover:underline inline-flex items-center gap-1" onClick={addReview}><Plus className="w-3 h-3" />Añadir revisión</button>
-          <EditActions saving={saving} onCancel={() => setEditing(false)} onSave={async () => { await onSave(draft); setEditing(false); }} />
-        </>
+        );
+      })}
+
+      {dialog && (
+        <ReviewDialog
+          initial={dialog === "new" ? null : dialog}
+          objectives={objectives}
+          saving={saving}
+          onClose={() => setDialog(null)}
+          onDelete={dialog === "new" ? undefined : async () => {
+            if (!confirm("¿Eliminar esta revisión?")) return;
+            await onSave(piai.reviews.filter((x) => x.id !== (dialog as PiaiReview).id));
+            setDialog(null);
+          }}
+          onSave={async (rev) => {
+            const exists = piai.reviews.some((x) => x.id === rev.id);
+            await onSave(exists ? piai.reviews.map((x) => (x.id === rev.id ? rev : x)) : [...piai.reviews, rev]);
+            setDialog(null);
+          }}
+        />
       )}
     </BlockCard>
   );
+}
+
+function ReviewDialog({ initial, objectives, saving, onClose, onSave, onDelete }: {
+  initial: PiaiReview | null;
+  objectives: PiaiGeneralObjective[];
+  saving: boolean;
+  onClose: () => void;
+  onSave: (r: PiaiReview) => Promise<void>;
+  onDelete?: () => Promise<void>;
+}) {
+  // Revisión nueva: parte de los objetivos generales actuales del PIA.
+  const [draft, setDraft] = useState<PiaiReview>(() => initial ?? {
+    id: newId("rv"),
+    date: todayStr(),
+    meetingDate: "",
+    comments: "",
+    items: objectives.map((o) => ({ id: newId("ri"), objectiveId: o.id, text: o.text, result: "", comment: "" })),
+  });
+  const setItem = (i: number, p: Partial<PiaiReview["items"][number]>) =>
+    setDraft((d) => ({ ...d, items: d.items.map((x, j) => (j === i ? { ...x, ...p } : x)) }));
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(draft.date ?? "");
+  const pending = draft.items.filter((i) => !i.result).length;
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{initial ? "Editar revisión de objetivos" : "Nueva revisión de objetivos"}</DialogTitle>
+          <DialogDescription>Se guarda con su fecha al pulsar Guardar y queda en el historial.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-4">
+            <div className="space-y-1">
+              <Label className="text-xs">Fecha de la revisión</Label>
+              <Input type="date" className="w-44" value={draft.date ?? ""} onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Fecha reunión PPUU / equipo técnico</Label>
+              <Input type="date" className="w-44" value={draft.meetingDate ?? ""} onChange={(e) => setDraft((d) => ({ ...d, meetingDate: e.target.value }))} />
+            </div>
+          </div>
+          <div className="space-y-2.5">
+            {draft.items.map((it, i) => (
+              <div key={it.id} className="rounded-md border p-2.5 space-y-2">
+                <p className="text-sm font-medium"><span className="text-muted-foreground mr-1">{i + 1}.</span>{it.text}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {PIAI_REVIEW_RESULTS.map((res) => (
+                    <button key={res} type="button" aria-pressed={it.result === res}
+                      onClick={() => setItem(i, { result: it.result === res ? "" : res })}
+                      className={cn("rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+                        it.result === res ? RESULT_STYLE[res].active : "bg-background hover:bg-muted text-muted-foreground")}>
+                      {res}
+                    </button>
+                  ))}
+                </div>
+                <Input className="h-8 text-xs" placeholder="Comentario (opcional)" value={it.comment ?? ""} onChange={(e) => setItem(i, { comment: e.target.value })} />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Comentarios generales</Label>
+            <Textarea rows={2} value={draft.comments ?? ""} onChange={(e) => setDraft((d) => ({ ...d, comments: e.target.value }))} />
+          </div>
+        </div>
+        <DialogFooter className="gap-2 sm:justify-between">
+          {onDelete ? <Button variant="ghost" size="sm" className="text-destructive" onClick={onDelete}><Trash2 className="w-3.5 h-3.5 mr-1" />Eliminar</Button> : <span />}
+          <div className="flex items-center gap-2">
+            {pending > 0 && <span className="text-[11px] text-muted-foreground">{pending} sin marcar</span>}
+            <Button variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
+            <Button size="sm" disabled={!valid || saving} onClick={() => onSave(draft)}>
+              <Save className="w-3.5 h-3.5 mr-1" />{saving ? "Guardando…" : "Guardar revisión"}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Historial cronológico: cada PIA general seguido de sus revisiones.
+function historyEntries(piais: PiaiDTO[]) {
+  const out: { key: string; kind: "pia" | "review"; date: string; piaiId: string; reviewId?: string }[] = [];
+  for (const p of piais) {
+    out.push({ key: `p-${p.id}`, kind: "pia", date: p.date, piaiId: p.id });
+    for (const r of p.reviews) {
+      if (r.date) out.push({ key: `r-${r.id}`, kind: "review", date: r.date, piaiId: p.id, reviewId: r.id });
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date) || (a.kind === "pia" ? -1 : 1));
 }
 
 // ─── Nuevo PIAI ──────────────────────────────────────────────────────────────

@@ -132,4 +132,29 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Mano al pasar por encima de cualquier cosa que se pueda pulsar (Tailwind
+     v4 ya no lo pone por defecto en los botones). Va en "base", así que las
+     clases concretas (p. ej. cursor-grab en la agenda) siguen mandando. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="option"],
+  [role="switch"],
+  [role="checkbox"],
+  a[href],
+  summary,
+  label[for],
+  select,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="date"],
+  input[type="file"] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }

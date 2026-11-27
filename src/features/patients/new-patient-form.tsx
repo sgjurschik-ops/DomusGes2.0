@@ -350,7 +350,7 @@ export function NewPatientForm({ mode = "create" }: Props) {
               <Input id="referentPhone" {...register("referentPhone")} />
             </Field>
             {isDayCenterForm && (
-              <Field label="Referente" error={errors.referent?.message}>
+              <Field label="Referente técnico/a" error={errors.referent?.message}>
                 <Input id="referent" {...register("referent")} />
               </Field>
             )}

@@ -7,6 +7,7 @@ import {
   PIAI_GENERAL_FIELDS,
   PIAI_SECTIONS,
   PIAI_STATUSES,
+  PIAI_REVIEW_RESULTS,
   safeJsonObject,
   type PiaiDTO,
   type PiaiGeneral,
@@ -117,25 +118,25 @@ export function cleanGeneralObjectives(v: unknown): PiaiGeneralObjective[] {
 
 export function cleanReviews(v: unknown): PiaiReview[] {
   if (!Array.isArray(v)) return [];
-  return v.slice(0, 30).map((r, i) => {
+  return v.slice(0, 40).map((r, i) => {
     const x = (r && typeof r === "object" ? r : {}) as Record<string, unknown>;
-    const objectives = Array.isArray(x.objectives) ? x.objectives : [];
+    // Formato antiguo (objetivos con acciones): se convierte a la lista de
+    // objetivos revisados, sin resultado marcado.
+    const rawItems = Array.isArray(x.items) ? x.items : Array.isArray(x.objectives) ? x.objectives : [];
     return {
       id: str(x.id, 60) || `rv-${i}`,
       date: str(x.date, 20),
       meetingDate: str(x.meetingDate, 20),
       comments: str(x.comments),
-      objectives: objectives.slice(0, 30).map((o, j) => {
+      items: rawItems.slice(0, 40).map((o, j) => {
         const y = (o && typeof o === "object" ? o : {}) as Record<string, unknown>;
-        const actions = Array.isArray(y.actions) ? y.actions : [];
+        const result = str(y.result, 40) ?? "";
         return {
-          id: str(y.id, 60) || `ro-${j}`,
+          id: str(y.id, 60) || `ri-${j}`,
+          objectiveId: str(y.objectiveId, 60),
           text: str(y.text, 2000) ?? "",
-          modifications: str(y.modifications, 4000),
-          actions: actions.slice(0, 20).map((a, k) => {
-            const z = (a && typeof a === "object" ? a : {}) as Record<string, unknown>;
-            return { id: str(z.id, 60) || `ra-${k}`, text: str(z.text, 2000) ?? "", status: str(z.status, 40) ?? "Pendiente" };
-          }),
+          result: (PIAI_REVIEW_RESULTS as readonly string[]).includes(result) ? result : "",
+          comment: str(y.comment, 4000) ?? str(y.modifications, 4000),
         };
       }),
     };

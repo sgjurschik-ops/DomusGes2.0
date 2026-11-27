@@ -109,21 +109,29 @@ export function piaiSectionDef(key: string): PiaiSectionDef | undefined {
   return PIAI_SECTIONS.find((s) => s.key === key);
 }
 
-// ─── Revisiones ──────────────────────────────────────────────────────────────
+// ─── Revisiones de objetivos ─────────────────────────────────────────────────
+// Ciclo: PIA general una vez al año y, a los ~6 meses, una REVISIÓN DE
+// OBJETIVOS en la que solo se marca, para cada objetivo general, si se ha
+// conseguido, se mantiene o no se ha conseguido. Cada revisión queda guardada
+// con su fecha dentro de su PIA y aparece en el historial.
 
-export const PIAI_ACTION_STATUSES = ["Pendiente", "En curso", "Conseguido", "No conseguido"] as const;
+export const PIAI_REVIEW_RESULTS = ["Conseguido", "Se mantiene", "No conseguido"] as const;
+export type PiaiReviewResult = (typeof PIAI_REVIEW_RESULTS)[number];
+
+export interface PiaiReviewItem {
+  id: string;
+  objectiveId?: string; // id del objetivo general revisado
+  text: string; // texto del objetivo en el momento de la revisión
+  result: string; // "" = sin marcar | PIAI_REVIEW_RESULTS
+  comment?: string;
+}
 
 export interface PiaiReview {
   id: string;
   date?: string;
   meetingDate?: string;
   comments?: string;
-  objectives: {
-    id: string;
-    text: string;
-    modifications?: string;
-    actions: { id: string; text: string; status: string }[];
-  }[];
+  items: PiaiReviewItem[];
 }
 
 // ─── DTO ─────────────────────────────────────────────────────────────────────
