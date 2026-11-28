@@ -55,6 +55,7 @@ import { OccupationalProfileTab, getProfileCompletion } from "./occupational-pro
 import { InterventionPlanTab } from "./intervention-plan-tab";
 import { EvaluationTab } from "./evaluation-tab";
 import { PiaiTab } from "./piai-tab";
+import { CareGuideTab } from "./care-guide-tab";
 import { PIAI_SECTIONS, type PiaiDTO } from "@/lib/piai";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ListPlus, EyeOff, Lock, ChevronDown, ChevronRight, ChevronUp, Flag, ClipboardPen } from "lucide-react";
@@ -415,6 +416,7 @@ export function PatientDetailView() {
           {!isAdmin && <TabSep />}
           {!isAdmin && showOccupationalProfile && <TabsTrigger value="occupational-profile" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "Historia de Vida" : "Perfil ocupacional"}</TabsTrigger>}
           {!isAdmin && <TabsTrigger value="intervention-plan" className={cn(TAB_BASE, TAB_DOC)}>{isDayCenter ? "PIAI" : "Plan de intervención"}</TabsTrigger>}
+          {!isAdmin && isDayCenter && <TabsTrigger value="care-guide" className={cn(TAB_BASE, TAB_DOC)}>Guía de cuidados</TabsTrigger>}
         </TabsList>
 
         {/* Overview */}
@@ -788,6 +790,11 @@ export function PatientDetailView() {
   {/* Centro de día: el PIAI de equipo (los objetivos de TO del plan van
       dentro, en su apartado). Resto: el Plan de intervención de siempre. */}
   {isDayCenter ? <PiaiTab patientId={patient.id} referent={patient.referent} careTeamReferent={patient.careTeamReferent} /> : <InterventionPlanTab patientId={patient.id} />}
+</TabsContent>}
+
+{/* Guía de cuidados — solo Centro de día */}
+{!isAdmin && isDayCenter && <TabsContent value="care-guide" className="mt-3">
+  <CareGuideTab patientId={patient.id} patientName={patient.fullName} referent={patient.referent} careTeamReferent={patient.careTeamReferent} />
 </TabsContent>}
 
         {/* Assessments — hidden for admin */}
