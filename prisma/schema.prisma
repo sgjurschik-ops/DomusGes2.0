@@ -43,7 +43,6 @@ model Professional {
   tasks            Task[]
   evaluations      PatientEvaluation[]
   piais            Piai[]
-  careGuidesUpdated CareGuide[]
 
   @@index([isActive])
 }
@@ -93,7 +92,6 @@ model Patient {
   evaluations   PatientEvaluation[]
   piais         Piai[]
   occupationalProfile OccupationalProfile?
-  careGuide     CareGuide?
 
   @@index([status])
   @@index([specialty])
@@ -477,18 +475,4 @@ model PiaiSection {
   piai Piai @relation(fields: [piaiId], references: [id], onDelete: Cascade)
 
   @@unique([piaiId, sectionKey])
-}
-
-// Guía de cuidados (Centro de día): una por usuario/a, siempre la vigente.
-// "data" es JSON con la forma de CareGuideData (src/lib/care-guide.ts).
-model CareGuide {
-  id          String   @id @default(cuid())
-  patientId   String   @unique
-  data        String   @default("{}")
-  updatedById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  patient     Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  updatedBy   Professional? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 }
