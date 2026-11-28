@@ -15,7 +15,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { SpecialtyAvatar, SpecialtyBadge, formatRelative } from "@/components/domain";
+import { CategoryAvatar, SpecialtyCode, SpecialtyBadge, formatRelative } from "@/components/domain";
 import { Search, Plus, Users, AlertTriangle, SlidersHorizontal, X, ArrowUp, ArrowDown, FileDown, ShieldCheck } from "lucide-react";
 import { VisitsExportDialog } from "./visits-export-dialog";
 import type { Specialty, PatientStatus, PatientDTO } from "@/types/domain";
@@ -76,15 +76,26 @@ function isStaleVisit(iso: string | null): boolean {
   return diffDays > STALE_VISIT_DAYS;
 }
 
-// Línea secundaria gris bajo el nombre: especialidad · clasificación/recurso ·
-// estado. Sustituye a las antiguas pastillas de colores para que el listado
-// se vea más sobrio; el color del profesional queda solo en el avatar.
-function patientSubtitle(p: PatientDTO, opts: { showResource: boolean; showEmCategory: boolean }): string {
-  const parts: string[] = [p.specialty];
-  if (opts.showResource && p.resource) parts.push(p.resource);
-  if (opts.showEmCategory && p.emCategory) parts.push(p.emCategory);
+// Línea secundaria gris bajo el nombre: sigla de la especialidad (en su
+// color) · recurso/clasificación · estado. El color del avatar indica la
+// clasificación (Centro de día / Asociación).
+function PatientSubtitle({ p, showResource, showEmCategory }: { p: PatientDTO; showResource: boolean; showEmCategory: boolean }) {
+  const parts: string[] = [];
+  if (showResource && p.resource) parts.push(p.resource);
+  if (showEmCategory && p.emCategory) parts.push(p.emCategory);
   if (p.status !== "Activo") parts.push(p.status);
-  return parts.join(" · ");
+  return (
+    <>
+      <SpecialtyCode specialty={p.specialty} />
+      {parts.length > 0 && <> · {parts.join(" · ")}</>}
+      {showResource && !p.resource && (
+        <>
+          {" · "}
+          <MissingResource />
+        </>
+      )}
+    </>
+  );
 }
 
 // Avisos en texto ámbar discreto (sin pastilla). Muestra los dos primeros y
@@ -481,20 +492,14 @@ export function PatientsListView() {
                     >
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3.5 min-w-0">
-                          <SpecialtyAvatar name={p.fullName} specialty={p.specialty} size={36} />
+                          <CategoryAvatar name={p.fullName} category={p.emCategory} size={36} />
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <p className="font-medium truncate">{p.fullName}</p>
                               {p.resource === "Asociación EM" && p.informedConsent && <ConsentIcon />}
                             </div>
                             <p className="text-xs text-muted-foreground truncate mt-0.5">
-                              {patientSubtitle(p, { showResource: !activeResource, showEmCategory: isEM })}
-                              {!activeResource && !p.resource && (
-                                <>
-                                  {" · "}
-                                  <MissingResource />
-                                </>
-                              )}
+                              <PatientSubtitle p={p} showResource={!activeResource} showEmCategory={isEM} />
                             </p>
                           </div>
                         </div>
@@ -532,20 +537,14 @@ export function PatientsListView() {
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <SpecialtyAvatar name={p.fullName} specialty={p.specialty} size={44} />
+                  <CategoryAvatar name={p.fullName} category={p.emCategory} size={44} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="font-semibold text-sm truncate">{p.fullName}</p>
                       {p.resource === "Asociación EM" && p.informedConsent && <ConsentIcon />}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {patientSubtitle(p, { showResource: !activeResource, showEmCategory: isEM })}
-                      {!activeResource && !p.resource && (
-                        <>
-                          {" · "}
-                          <MissingResource />
-                        </>
-                      )}
+                      <PatientSubtitle p={p} showResource={!activeResource} showEmCategory={isEM} />
                     </p>
                     <AlertsText alerts={p.alerts ?? []} className="mt-1" />
                   </div>

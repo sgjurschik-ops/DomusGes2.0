@@ -61,10 +61,7 @@ export function SpecialtyBadge({
   );
 }
 
-// Tono de cada especialidad para el AVATAR del listado: fondo pastel suave y
-// texto oscuro del mismo color. Es el único sitio del listado donde se usa el
-// color del profesional, para que la tabla se vea sobria pero se distinga de
-// un vistazo a quién atiende cada profesional.
+// Color de cada especialidad para su sigla en el listado (fg) y fondos suaves (bg).
 const SPECIALTY_AVATAR_TONES: Record<Specialty, { fg: string; bg: string }> = {
   Fisioterapia: { fg: "#2f6b45", bg: "#e4f1e8" },
   Psicología: { fg: "#5b3bb0", bg: "#ece7fa" },
@@ -86,27 +83,18 @@ function initialsOf(name: string): string {
     .join("");
 }
 
-// Avatar con el color suave de la especialidad (listado de usuarios/as).
-export function SpecialtyAvatar({
-  name,
-  specialty,
-  size = 36,
-  className,
-}: {
-  name: string;
-  specialty: Specialty;
-  size?: number;
-  className?: string;
-}) {
-  const tone = SPECIALTY_AVATAR_TONES[specialty] ?? { fg: "#475569", bg: "#eef0f2" };
+// Sigla de la especialidad en su color, sin fondo (p. ej. "TO" en cobre).
+// Es el toque de color del profesional en el listado; el nombre completo
+// aparece al pasar el ratón.
+export function SpecialtyCode({ specialty, className }: { specialty: Specialty; className?: string }) {
+  const tone = SPECIALTY_AVATAR_TONES[specialty];
   return (
     <span
       title={specialty}
-      className={cn("inline-flex items-center justify-center rounded-full font-semibold shrink-0", className)}
-      style={{ backgroundColor: tone.bg, color: tone.fg, width: size, height: size, fontSize: Math.round(size * 0.34) }}
-      aria-hidden
+      className={cn("font-semibold tracking-wide", className)}
+      style={{ color: tone?.fg }}
     >
-      {initialsOf(name)}
+      {SPECIALTY_ABBR[specialty]}
     </span>
   );
 }
@@ -186,6 +174,39 @@ export const UNCLASSIFIED_AVATAR_COLOR = "#64748b";
 // Devuelve el color de avatar que corresponde a una clasificación EM.
 export function emCategoryAvatarColor(category: string | null | undefined): string {
   return (category && EM_CATEGORY_AVATAR_COLORS[category]) || UNCLASSIFIED_AVATAR_COLOR;
+}
+
+// Versión suave (fondo pastel + iniciales en color) para el listado de
+// usuarios/as: distingue Centro de día y Asociación de un vistazo.
+//   Centro de día → burdeos   |   Asociación → azul verdoso   |   resto → gris
+const EM_CATEGORY_AVATAR_TONES: Record<string, { fg: string; bg: string }> = {
+  "Centro de día": { fg: "#8a2846", bg: "#f6e3ea" },
+  "Asociación": { fg: "#0f6b63", bg: "#dcefec" },
+};
+const UNCLASSIFIED_AVATAR_TONE = { fg: "#475569", bg: "#eceff2" };
+
+export function CategoryAvatar({
+  name,
+  category,
+  size = 36,
+  className,
+}: {
+  name: string;
+  category: string | null | undefined;
+  size?: number;
+  className?: string;
+}) {
+  const tone = (category && EM_CATEGORY_AVATAR_TONES[category]) || UNCLASSIFIED_AVATAR_TONE;
+  return (
+    <span
+      title={category ?? undefined}
+      className={cn("inline-flex items-center justify-center rounded-full font-semibold shrink-0", className)}
+      style={{ backgroundColor: tone.bg, color: tone.fg, width: size, height: size, fontSize: Math.round(size * 0.34) }}
+      aria-hidden
+    >
+      {initialsOf(name)}
+    </span>
+  );
 }
 
 export function EmCategoryBadge({ category, className }: { category: string | null; className?: string }) {
