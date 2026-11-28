@@ -7,6 +7,14 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { loginSchema } from "@/lib/schemas";
+import { audit } from "@/lib/audit";
+
+// Tras MAX_FAILED_LOGINS contraseñas incorrectas seguidas, la cuenta queda
+// bloqueada LOCK_MINUTES minutos. Un/a administrador/a puede desbloquearla
+// antes restableciendo la contraseña.
+export const MAX_FAILED_LOGINS = 5;
+export const LOCK_MINUTES = 15;
+export const LOCKED_ERROR = "LOCKED";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt", maxAge: 60 * 60 }, // 1h — idle timeout in app-shell handles the 15-min cutoff
@@ -26,13 +34,41 @@ export const authOptions: NextAuthOptions = {
         });
         if (!parsed.success) return null;
 
-        const prof = await db.professional.findUnique({
-          where: { email: parsed.data.email.toLowerCase() },
-        });
-        if (!prof || !prof.isActive) return null;
+        const email = parsed.data.email.toLowerCase();
+        const prof = await db.professional.findUnique({ where: { email } });
+        if (!prof || !prof.isActive) {
+          await audit(prof?.id ?? null, "auth.login_failed", "Professional", prof?.id ?? null, { email, reason: prof ? "inactive" : "unknown_email" });
+          return null;
+        }
+
+        // Cuenta bloqueada temporalmente por demasiados intentos fallidos.
+        if (prof.lockedUntil && prof.lockedUntil > new Date()) {
+          await audit(prof.id, "auth.login_blocked", "Professional", prof.id);
+          throw new Error(LOCKED_ERROR);
+        }
 
         const ok = await bcrypt.compare(parsed.data.password, prof.passwordHash);
-        if (!ok) return null;
+        if (!ok) {
+          const failed = prof.failedLoginCount + 1;
+          const lock = failed >= MAX_FAILED_LOGINS;
+          await db.professional.update({
+            where: { id: prof.id },
+            data: lock
+              ? { failedLoginCount: 0, lockedUntil: new Date(Date.now() + LOCK_MINUTES * 60_000) }
+              : { failedLoginCount: failed },
+          });
+          await audit(prof.id, lock ? "auth.locked" : "auth.login_failed", "Professional", prof.id, { attempt: failed });
+          if (lock) throw new Error(LOCKED_ERROR);
+          return null;
+        }
+
+        if (prof.failedLoginCount > 0 || prof.lockedUntil) {
+          await db.professional.update({
+            where: { id: prof.id },
+            data: { failedLoginCount: 0, lockedUntil: null },
+          });
+        }
+        await audit(prof.id, "auth.login", "Professional", prof.id);
 
         return {
           id: prof.id,

@@ -23,6 +23,9 @@ model Professional {
   isAdmin      Boolean  @default(false) // legacy — use userRole instead
   userRole     String   @default("therapist") // admin | therapist | guest
   color        String   @default("#1a5c58")
+  // Bloqueo temporal tras varios intentos de inicio de sesión fallidos.
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
   joinedAt     DateTime @default(now())
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

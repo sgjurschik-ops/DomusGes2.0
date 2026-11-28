@@ -19,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     }
     await db.professional.update({
       where: { id },
-      data: { passwordHash: bcrypt.hashSync(body.password, 10) },
+      data: { passwordHash: bcrypt.hashSync(body.password, 10), failedLoginCount: 0, lockedUntil: null },
     });
     await audit(admin.id, "professional.password_reset", "Professional", id);
     return NextResponse.json({ ok: true });

@@ -39,7 +39,11 @@ export function LoginView() {
     });
     setSubmitting(false);
     if (res?.error) {
-      setServerError("Email o contraseña incorrectos.");
+      setServerError(
+        res.error === "LOCKED"
+          ? "Demasiados intentos fallidos. Por seguridad, la cuenta queda bloqueada 15 minutos. Si lo necesitas antes, pide a un/a administrador/a que restablezca tu contraseña."
+          : "Email o contraseña incorrectos.",
+      );
       return;
     }
     router.refresh();
