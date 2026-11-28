@@ -51,7 +51,8 @@ export function careIconSvg(name: CareIconName, size: number, color = "currentCo
 
 // ─── Estructura ──────────────────────────────────────────────────────────────
 
-// level  → nivel de apoyo: un solo valor, botones grandes con icono
+// level  → nivel de apoyo: uno o varios (p. ej. supervisión + guía verbal),
+//          botones grandes con icono
 // choice → una opción entre pocas (p. ej. Sí / No), botones pequeños
 // chips  → varias opciones de texto
 // tiles  → varias opciones con icono (ayudas técnicas)
@@ -249,8 +250,8 @@ export function optionIcon(f: CareFieldDef, label: string, fallback: CareIconNam
   return f.options?.find((op) => op.label === label)?.icon ?? fallback;
 }
 
-const isSingle = (k: CareFieldKind) => k === "level" || k === "choice";
-const isMulti = (k: CareFieldKind) => k === "chips" || k === "tiles" || k === "alerts";
+const isSingle = (k: CareFieldKind) => k === "choice";
+const isMulti = (k: CareFieldKind) => k === "level" || k === "chips" || k === "tiles" || k === "alerts";
 
 // Limpia lo que llega del navegador: solo apartados, campos y opciones
 // conocidos; textos recortados a un tamaño razonable.
@@ -267,8 +268,11 @@ export function cleanCareGuide(input: unknown): CareGuideData {
       const text = typeof raw.text === "string" ? raw.text.slice(0, f.kind === "text" ? 4000 : 500) : "";
       if (text.trim()) value.text = text;
       if (isSingle(f.kind) && typeof raw.sel === "string" && labels.includes(raw.sel)) value.sel = raw.sel;
-      if (isMulti(f.kind) && Array.isArray(raw.sel)) {
-        const chosen = labels.filter((l) => (raw.sel as unknown[]).includes(l));
+      // Los niveles de apoyo antes eran de una sola opción: se acepta también
+      // un texto suelto y se convierte en lista.
+      const rawSel = f.kind === "level" && typeof raw.sel === "string" ? [raw.sel] : raw.sel;
+      if (isMulti(f.kind) && Array.isArray(rawSel)) {
+        const chosen = labels.filter((l) => (rawSel as unknown[]).includes(l));
         if (chosen.length) value.sel = chosen;
       }
       if (f.kind === "alerts" && raw.details && typeof raw.details === "object") {

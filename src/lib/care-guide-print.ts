@@ -17,11 +17,14 @@ function fieldHtml(s: CareSectionDef, f: CareFieldDef, v: CareFieldValue): strin
   const sel = selList(v);
   const text = v.text?.trim() ?? "";
   switch (f.kind) {
-    case "level":
+    case "level": {
+      const lead = sel
+        .map((l) => `<span class="lvl">${careIconSvg(optionIcon(f, l, s.icon), 15, s.tone, 1.9)}<b>${esc(l)}</b></span>`)
+        .join(" + ");
+      return `${lead}${lead && text ? " " : ""}${esc(text)}`;
+    }
     case "choice": {
-      const lead = sel[0]
-        ? `<span class="lvl">${f.kind === "level" ? careIconSvg(optionIcon(f, sel[0], s.icon), 15, s.tone, 1.9) : ""}<b>${esc(sel[0])}</b></span>`
-        : "";
+      const lead = sel[0] ? `<b>${esc(sel[0])}</b>` : "";
       return `${lead}${lead && text ? " " : ""}${esc(text)}`;
     }
     case "chips":

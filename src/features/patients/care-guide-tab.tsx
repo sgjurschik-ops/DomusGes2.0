@@ -97,16 +97,17 @@ function FieldRead({ section, field, value }: { section: CareSectionDef; field: 
   const sel = selList(value);
   const text = value.text?.trim();
   if (field.kind === "level" || field.kind === "choice") {
+    const shown = field.kind === "level" ? sel : sel.slice(0, 1);
     return (
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        {sel[0] && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 font-semibold">
+        {shown.map((l) => (
+          <span key={l} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 font-semibold">
             {field.kind === "level" && (
-              <span style={{ color: section.tone }}><CareIcon name={optionIcon(field, sel[0], section.icon)} size={17} /></span>
+              <span style={{ color: section.tone }}><CareIcon name={optionIcon(field, l, section.icon)} size={17} /></span>
             )}
-            {sel[0]}
+            {l}
           </span>
-        )}
+        ))}
         {text && <span>{text}</span>}
       </div>
     );
@@ -204,12 +205,12 @@ function FieldEdit({
     picker = (
       <div className="flex flex-wrap gap-2">
         {options.map((op) => {
-          const active = sel[0] === op.label;
+          const active = sel.includes(op.label);
           return (
             <button
               key={op.label}
               type="button"
-              onClick={() => pickSingle(op.label)}
+              onClick={() => toggleMulti(op.label)}
               aria-pressed={active}
               className={cn(
                 "flex w-[108px] flex-col items-center gap-1.5 rounded-lg px-1.5 py-2.5 text-xs transition-colors",
@@ -270,6 +271,7 @@ function FieldEdit({
     <div className="flex flex-col gap-2 px-4 py-3.5 sm:flex-row sm:gap-4">
       <p className="w-[140px] shrink-0 pt-1 text-sm font-semibold">{field.label}</p>
       <div className="min-w-0 flex-1 space-y-2">
+        {field.kind === "level" && <p className="text-[11px] text-muted-foreground">Puedes marcar más de una.</p>}
         {picker}
         {field.kind === "text" ? (
           <Textarea value={text} onChange={(e) => onChange({ ...value, text: e.target.value })} placeholder={field.placeholder} rows={3} className="max-w-2xl" />
