@@ -126,7 +126,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const title = VIEW_TITLES[view] ?? "DomusGes";
+  const title = VIEW_TITLES[view] ?? "Nexo";
   const showNewPatient = view === "patients";
 
   return (

@@ -3,7 +3,7 @@
 import { signOut } from "next-auth/react";
 import {
   LayoutDashboard, Users, CalendarDays, FileText, Settings, Receipt,
-  MapPin, ClipboardList, UserCog, ChevronLeft, ChevronRight, LogOut, Activity, X,
+  MapPin, ClipboardList, UserCog, ChevronLeft, ChevronRight, LogOut, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNav } from "@/store/nav";
@@ -17,6 +17,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import type { View } from "@/types/domain";
 import { useEffect } from "react";
 import { ChevronsUpDown, Check } from "lucide-react";
+import { NexoLogo, APP_NAME, APP_TAGLINE } from "@/components/brand/nexo-logo";
 
 type UserRole = "admin" | "therapist" | "guest";
 
@@ -103,12 +104,10 @@ export function Sidebar() {
             "flex items-center gap-2.5",
             sidebarCollapsed && "lg:flex-col lg:gap-2",
           )}>
-            <div className="w-9 h-9 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shrink-0">
-              <Activity className="w-5 h-5" />
-            </div>
+            <NexoLogo size={36} />
             <div className={cn(sidebarCollapsed && "lg:hidden")}>
-              <p className="font-bold text-sm whitespace-nowrap">DomusGes</p>
-              <p className="text-[10px] text-sidebar-foreground/60 uppercase tracking-wider whitespace-nowrap">Seguimiento</p>
+              <p className="font-bold text-sm whitespace-nowrap">{APP_NAME}</p>
+              <p className="text-[10px] text-sidebar-foreground/60 uppercase tracking-wider whitespace-nowrap">{APP_TAGLINE}</p>
             </div>
 
             {sidebarCollapsed && (

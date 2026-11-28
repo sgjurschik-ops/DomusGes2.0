@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Activity, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import { NexoLogo, APP_NAME } from "@/components/brand/nexo-logo";
 import { loginSchema, type LoginInput } from "@/lib/schemas";
 
 export function LoginView() {
@@ -48,12 +49,10 @@ export function LoginView() {
     <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-gradient-to-br from-primary/10 via-background to-accent/30">
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 justify-center mb-6">
-          <div className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center">
-            <Activity className="w-7 h-7" />
-          </div>
+          <NexoLogo size={48} />
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">DomusGes</h1>
-            <p className="text-xs text-muted-foreground">Seguimiento de usuarios/as</p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">{APP_NAME}</h1>
+            <p className="text-xs text-muted-foreground">Gestión clínica multidisciplinar</p>
           </div>
         </div>
 

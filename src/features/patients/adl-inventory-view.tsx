@@ -170,7 +170,7 @@ td.sec{text-align:left;background:#eef4f3;color:#1a5c58;font-weight:700;text-tra
 <p style="margin:6px 0">${esc(data.perception) || "—"}</p>
 <div>Conclusión de autonomía: ${conclusion}</div>
 </div>
-<div class="footer">DomusGes · Inventario de AVDs · ${esc(new Date().toLocaleDateString("es-ES"))}</div>
+<div class="footer">Nexo · Inventario de AVDs · ${esc(new Date().toLocaleDateString("es-ES"))}</div>
 </body></html>`;
 }
 

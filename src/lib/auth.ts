@@ -13,7 +13,7 @@ export const authOptions: NextAuthOptions = {
   pages: { signIn: "/" }, // the SPA handles login UI at /
   providers: [
     CredentialsProvider({
-      name: "DomusGes",
+      name: "Nexo",
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Contraseña", type: "password" },

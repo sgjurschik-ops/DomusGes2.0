@@ -51,7 +51,7 @@
   --card-foreground: oklch(0.18 0.02 180);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.18 0.02 180);
-  /* DomusGes brand: #1a5c58 → oklch ≈ 0.36 0.05 180 */
+  /* Nexo (antes DomusGes) brand: #1a5c58 → oklch ≈ 0.36 0.05 180 */
   --primary: oklch(0.36 0.05 180);
   --primary-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.96 0.01 180);

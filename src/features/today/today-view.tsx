@@ -31,7 +31,7 @@ async function geocodeAddress(address: string): Promise<[number, number] | null>
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1&countrycodes=es`,
-      { headers: { "User-Agent": "DomusGes-ClinicalApp/1.0" } }
+      { headers: { "User-Agent": "Nexo-ClinicalApp/1.0" } }
     );
     const data = await res.json();
     if (data.length > 0) {

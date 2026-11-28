@@ -62,7 +62,7 @@ export function AddressSearch({
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(text)}&limit=5&countrycodes=es&addressdetails=1`,
-          { headers: { "User-Agent": "DomusGes-ClinicalApp/1.0" } }
+          { headers: { "User-Agent": "Nexo-ClinicalApp/1.0" } }
         );
         const data: NominatimResult[] = await res.json();
         setResults(data);
@@ -100,7 +100,7 @@ export function AddressSearch({
         try {
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
-            { headers: { "User-Agent": "DomusGes-ClinicalApp/1.0" } }
+            { headers: { "User-Agent": "Nexo-ClinicalApp/1.0" } }
           );
           const data = await res.json();
           if (data.display_name) {

@@ -115,7 +115,7 @@ async function buildWord(
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 280 },
-      children: [new TextRun({ text: "DomusGes · Seguimiento de usuarios/as", size: 18, color: "707070" })],
+      children: [new TextRun({ text: "Nexo · Seguimiento de usuarios/as", size: 18, color: "707070" })],
     }),
   ];
 
@@ -476,7 +476,7 @@ async function buildPdf(
   // Header
   page.drawText(pdfSafe("Informe clínico"), { x: MARGIN_PT, y, size: 20, font: fontBold });
   y -= 26;
-  page.drawText(pdfSafe("DomusGes · Seguimiento de usuarios/as"), { x: MARGIN_PT, y, size: 10, font, color: GRAY_RGB });
+  page.drawText(pdfSafe("Nexo · Seguimiento de usuarios/as"), { x: MARGIN_PT, y, size: 10, font, color: GRAY_RGB });
   y -= 28;
 
   const isFamily = data.audience === "family";

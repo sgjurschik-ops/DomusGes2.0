@@ -404,7 +404,7 @@ function CentreTab() {
               id="centre-name"
               value={centre.name}
               onChange={(e) => update("name", e.target.value)}
-              placeholder="p. ej. Centro de Rehabilitación Domus"
+              placeholder="p. ej. Centro de Rehabilitación"
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
@@ -599,7 +599,7 @@ function AccountSection() {
       <CardHeader>
         <CardTitle className="text-base">Cuenta</CardTitle>
         <CardDescription className="text-xs">
-          Acciones relacionadas con tu acceso a DomusGes.
+          Acciones relacionadas con tu acceso a Nexo.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

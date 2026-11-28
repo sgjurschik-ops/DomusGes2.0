@@ -10,11 +10,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "DomusGes — Seguimiento de usuarios/as",
+  title: "Nexo — Gestión clínica",
   description:
-    "Aplicación de seguimiento de usuarios/as para terapia ocupacional, fisioterapia y psicología domiciliaria.",
-  keywords: ["DomusGes", "terapia ocupacional", "fisioterapia", "psicología", "seguimiento usuarios"],
-  authors: [{ name: "DomusGes" }],
+    "Nexo: gestión clínica multidisciplinar y seguimiento de usuarios/as.",
+  keywords: ["Nexo", "terapia ocupacional", "fisioterapia", "psicología", "seguimiento usuarios"],
+  authors: [{ name: "Nexo" }],
 };
 
 export default function RootLayout({

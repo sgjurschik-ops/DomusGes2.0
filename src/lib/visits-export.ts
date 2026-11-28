@@ -125,7 +125,7 @@ export function buildVisitsPrintHtml(
 <h1>Seguimientos</h1>
 <div class="subtitle">${esc(meta.title ?? "")}${meta.title ? " · " : ""}Exportado ${esc(today)}</div>
 ${sections || `<p class="empty">No hay seguimientos.</p>`}
-<div class="footer">DomusGes · Exportación de seguimientos · ${esc(today)}</div>
+<div class="footer">Nexo · Exportación de seguimientos · ${esc(today)}</div>
 </body></html>`;
 }
 

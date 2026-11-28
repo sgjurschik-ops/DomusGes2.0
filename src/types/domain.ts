@@ -1,4 +1,4 @@
-// Centralized domain types for DomusGes
+// Centralized domain types for Nexo (antes DomusGes)
 // These mirror Prisma models but are decoupled so the API can evolve
 // without forcing every consumer to import @prisma/client.
 

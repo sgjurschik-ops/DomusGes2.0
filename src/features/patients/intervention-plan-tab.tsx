@@ -877,7 +877,7 @@ td.goal{text-align:left;font-weight:500}
 .footer{margin-top:24px;padding-top:12px;border-top:1px solid #ddd;font-size:11px;color:#999;text-align:center}
 @media print{body{padding:16px}button{display:none!important}}
 </style></head><body>${el.innerHTML}
-<div class="footer">DomusGes · Informe GAS · ${new Date().toLocaleDateString("es-ES")}</div>
+<div class="footer">Nexo · Informe GAS · ${new Date().toLocaleDateString("es-ES")}</div>
 </body></html>`);
     w.document.close();
     w.print();

@@ -332,7 +332,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 <!-- COVER -->
 <div class="cover-bar">
   <h1>Informe de Perfil Ocupacional</h1>
-  <p>DomusGes · Seguimiento ocupacional</p>
+  <p>Nexo · Seguimiento ocupacional</p>
 </div>
 
 <div class="patient-card">
