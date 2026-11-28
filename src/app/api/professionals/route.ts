@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { requireProfessional, requireAdmin, audit } from "@/lib/server";
 import { professionalCreateSchema } from "@/lib/schemas";
+import { randomBytes } from "crypto";
 
 export async function GET() {
   const prof = await requireProfessional();
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     : d.email!.toLowerCase();
 
   const password = (d.userRole === "guest" && !d.password)
-    ? Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 6).toUpperCase()
+    ? randomBytes(18).toString("base64url")
     : d.password!;
 
   const exists = await db.professional.findUnique({ where: { email } });

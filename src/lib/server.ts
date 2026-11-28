@@ -8,6 +8,10 @@ import type { ProfessionalDTO, AreaSummaryData } from "@/types/domain";
 import type { Prisma } from "@prisma/client";
 import { RESOURCES } from "@/lib/schemas";
 
+// El registro de auditoría vive en audit.ts; se re-exporta aquí para que las
+// rutas existentes sigan importándolo desde "@/lib/server".
+export { audit } from "@/lib/audit";
+
 export type UserRole = "admin" | "therapist" | "guest";
 
 export async function getCurrentProfessional(): Promise<ProfessionalDTO | null> {
@@ -133,30 +137,6 @@ export async function canViewPatient(prof: ProfessionalDTO, patientId: string): 
   if (prof.userRole !== "guest") return true;
   if (await isDayCenterPatient(patientId)) return true;
   return isAssignedTherapist(prof.id, patientId);
-}
-
-export async function audit(
-  professionalId: string | null,
-  action: string,
-  entityType: string,
-  entityId: string | null = null,
-  metadata: Record<string, unknown> = {},
-  ipAddress: string | null = null,
-) {
-  try {
-    await db.auditLog.create({
-      data: {
-        professionalId,
-        action,
-        entityType,
-        entityId,
-        metadata: JSON.stringify(metadata),
-        ipAddress,
-      },
-    });
-  } catch (err) {
-    console.error("[audit] failed to write log:", err);
-  }
 }
 
 export async function getPatientTimelineMap(patientIds: string[]) {
