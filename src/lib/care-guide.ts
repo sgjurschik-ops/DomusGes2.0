@@ -22,12 +22,12 @@ export const CARE_ICONS = {
   ayuda1: "<path d=\"M8 13V6.5a1.5 1.5 0 0 1 3 0V11M11 11V5a1.5 1.5 0 0 1 3 0v6M14 11V6.5a1.5 1.5 0 0 1 3 0V14c0 3.9-2.7 7-6 7-2.4 0-3.9-1.2-5.2-3.5L4 14.2a1.5 1.5 0 0 1 2.6-1.5L8 15\"></path>",
   ayuda2: "<circle cx=\"8\" cy=\"7\" r=\"2.3\"></circle><circle cx=\"16\" cy=\"7\" r=\"2.3\"></circle><path d=\"M3.5 20v-3a4.5 4.5 0 0 1 9 0v3M11.5 20v-3a4.5 4.5 0 0 1 9 0v3\"></path>",
   baston: "<path d=\"M10 21V8a3 3 0 0 1 6 0v1.5\"></path>",
-  andador: "<path d=\"M6 20V8.5h12V20M6 8.5L7.5 4h9L18 8.5M6 13.5h12\"></path><circle cx=\"6\" cy=\"20.5\" r=\"1\"></circle><circle cx=\"18\" cy=\"20.5\" r=\"1\"></circle>",
+  andador: "<path d=\"M6 21V8.5h12V21M6 8.5L7.5 4h9L18 8.5M6 13.5h12\"></path>",
   silla: "<circle cx=\"9.5\" cy=\"16\" r=\"5\"></circle><circle cx=\"18.5\" cy=\"19.5\" r=\"1.4\"></circle><path d=\"M7 3v8h7.5l2.5 6.5h2M7 11h9\"></path>",
-  vaso: "<path d=\"M5 4h4.5l2.5 3.5L14.5 4H19l-2 16H7z\"></path>",
-  plato: "<circle cx=\"12\" cy=\"13\" r=\"7.5\"></circle><circle cx=\"12\" cy=\"13\" r=\"4\"></circle><path d=\"M4.5 10.5a8 8 0 0 1 15 0\" stroke-width=\"3\"></path>",
-  antideslizante: "<rect x=\"3.5\" y=\"6\" width=\"17\" height=\"12\" rx=\"2\"></rect><circle cx=\"8\" cy=\"10\" r=\".6\"></circle><circle cx=\"12\" cy=\"10\" r=\".6\"></circle><circle cx=\"16\" cy=\"10\" r=\".6\"></circle><circle cx=\"8\" cy=\"14\" r=\".6\"></circle><circle cx=\"12\" cy=\"14\" r=\".6\"></circle><circle cx=\"16\" cy=\"14\" r=\".6\"></circle>",
-  cuchara: "<ellipse cx=\"12\" cy=\"7\" rx=\"3\" ry=\"4\"></ellipse><path d=\"M12 11v10\"></path>",
+  vaso: "<path d=\"M5 5.5h3.5L11 9l2.5-3.5H16L14.5 20h-8z\"></path><path d=\"M15.8 9.5h1.7a2 2 0 0 1 0 4h-2.2\"></path>",
+  plato: "<path d=\"M2.5 14.5h19M4.5 14.5l2 4.5h11l2-4.5\"></path><path d=\"M17 14.5V6h3v8.5\"></path><path d=\"M6.5 12c1.8-2 6.2-2 8 0\"></path>",
+  antideslizante: "<path d=\"M2.5 18l3-7h13l3 7z\"></path><ellipse cx=\"12\" cy=\"13.8\" rx=\"4.2\" ry=\"1.6\"></ellipse><path d=\"M6 16.5h.01M9 16.5h.01M15 16.5h.01M18 16.5h.01\" stroke-width=\"2.2\"></path>",
+  cuchara: "<ellipse cx=\"12\" cy=\"7.5\" rx=\"2.3\" ry=\"3.2\"></ellipse><path d=\"M12 10.7V21\"></path>",
   espesante: "<rect x=\"6.5\" y=\"7\" width=\"11\" height=\"14\" rx=\"1.5\"></rect><path d=\"M7.5 3.5h9V7h-9zM9.5 12h5M9.5 15h5\"></path>",
   absorbente: "<path d=\"M3.5 6h17l-2.5 9a6.5 6.5 0 0 1-12 0z\"></path><path d=\"M8 6v3M16 6v3\"></path>",
   barras: "<path d=\"M4 4v16\"></path><path d=\"M4 9h11a2 2 0 0 1 0 4H4\" ></path>",
@@ -42,7 +42,18 @@ export const CARE_ICONS = {
   desorientacion: "<path d=\"M4 21V3h9v18\"></path><path d=\"M13 12h8M18 9l3 3-3 3\"></path><circle cx=\"10.5\" cy=\"12\" r=\".6\"></circle>",
   crisis: "<path d=\"M13 2.5L4.5 14h7l-1 7.5L19 10h-7z\"></path>",
   diabetes: "<path d=\"M12 3s-6 7-6 11a6 6 0 0 0 12 0c0-4-6-11-6-11z\"></path><path d=\"M12 11v6M9 14h6\"></path>",
-  piel: "<path d=\"M5 15.5L15.5 5a3 3 0 0 1 4.2 4.2L9.2 19.7A3 3 0 0 1 5 15.5z\"></path><path d=\"M10 10l4 4\"></path>",} as const;
+  piel: "<path d=\"M5 15.5L15.5 5a3 3 0 0 1 4.2 4.2L9.2 19.7A3 3 0 0 1 5 15.5z\"></path><path d=\"M10 10l4 4\"></path>",  cubiertos: "<path d=\"M8.5 3v4.5a2.5 2.5 0 0 0 5 0V3M11 3v4.5\"></path><rect x=\"9\" y=\"11\" width=\"4\" height=\"10\" rx=\"2\"></rect><path d=\"M17 3c-1.5 1-2 3-2 5.5h2V21\"></path>",
+  muletas: "<path d=\"M6.5 3.5h4M8.5 3.5V21M7 10h3\"></path><path d=\"M13.5 3.5h4M15.5 3.5V21M14 10h3\"></path>",
+  rollator: "<path d=\"M6 18V5h12v13M6 11h12\"></path><path d=\"M6 5h-1.5M18 5h1.5\"></path><circle cx=\"6\" cy=\"19.5\" r=\"1.5\"></circle><circle cx=\"18\" cy=\"19.5\" r=\"1.5\"></circle>",
+  disco: "<circle cx=\"12\" cy=\"12\" r=\"8\"></circle><circle cx=\"12\" cy=\"12\" r=\"2\"></circle><path d=\"M5 7.5A8 8 0 0 1 9 4.5M9 4.5l-.5 2.5M19 16.5a8 8 0 0 1-4 3M15 19.5l.5-2.5\"></path>",
+  grua: "<path d=\"M4 21h16M6 21V4h10v4\"></path><path d=\"M12.5 8h7l-1.5 5h-4z\"></path><path d=\"M6 8l4-4\"></path>",
+  wc: "<path d=\"M6 3.5h6v6H6z\"></path><path d=\"M4.5 9.5h15a6 6 0 0 1-6 6h-1l1 5h-7l1-5.5A6 6 0 0 1 4.5 9.5z\"></path>",
+  esponja: "<rect x=\"3\" y=\"3.5\" width=\"9\" height=\"6.5\" rx=\"2.5\"></rect><path d=\"M10.5 8.5l10 12\"></path><circle cx=\"6\" cy=\"6.5\" r=\".5\"></circle><circle cx=\"9\" cy=\"6.5\" r=\".5\"></circle>",
+  calzador: "<path d=\"M9 3h5l-.5 5c-.3 2-1.5 3-1.5 5v8\"></path><path d=\"M10.5 21h3\"></path>",
+  abotonador: "<circle cx=\"8.5\" cy=\"15\" r=\"4.5\"></circle><circle cx=\"7.3\" cy=\"13.8\" r=\".6\"></circle><circle cx=\"9.7\" cy=\"16.2\" r=\".6\"></circle><path d=\"M12 11.5L20 3.5M17.5 3.5h2.5V6\"></path>",
+  zapato: "<path d=\"M3 18v-6l5-1 2 2.5h3.5L21 16v2z\"></path><path d=\"M3 20h18M9.5 15l1.8-1.8M12.5 15l1.8-1.8\"></path>",
+  calcetin: "<path d=\"M9 3h6v9l3.2 4.2A3 3 0 0 1 15.8 21H11a5 5 0 0 1-5-5v-2.5L9 11z\"></path><path d=\"M9 6h6\"></path>",
+} as const;
 export type CareIconName = keyof typeof CARE_ICONS;
 
 export function careIconSvg(name: CareIconName, size: number, color = "currentColor", strokeWidth = 1.7): string {
@@ -63,6 +74,8 @@ export type CareFieldKind = "level" | "choice" | "chips" | "tiles" | "alerts" | 
 export interface CareOption {
   label: string;
   icon?: CareIconName;
+  // Nombres antiguos de esta misma opción (guías guardadas antes de unificar).
+  aliases?: readonly string[];
 }
 
 export interface CareFieldDef {
@@ -97,7 +110,7 @@ export interface CareGuideDTO {
 
 export const ALERT_RED = "#b42318";
 
-const o = (label: string, icon?: CareIconName): CareOption => ({ label, icon });
+const o = (label: string, icon?: CareIconName, aliases?: readonly string[]): CareOption => ({ label, icon, aliases });
 
 const LEVELS: readonly CareOption[] = [
   o("Autónomo/a", "autonomo"), o("Supervisión", "supervision"), o("Guía verbal", "guiaverbal"),
@@ -139,10 +152,10 @@ export const CARE_SECTIONS: readonly CareSectionDef[] = [
       {
         key: "ayudas", label: "Ayudas técnicas", kind: "tiles",
         options: [
-          o("Bastón", "baston"), o("Muletas", "baston"), o("Andador", "andador"), o("Rollator", "andador"),
-          o("Silla de ruedas", "silla"), o("Silla eléctrica", "silla"), o("Disco giratorio"), o("Grúa"),
+          o("Bastón", "baston"), o("Muletas", "muletas"), o("Andador", "andador"), o("Rollator", "rollator"),
+          o("Silla de ruedas", "silla", ["Silla eléctrica"]), o("Disco giratorio", "disco"), o("Grúa", "grua"),
         ],
-        placeholder: "Otras / detalles (p. ej. lado izquierdo afectado)",
+        placeholder: "Otras / detalles (p. ej. silla eléctrica, lado izquierdo afectado)",
       },
       { key: "pautas", label: PAUTAS, kind: "text", placeholder: "Cómo ayudar en traslados y transferencias…" },
     ],
@@ -156,11 +169,13 @@ export const CARE_SECTIONS: readonly CareSectionDef[] = [
       {
         key: "ayudas", label: "Ayudas técnicas", kind: "tiles",
         options: [
-          o("Tope para el plato", "plato"), o("Plato con reborde", "plato"), o("Antideslizante", "antideslizante"),
-          o("Vaso con escotadura", "vaso"), o("Vaso con asas", "vaso"), o("Cuchara pequeña", "cuchara"),
-          o("Cubiertos adaptados", "cuchara"), o("Espesante", "espesante"),
+          o("Plato con tope o reborde", "plato", ["Tope para el plato", "Plato con reborde"]),
+          o("Antideslizante", "antideslizante"),
+          o("Vaso adaptado", "vaso", ["Vaso con escotadura", "Vaso con asas"]),
+          o("Cuchara pequeña", "cuchara"),
+          o("Cubiertos adaptados", "cubiertos"),
         ],
-        placeholder: "Otras",
+        placeholder: "Otras / detalles (p. ej. vaso con escotadura)",
       },
       { key: "pautas", label: PAUTAS, kind: "text", placeholder: "Ambiente, ritmo, cantidades…" },
     ],
@@ -176,7 +191,7 @@ export const CARE_SECTIONS: readonly CareSectionDef[] = [
       { key: "absorbentes", label: "Absorbentes", kind: "choice", options: [o("No"), o("Sí"), o("Solo de noche"), o("Ocasional")], placeholder: DETAIL },
       {
         key: "ayudas", label: "Ayudas técnicas", kind: "tiles",
-        options: [o("Absorbente", "absorbente"), o("Barras de apoyo", "barras"), o("Alza de WC"), o("Silla de ducha", "ducha"), o("Esponja de mango largo")],
+        options: [o("Barras de apoyo", "barras"), o("Alza de WC", "wc"), o("Silla de ducha", "ducha"), o("Esponja de mango largo", "esponja")],
         placeholder: "Otras (o «valorar»)",
       },
       { key: "pautas", label: PAUTAS, kind: "text", placeholder: "Guía verbal, qué observar…" },
@@ -188,7 +203,7 @@ export const CARE_SECTIONS: readonly CareSectionDef[] = [
       { key: "apoyos", label: "Apoyos", kind: "level", options: LEVELS, placeholder: DETAIL },
       {
         key: "ayudas", label: "Ayudas técnicas", kind: "tiles",
-        options: [o("Calzador largo"), o("Abotonador"), o("Calzado con velcro"), o("Ponemedias")],
+        options: [o("Calzador largo", "calzador"), o("Abotonador", "abotonador"), o("Calzado con velcro", "zapato"), o("Ponemedias", "calcetin")],
         placeholder: "Otras",
       },
       { key: "pautas", label: PAUTAS, kind: "text", placeholder: "Orden de las prendas, lado afectado…" },
@@ -204,7 +219,7 @@ export const CARE_SECTIONS: readonly CareSectionDef[] = [
       },
       {
         key: "ayudas", label: "Ayudas técnicas", kind: "tiles",
-        options: [o("Gafas", "gafas"), o("Audífono", "audifono"), o("Pictogramas", "pictos"), o("Tablero de comunicación", "pictos"), o("Reloj o agenda visual", "reloj")],
+        options: [o("Gafas", "gafas"), o("Audífono", "audifono"), o("Pictogramas o tablero", "pictos", ["Pictogramas", "Tablero de comunicación"]), o("Reloj o agenda visual", "reloj")],
         placeholder: "Otras (o «no precisa por el momento»)",
       },
       { key: "pautas", label: PAUTAS, kind: "text", placeholder: "Cómo comunicarse mejor con la persona…" },
@@ -264,6 +279,11 @@ export function cleanCareGuide(input: unknown): CareGuideData {
     for (const f of s.fields) {
       const raw = (sec[f.key] && typeof sec[f.key] === "object" ? sec[f.key] : {}) as Record<string, unknown>;
       const labels = (f.options ?? []).map((op) => op.label);
+      // Traduce nombres antiguos al nombre actual de la opción.
+      const canon = (x: unknown) => {
+        if (typeof x !== "string") return x;
+        return (f.options ?? []).find((op) => op.aliases?.includes(x))?.label ?? x;
+      };
       const value: CareFieldValue = {};
       const text = typeof raw.text === "string" ? raw.text.slice(0, f.kind === "text" ? 4000 : 500) : "";
       if (text.trim()) value.text = text;
@@ -272,7 +292,8 @@ export function cleanCareGuide(input: unknown): CareGuideData {
       // un texto suelto y se convierte en lista.
       const rawSel = f.kind === "level" && typeof raw.sel === "string" ? [raw.sel] : raw.sel;
       if (isMulti(f.kind) && Array.isArray(rawSel)) {
-        const chosen = labels.filter((l) => (rawSel as unknown[]).includes(l));
+        const given = rawSel.map(canon);
+        const chosen = labels.filter((l) => given.includes(l));
         if (chosen.length) value.sel = chosen;
       }
       if (f.kind === "alerts" && raw.details && typeof raw.details === "object") {
