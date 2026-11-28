@@ -15,7 +15,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Avatar, SpecialtyBadge, StatusBadge, ResourceBadge, EmCategoryBadge, emCategoryAvatarColor, formatRelative } from "@/components/domain";
+import { SpecialtyAvatar, SpecialtyBadge, formatRelative } from "@/components/domain";
 import { Search, Plus, Users, AlertTriangle, SlidersHorizontal, X, ArrowUp, ArrowDown, FileDown, ShieldCheck } from "lucide-react";
 import { VisitsExportDialog } from "./visits-export-dialog";
 import type { Specialty, PatientStatus, PatientDTO } from "@/types/domain";
@@ -74,6 +74,46 @@ function isStaleVisit(iso: string | null): boolean {
   if (!iso) return false;
   const diffDays = (Date.now() - new Date(iso).getTime()) / 86400000;
   return diffDays > STALE_VISIT_DAYS;
+}
+
+// Línea secundaria gris bajo el nombre: especialidad · clasificación/recurso ·
+// estado. Sustituye a las antiguas pastillas de colores para que el listado
+// se vea más sobrio; el color del profesional queda solo en el avatar.
+function patientSubtitle(p: PatientDTO, opts: { showResource: boolean; showEmCategory: boolean }): string {
+  const parts: string[] = [p.specialty];
+  if (opts.showResource && p.resource) parts.push(p.resource);
+  if (opts.showEmCategory && p.emCategory) parts.push(p.emCategory);
+  if (p.status !== "Activo") parts.push(p.status);
+  return parts.join(" · ");
+}
+
+// Avisos en texto ámbar discreto (sin pastilla). Muestra los dos primeros y
+// un "+N" si hay más.
+function AlertsText({ alerts, className }: { alerts: string[]; className?: string }) {
+  if (alerts.length === 0) return null;
+  const shown = alerts.slice(0, 2).join(" · ");
+  const extra = alerts.length - 2;
+  return (
+    <span className={cn("inline-flex items-start gap-1.5 text-xs text-amber-800", className)} title={alerts.join("\n")}>
+      <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0 text-amber-600" aria-hidden />
+      <span>
+        {shown}
+        {extra > 0 && <span className="text-muted-foreground"> +{extra}</span>}
+      </span>
+    </span>
+  );
+}
+
+function ConsentIcon() {
+  return (
+    <span title="Consentimiento informado firmado" className="inline-flex shrink-0">
+      <ShieldCheck className="w-4 h-4 text-emerald-700" aria-label="Consentimiento informado firmado" />
+    </span>
+  );
+}
+
+function MissingResource() {
+  return <span className="text-xs text-amber-800">Sin recurso asignado</span>;
 }
 
 function SortableHeader({
@@ -308,10 +348,14 @@ export function PatientsListView() {
               type="button"
               onClick={() => setSpecialty((prev) => (prev === s ? "Todas" : s))}
               aria-pressed={specialty === s}
-              className="rounded-[4px] transition-opacity"
-              style={{ opacity: specialty === "Todas" || specialty === s ? 1 : 0.4 }}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors",
+                specialty === s ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                specialty !== "Todas" && specialty !== s && "opacity-50",
+              )}
             >
               <SpecialtyBadge specialty={s} compact />
+              <span className="hidden sm:inline">{s}</span>
             </button>
           ))}
         </div>
@@ -390,9 +434,17 @@ export function PatientsListView() {
           <Card className="hidden lg:block overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                  <th className="text-left font-medium px-4 py-2.5">Usuario/a</th>
-                  <th className="text-left font-medium px-4 py-2.5 w-40">
+                <tr className="border-b text-xs text-muted-foreground">
+                  <th className="text-left font-medium px-5 py-3">
+                    <SortableHeader
+                      label="Usuario/a"
+                      active={sortKey === "name"}
+                      dir={sortDir}
+                      onClick={() => toggleSort("name")}
+                    />
+                  </th>
+                  <th className="text-left font-medium px-4 py-3">Avisos</th>
+                  <th className="text-left font-medium px-4 py-3 w-40">
                     <SortableHeader
                       label="Última visita"
                       active={sortKey === "lastVisit"}
@@ -400,7 +452,7 @@ export function PatientsListView() {
                       onClick={() => toggleSort("lastVisit")}
                     />
                   </th>
-                  <th className="text-left font-medium px-4 py-2.5 w-40">
+                  <th className="text-left font-medium px-5 py-3 w-40">
                     <SortableHeader
                       label="Próxima cita"
                       active={sortKey === "nextAppt"}
@@ -427,46 +479,33 @@ export function PatientsListView() {
                         }
                       }}
                     >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <Avatar name={p.fullName} color={emCategoryAvatarColor(p.emCategory)} size={36} />
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <SpecialtyAvatar name={p.fullName} specialty={p.specialty} size={36} />
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5">
                               <p className="font-medium truncate">{p.fullName}</p>
-                              <SpecialtyBadge specialty={p.specialty} compact />
-                              {p.status !== "Activo" && <StatusBadge status={p.status} />}
-                              {!activeResource && <ResourceBadge resource={p.resource} />}
-                              {isEM && <EmCategoryBadge category={p.emCategory} />}
-                              {p.resource === "Asociación EM" && p.informedConsent && (
-                                <span
-                                  title="Consentimiento informado firmado"
-                                  className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-600 shrink-0"
-                                >
-                                  <ShieldCheck className="w-3 h-3 text-white" />
-                                </span>
-                              )}
-                              {(p.alerts ?? []).slice(0, 2).map((alert) => (
-                                <span
-                                  key={alert}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-amber-100 border border-amber-300 text-amber-900 whitespace-nowrap"
-                                >
-                                  <AlertTriangle className="w-2.5 h-2.5" />
-                                  {alert}
-                                </span>
-                              ))}
-                              {(p.alerts ?? []).length > 2 && (
-                                <span className="text-[11px] text-muted-foreground">
-                                  +{(p.alerts ?? []).length - 2}
-                                </span>
-                              )}
+                              {p.resource === "Asociación EM" && p.informedConsent && <ConsentIcon />}
                             </div>
+                            <p className="text-xs text-muted-foreground truncate mt-0.5">
+                              {patientSubtitle(p, { showResource: !activeResource, showEmCategory: isEM })}
+                              {!activeResource && !p.resource && (
+                                <>
+                                  {" · "}
+                                  <MissingResource />
+                                </>
+                              )}
+                            </p>
                           </div>
                         </div>
                       </td>
-                      <td className={`px-4 py-3 whitespace-nowrap ${stale ? "text-amber-700 font-medium" : "text-muted-foreground"}`}>
+                      <td className="px-4 py-3">
+                        <AlertsText alerts={p.alerts ?? []} />
+                      </td>
+                      <td className={cn("px-4 py-3 whitespace-nowrap tabular-nums", stale ? "text-amber-700" : "text-muted-foreground")}>
                         {formatRelative(p.lastVisitDate)}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                      <td className="px-5 py-3 whitespace-nowrap tabular-nums text-muted-foreground">
                         {formatRelative(p.nextAppointmentDate)}
                       </td>
                     </tr>
@@ -493,36 +532,22 @@ export function PatientsListView() {
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <Avatar name={p.fullName} color={emCategoryAvatarColor(p.emCategory)} size={44} />
+                  <SpecialtyAvatar name={p.fullName} specialty={p.specialty} size={44} />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
                       <p className="font-semibold text-sm truncate">{p.fullName}</p>
-                      <SpecialtyBadge specialty={p.specialty} compact />
-                      {p.status !== "Activo" && <StatusBadge status={p.status} />}
-                      {!activeResource && <ResourceBadge resource={p.resource} />}
-                      {isEM && <EmCategoryBadge category={p.emCategory} />}
-                      {p.resource === "Asociación EM" && p.informedConsent && (
-                        <span
-                          title="Consentimiento informado firmado"
-                          className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-600 shrink-0"
-                        >
-                          <ShieldCheck className="w-3 h-3 text-white" />
-                        </span>
-                      )}
+                      {p.resource === "Asociación EM" && p.informedConsent && <ConsentIcon />}
                     </div>
-                    {(p.alerts ?? []).length > 0 ? (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {(p.alerts ?? []).map((alert) => (
-                          <span
-                            key={alert}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-amber-100 border border-amber-300 text-amber-900"
-                          >
-                            <AlertTriangle className="w-2.5 h-2.5" />
-                            {alert}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {patientSubtitle(p, { showResource: !activeResource, showEmCategory: isEM })}
+                      {!activeResource && !p.resource && (
+                        <>
+                          {" · "}
+                          <MissingResource />
+                        </>
+                      )}
+                    </p>
+                    <AlertsText alerts={p.alerts ?? []} className="mt-1" />
                   </div>
                   <div className="text-right hidden sm:block">
                     <p className="text-[11px] text-muted-foreground uppercase">Próxima cita</p>

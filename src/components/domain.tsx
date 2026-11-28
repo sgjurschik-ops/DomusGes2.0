@@ -61,6 +61,56 @@ export function SpecialtyBadge({
   );
 }
 
+// Tono de cada especialidad para el AVATAR del listado: fondo pastel suave y
+// texto oscuro del mismo color. Es el único sitio del listado donde se usa el
+// color del profesional, para que la tabla se vea sobria pero se distinga de
+// un vistazo a quién atiende cada profesional.
+const SPECIALTY_AVATAR_TONES: Record<Specialty, { fg: string; bg: string }> = {
+  Fisioterapia: { fg: "#2f6b45", bg: "#e4f1e8" },
+  Psicología: { fg: "#5b3bb0", bg: "#ece7fa" },
+  Neuropsicología: { fg: "#93306d", bg: "#f6e6ef" },
+  "T. Ocupacional": { fg: "#9a4612", bg: "#fbebdf" },
+  "Trabajo Social": { fg: "#1f5694", bg: "#e5eef8" },
+  "Terapeuta Petö": { fg: "#3f48ad", bg: "#e8eafb" },
+  Cuidados: { fg: "#0d6577", bg: "#e0f2f5" },
+  Logopedia: { fg: "#a12424", bg: "#f9e5e5" },
+};
+
+function initialsOf(name: string): string {
+  return name
+    .split(" ")
+    // Ignora palabras que no empiezan por letra, p. ej. "(Aranzazu)".
+    .filter((w) => /^\p{L}/u.test(w))
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+// Avatar con el color suave de la especialidad (listado de usuarios/as).
+export function SpecialtyAvatar({
+  name,
+  specialty,
+  size = 36,
+  className,
+}: {
+  name: string;
+  specialty: Specialty;
+  size?: number;
+  className?: string;
+}) {
+  const tone = SPECIALTY_AVATAR_TONES[specialty] ?? { fg: "#475569", bg: "#eef0f2" };
+  return (
+    <span
+      title={specialty}
+      className={cn("inline-flex items-center justify-center rounded-full font-semibold shrink-0", className)}
+      style={{ backgroundColor: tone.bg, color: tone.fg, width: size, height: size, fontSize: Math.round(size * 0.34) }}
+      aria-hidden
+    >
+      {initialsOf(name)}
+    </span>
+  );
+}
+
 const STATUS_STYLES: Record<PatientStatus, string> = {
   Activo: "bg-emerald-100 text-emerald-900 border-emerald-200",
   "En seguimiento": "bg-sky-100 text-sky-900 border-sky-200",
